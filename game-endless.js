@@ -18,6 +18,7 @@ let updateButtonRect = null;
 let directionalInputSequence = 0;
 let updateReady = false;
 let isRefreshingForUpdate = false;
+let hasSeenServiceWorkerController = Boolean(navigator.serviceWorker?.controller);
 const isStandalone =
   window.matchMedia("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
@@ -50,7 +51,10 @@ if ("serviceWorker" in navigator) {
       });
 
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (updateReady && !isRefreshingForUpdate) {
+        const controllerWasAlreadyPresent = hasSeenServiceWorkerController;
+        hasSeenServiceWorkerController = true;
+
+        if (controllerWasAlreadyPresent && !isRefreshingForUpdate) {
           // A fresh service worker took over while the app stayed open; prompt for a reload.
           updateReady = true;
         }
