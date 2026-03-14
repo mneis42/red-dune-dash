@@ -1,6 +1,7 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+// Runtime-only UI state for touch input, HUD effects and short-lived overlays.
 const activeTouchControls = new Map();
 const hudEffects = [];
 let jumpButtonGlow = 0;
@@ -18,6 +19,7 @@ const isStandalone =
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    // Register once and proactively re-check for updates when the app comes back into focus.
     navigator.serviceWorker.register("./service-worker.js").then((registration) => {
       registration.update().catch(() => {
         // Ignore update check failures.
@@ -36,20 +38,34 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+/**
+ * Syncs DOM classes that switch between the normal game view and the portrait helper screen.
+ */
 function syncCanvasOnlyMode() {
   const portraitMode = isPortraitMobileView();
   document.body.classList.add("canvas-only");
   document.body.classList.toggle("portrait-mode", portraitMode);
+  // Give players a short reaction window after rotating back into landscape mid-run.
   if (wasPortraitMode && !portraitMode && gameState === "playing") {
     resumeCountdownTimer = 3000;
   }
   wasPortraitMode = portraitMode;
 }
 
+/**
+ * Returns whether the mobile install CTA should be shown.
+ *
+ * @returns {boolean} True when the app runs on touch devices outside standalone mode.
+ */
 function shouldShowInstallPrompt() {
   return isTouchDevice && !isStandalone;
 }
 
+/**
+ * Detects iOS Safari-like environments that need manual "Add to Home Screen" instructions.
+ *
+ * @returns {boolean} True when the current device matches the iOS fallback path.
+ */
 function isIosInstallFallback() {
   const ua = window.navigator.userAgent;
   return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
@@ -67,6 +83,7 @@ window.addEventListener("appinstalled", () => {
 });
 
 const mobileHud = {
+  // HUD coordinates are authored against the fixed 960x540 canvas space.
   topBar: { x: 0, y: 0, w: 960, h: 44 },
   leftPad: { cx: 94, cy: 462, r: 58 },
   rightPad: { cx: 232, cy: 462, r: 58 },
@@ -175,6 +192,11 @@ let runFrameIndex = 0;
 let runFrameTimer = 0;
 let rocketSpawnTimer = 0;
 
+/**
+ * Loads the locally stored high score.
+ *
+ * @returns {number} The persisted high score or 0 when nothing valid was stored.
+ */
 function loadHighScore() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -185,6 +207,11 @@ function loadHighScore() {
   }
 }
 
+/**
+ * Persists a new high score if it exceeds the existing one.
+ *
+ * @param {number} score - Candidate score to store.
+ */
 function saveHighScore(score) {
   highScore = Math.max(highScore, score);
   try {
@@ -194,22 +221,54 @@ function saveHighScore(score) {
   }
 }
 
+/**
+ * Returns a random floating-point number within an inclusive min/exclusive max range.
+ *
+ * @param {number} min - Lower bound.
+ * @param {number} max - Upper bound.
+ * @returns {number} Random number between min and max.
+ */
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
 }
 
+/**
+ * Returns a random integer within an inclusive range.
+ *
+ * @param {number} min - Lower bound.
+ * @param {number} max - Upper bound.
+ * @returns {number} Random integer between min and max.
+ */
 function randomInt(min, max) {
   return Math.floor(randomBetween(min, max + 1));
 }
 
+/**
+ * Clamps a numeric value into a closed interval.
+ *
+ * @param {number} value - Value to clamp.
+ * @param {number} min - Lower bound.
+ * @param {number} max - Upper bound.
+ * @returns {number} Clamped value.
+ */
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+/**
+ * Checks whether the current device should be treated as a mobile portrait layout.
+ *
+ * @returns {boolean} True when a touch device is currently taller than wide.
+ */
 function isPortraitMobileView() {
   return isTouchDevice && window.innerHeight > window.innerWidth;
 }
 
+/**
+ * Attempts to enter fullscreen and lock screen orientation to landscape on supported devices.
+ *
+ * @returns {Promise<void>} Resolves once lock attempts have finished.
+ */
 async function requestLandscapeLock() {
   if (!isTouchDevice || orientationLocked) {
     return;
@@ -236,10 +295,18 @@ async function requestLandscapeLock() {
 window.addEventListener("resize", syncCanvasOnlyMode);
 window.addEventListener("orientationchange", syncCanvasOnlyMode);
 
+/**
+ * Computes the displayed total score including distance bonus.
+ *
+ * @returns {number} Current total score.
+ */
 function getTotalScore() {
   return player.score + Math.floor(Math.max(0, player.farthestX - level.spawn.x) / 12);
 }
 
+/**
+ * Updates the persisted high score when the current run beats it.
+ */
 function syncHighScore() {
   const total = getTotalScore();
   if (total > highScore) {
@@ -247,6 +314,9 @@ function syncHighScore() {
   }
 }
 
+/**
+ * Rebuilds the current left/right movement flags from active touch pointers.
+ */
 function updateTouchInputState() {
   let leftPressed = false;
   let rightPressed = false;
@@ -264,6 +334,12 @@ function updateTouchInputState() {
   keys.right = rightPressed;
 }
 
+/**
+ * Converts a pointer event from DOM coordinates into canvas space.
+ *
+ * @param {PointerEvent} event - Pointer event from the canvas.
+ * @returns {{x:number, y:number}|null} Canvas-space point or null when sizing is unavailable.
+ */
 function getCanvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
   if (!rect.width || !rect.height) {
@@ -276,6 +352,13 @@ function getCanvasPoint(event) {
   };
 }
 
+/**
+ * Checks whether a point lies inside a rectangle.
+ *
+ * @param {{x:number, y:number}} point - Point to test.
+ * @param {{x:number, y:number, w:number, h:number}} rect - Rectangle bounds.
+ * @returns {boolean} True when the point is inside the rectangle.
+ */
 function pointInRect(point, rect) {
   return (
     point.x >= rect.x &&
@@ -285,17 +368,31 @@ function pointInRect(point, rect) {
   );
 }
 
+/**
+ * Checks whether a point lies inside a circle.
+ *
+ * @param {{x:number, y:number}} point - Point to test.
+ * @param {{cx:number, cy:number, r:number}} circle - Circle bounds.
+ * @returns {boolean} True when the point is inside the circle.
+ */
 function pointInCircle(point, circle) {
   const dx = point.x - circle.cx;
   const dy = point.y - circle.cy;
   return dx * dx + dy * dy <= circle.r * circle.r;
 }
 
+/**
+ * Resolves a touch point to the corresponding in-canvas control action.
+ *
+ * @param {{x:number, y:number}|null} point - Canvas-space touch position.
+ * @returns {"left"|"right"|"jump"|"tap"|null} Detected control action.
+ */
 function getTouchAction(point) {
   if (!point) {
     return null;
   }
 
+  // Touch controls are rendered inside the canvas, so hit-testing uses canvas coordinates too.
   if (pointInCircle(point, mobileHud.leftPad)) {
     return "left";
   }
@@ -308,14 +405,40 @@ function getTouchAction(point) {
   return "tap";
 }
 
+/**
+ * Creates a platform descriptor.
+ *
+ * @param {number} x - World x-position.
+ * @param {number} y - World y-position.
+ * @param {number} w - Platform width.
+ * @param {number} h - Platform height.
+ * @param {string} kind - Platform type such as "ground" or "plate".
+ * @returns {{x:number, y:number, w:number, h:number, kind:string}} Platform object.
+ */
 function createPlatform(x, y, w, h, kind) {
   return { x, y, w, h, kind };
 }
 
+/**
+ * Creates an enemy patrol descriptor.
+ *
+ * @param {number} x - Initial x-position.
+ * @param {number} y - Initial y-position.
+ * @param {number} minX - Patrol minimum x-position.
+ * @param {number} maxX - Patrol maximum x-position.
+ * @param {number} speed - Initial horizontal speed.
+ * @returns {{x:number, y:number, w:number, h:number, minX:number, maxX:number, vx:number, alive:boolean}} Bug object.
+ */
 function createBug(x, y, minX, maxX, speed) {
   return { x, y, w: 46, h: 38, minX, maxX, vx: speed, alive: true };
 }
 
+/**
+ * Spawns a bonus rocket entering from one side of the screen.
+ *
+ * @param {boolean} fromLeft - Whether the rocket should fly in from the left.
+ * @returns {{x:number, y:number, w:number, h:number, vx:number, fromLeft:boolean, active:boolean}} Rocket object.
+ */
 function createRocket(fromLeft) {
   const w = 110;
   const h = 44;
@@ -325,6 +448,12 @@ function createRocket(fromLeft) {
   return { x, y, w, h, vx, fromLeft, active: true };
 }
 
+/**
+ * Creates a drifting background cloud descriptor.
+ *
+ * @param {number} x - Initial x-position.
+ * @returns {{x:number, y:number, w:number, h:number, vx:number, puff:number}} Cloud object.
+ */
 function createCloud(x) {
   return {
     x,
@@ -336,11 +465,26 @@ function createCloud(x) {
   };
 }
 
+/**
+ * Creates a HUD fly-to effect descriptor.
+ *
+ * @param {number} x - World x-position where the effect starts.
+ * @param {number} y - World y-position where the effect starts.
+ * @param {string} emoji - Glyph to render.
+ * @param {string|null} [color=null] - Optional solid color override for non-emoji glyphs.
+ * @returns {{x:number, y:number, emoji:string, color:string|null}} Effect object.
+ */
 function createHitEffect(x, y, emoji, color = null) {
   return { x, y, emoji, color };
 }
 
+/**
+ * Returns the current HUD section definitions, including values, hit areas and tooltip content.
+ *
+ * @returns {Array<object>} HUD stat descriptors for rendering and interaction.
+ */
 function getHudStats() {
+  // Keep HUD layout, values and tooltip metadata in one place.
   return [
     {
       key: "gems",
@@ -393,20 +537,41 @@ function getHudStats() {
   ];
 }
 
+/**
+ * Looks up a HUD stat descriptor by key.
+ *
+ * @param {string} key - HUD stat key.
+ * @returns {object|null} Matching stat descriptor or null.
+ */
 function getHudStatByKey(key) {
   return getHudStats().find((stat) => stat.key === key) ?? null;
 }
 
+/**
+ * Resolves which HUD section was clicked or tapped.
+ *
+ * @param {{x:number, y:number}} point - Canvas-space pointer position.
+ * @returns {object|null} Matching HUD section or null.
+ */
 function getHudInfoHit(point) {
   return getHudStats().find((stat) => pointInRect(point, stat.hitArea)) ?? null;
 }
 
+/**
+ * Starts a fly-to-HUD animation from world space toward a HUD stat target.
+ *
+ * @param {number} worldX - World-space x-position.
+ * @param {number} worldY - World-space y-position.
+ * @param {string} emoji - Glyph to animate.
+ * @param {string} statKey - Target HUD stat key.
+ */
 function spawnHudEmoji(worldX, worldY, emoji, statKey) {
   const targetStat = getHudStatByKey(statKey);
   if (!targetStat) {
     return;
   }
 
+  // Convert a world pickup/hit position into a lightweight fly-to-HUD animation.
   hudEffects.push({
     emoji,
     color: targetStat.key === "gems" ? "#ffe37a" : null,
@@ -419,6 +584,11 @@ function spawnHudEmoji(worldX, worldY, emoji, statKey) {
   });
 }
 
+/**
+ * Advances and removes transient HUD animation effects.
+ *
+ * @param {number} delta - Frame delta in milliseconds.
+ */
 function updateHudEffects(delta) {
   for (let i = hudEffects.length - 1; i >= 0; i -= 1) {
     hudEffects[i].t += delta;
@@ -428,6 +598,9 @@ function updateHudEffects(delta) {
   }
 }
 
+/**
+ * Draws fly-to-HUD effects above the world.
+ */
 function drawHudEffects() {
   ctx.save();
   ctx.textAlign = "center";
@@ -461,6 +634,13 @@ function drawHudEffects() {
   ctx.restore();
 }
 
+/**
+ * Wraps a text string into multiple lines that fit within a maximum width.
+ *
+ * @param {string} text - Text to wrap.
+ * @param {number} maxWidth - Maximum line width in canvas pixels.
+ * @returns {string[]} Wrapped lines.
+ */
 function wrapTextLines(text, maxWidth) {
   const words = text.split(" ");
   const lines = [];
@@ -483,11 +663,25 @@ function wrapTextLines(text, maxWidth) {
   return lines;
 }
 
+/**
+ * Removes floor hazards that overlap a horizontal span.
+ *
+ * @param {number} startX - Start of the span.
+ * @param {number} endX - End of the span.
+ */
 function removeHazardsUnderSpan(startX, endX) {
   level.hazards = level.hazards.filter((hazard) => hazard.x + hazard.w <= startX || hazard.x >= endX);
 }
 
+/**
+ * Adds an intermediate helper platform when a generated platform would otherwise be too high.
+ *
+ * @param {{x:number, y:number, w:number, h:number, kind:string}} targetPlatform - Platform that needs support.
+ * @param {number} groundY - Ground y-position of the current chunk.
+ * @returns {boolean} True when a reachable setup exists after processing.
+ */
 function ensureStepPlatform(targetPlatform, groundY) {
+  // Insert an intermediate platform whenever procedural generation creates a jump that is too tall.
   const heightDelta = groundY - targetPlatform.y;
   if (heightDelta <= 124) {
     return true;
@@ -514,7 +708,15 @@ function ensureStepPlatform(targetPlatform, groundY) {
   return true;
 }
 
+/**
+ * Checks whether a platform has at least one plausible approach from nearby support geometry.
+ *
+ * @param {{x:number, y:number, w:number, h:number, kind:string}} targetPlatform - Platform to validate.
+ * @param {{x:number, y:number, w:number, h:number, kind:string}} ground - Ground platform in the same chunk.
+ * @returns {boolean} True when the platform can be approached.
+ */
 function hasReachableApproach(targetPlatform, ground) {
+  // Reject bonus platforms that look valid geometrically but cannot be reached by the player.
   const supports = level.platforms.filter((platform) => {
     if (platform.x + platform.w < targetPlatform.x - 150) {
       return false;
@@ -533,6 +735,13 @@ function hasReachableApproach(targetPlatform, ground) {
   });
 }
 
+/**
+ * Checks whether a generated platform overlaps existing platforms with optional padding.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} candidate - Platform candidate.
+ * @param {number} [padding=18] - Extra spacing around both platforms.
+ * @returns {boolean} True when a collision is detected.
+ */
 function platformCollides(candidate, padding = 18) {
   return level.platforms.some((platform) => {
     return !(
@@ -544,10 +753,20 @@ function platformCollides(candidate, padding = 18) {
   });
 }
 
+/**
+ * Checks whether an elevated platform sits too close to the ground to be meaningful.
+ *
+ * @param {{y:number}} platform - Platform to inspect.
+ * @param {number} groundY - Ground y-position.
+ * @returns {boolean} True when the platform is too close to the ground.
+ */
 function isTooCloseToGround(platform, groundY) {
   return groundY - platform.y < 68;
 }
 
+/**
+ * Resets all procedural world state and seeds the opening section of the run.
+ */
 function initLevel() {
   level.platforms = [];
   level.hazards = [];
@@ -573,6 +792,11 @@ function initLevel() {
   generateUntil(2600);
 }
 
+/**
+ * Randomly adds a spike hazard onto a ground segment when there is enough room.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} segment - Ground platform segment.
+ */
 function addGroundHazard(segment) {
   if (segment.w < 220 || Math.random() > 0.28) {
     return;
@@ -590,6 +814,12 @@ function addGroundHazard(segment) {
   });
 }
 
+/**
+ * Finds a safe x-position for a collectible on a platform.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
+ * @returns {number|null} Safe x-position or null when none exists.
+ */
 function getSafeGemX(platform) {
   const edgePadding = 28;
   const safeZones = [{ start: platform.x + edgePadding, end: platform.x + platform.w - edgePadding }];
@@ -631,6 +861,11 @@ function getSafeGemX(platform) {
   return (bestZone.start + bestZone.end) / 2;
 }
 
+/**
+ * Places a collectible on a platform when a safe location exists.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
+ */
 function addGemOnPlatform(platform) {
   if (platform.w < 90) {
     return;
@@ -649,6 +884,11 @@ function addGemOnPlatform(platform) {
   });
 }
 
+/**
+ * Places a bug patrol on a platform when the platform is large enough.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
+ */
 function addBugOnPlatform(platform) {
   if (platform.w < 120) {
     return;
@@ -660,7 +900,11 @@ function addBugOnPlatform(platform) {
   level.bugs.push(createBug(bugX, platform.y - 38, platform.x + patrolMargin, platform.x + platform.w - patrolMargin, speed));
 }
 
+/**
+ * Generates one endless-run chunk ahead of the player, including optional hazards and bonuses.
+ */
 function generateChunk() {
+  // Endless terrain is generated one chunk ahead of the camera at a time.
   const gapWidth = randomInt(78, 122);
   const x = level.nextChunkX + gapWidth;
   const width = randomInt(180, 340);
@@ -753,12 +997,20 @@ function generateChunk() {
   level.lastGroundY = groundY;
 }
 
+/**
+ * Generates chunks until the world extends beyond a target x-position.
+ *
+ * @param {number} targetX - World x-position that must be covered.
+ */
 function generateUntil(targetX) {
   while (level.nextChunkX < targetX) {
     generateChunk();
   }
 }
 
+/**
+ * Removes far-behind world entities that can no longer affect the current run.
+ */
 function cleanupWorld() {
   const cutoffX = cameraX - 900;
   level.platforms = level.platforms.filter((platform) => platform.x + platform.w > cutoffX);
@@ -768,6 +1020,11 @@ function cleanupWorld() {
   level.rockets = level.rockets.filter((rocket) => rocket.x + rocket.w > cutoffX && rocket.x < cameraX + canvas.width + 900);
 }
 
+/**
+ * Resets the player either to the latest checkpoint or to a brand-new run.
+ *
+ * @param {boolean} [fullReset=false] - Whether to fully restart the world and score state.
+ */
 function resetPlayer(fullReset = false) {
   if (fullReset) {
     initLevel();
@@ -785,6 +1042,7 @@ function resetPlayer(fullReset = false) {
     statusMessage = "Endloslauf gestartet";
   }
 
+  // A full reset rebuilds the world; a partial reset only restores the latest safe checkpoint.
   player.x = player.checkpointX;
   player.y = player.checkpointY;
   player.vx = 0;
@@ -799,10 +1057,24 @@ function resetPlayer(fullReset = false) {
   player.visible = true;
 }
 
+/**
+ * Performs an axis-aligned rectangle overlap test.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} a - First rectangle.
+ * @param {{x:number, y:number, w:number, h:number}} b - Second rectangle.
+ * @returns {boolean} True when the rectangles overlap.
+ */
 function overlaps(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+/**
+ * Checks collision between a circle and an axis-aligned rectangle.
+ *
+ * @param {{x:number, y:number, r:number}} circle - Circle descriptor.
+ * @param {{x:number, y:number, w:number, h:number}} rect - Rectangle descriptor.
+ * @returns {boolean} True when the circle intersects the rectangle.
+ */
 function circleRectCollision(circle, rect) {
   const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
   const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
@@ -811,7 +1083,14 @@ function circleRectCollision(circle, rect) {
   return dx * dx + dy * dy < circle.r * circle.r;
 }
 
+/**
+ * Computes a safe checkpoint x-position on a ground platform.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Ground platform used as checkpoint source.
+ * @returns {number} Safe checkpoint x-position.
+ */
 function getSafeCheckpointX(platform) {
+  // Keep checkpoints away from platform edges and floor hazards to avoid death loops.
   const edgeMargin = 28;
   const respawnWidth = player.w;
   const minX = platform.x + edgeMargin;
@@ -854,7 +1133,14 @@ function getSafeCheckpointX(platform) {
   return clamp(safeX, minX, maxX);
 }
 
+/**
+ * Finds the y-position of the closest supporting ground under the player at a given x-position.
+ *
+ * @param {number} playerX - Candidate player x-position.
+ * @returns {number|null} Ground-aligned player y-position or null when unsupported.
+ */
 function getStableGroundYAt(playerX) {
+  // Hurt poses should snap to real ground instead of hovering above gaps or enemies.
   const supportingPlatforms = level.platforms.filter((platform) => {
     if (platform.kind !== "ground") {
       return false;
@@ -871,6 +1157,13 @@ function getStableGroundYAt(playerX) {
   return supportingPlatforms[0].y - player.h;
 }
 
+/**
+ * Moves a hurt pose onto stable ground while preserving the intended impact location as much as possible.
+ *
+ * @param {number} preferredX - Preferred hurt x-position.
+ * @param {number} preferredY - Preferred hurt y-position.
+ * @returns {{x:number, y:number}} Safe pose position.
+ */
 function moveToSafeInjuredPose(preferredX, preferredY) {
   const clampedX = Math.max(0, preferredX);
   const groundY = getStableGroundYAt(clampedX);
@@ -887,22 +1180,32 @@ function moveToSafeInjuredPose(preferredX, preferredY) {
   };
 }
 
+/**
+ * Advances the active checkpoint when the player reaches a suitable ground segment.
+ *
+ * @param {{x:number, y:number, w:number, h:number, kind:string}} platform - Ground platform currently supporting the player.
+ */
 function updateCheckpoint(platform) {
   if (platform.kind !== "ground") {
     return;
   }
 
+  // Only move the checkpoint once the player has clearly progressed across the current chunk.
   if (player.x > player.checkpointX + 80) {
     player.checkpointX = getSafeCheckpointX(platform);
     player.checkpointY = platform.y - player.h;
   }
 }
 
+/**
+ * Advances the simulation for player movement, collisions, pickups, enemies and camera tracking.
+ */
 function handleMovement() {
   if (gameState !== "playing" || isPortraitMobileView() || player.hurtTimer > 0 || resumeCountdownTimer > 0) {
     return;
   }
 
+  // Keep enough world generated ahead of the player so the endless run never exposes seams.
   generateUntil(cameraX + canvas.width * 3);
 
   level.clouds.forEach((cloud) => {
@@ -1082,6 +1385,11 @@ function handleMovement() {
   syncHighScore();
 }
 
+/**
+ * Advances the running animation when the tiger is moving on the ground.
+ *
+ * @param {number} delta - Frame delta in milliseconds.
+ */
 function updateAnimation(delta) {
   const movingOnGround = player.grounded && Math.abs(player.vx) > 0.35;
 
@@ -1098,6 +1406,17 @@ function updateAnimation(delta) {
   }
 }
 
+/**
+ * Applies damage, transitions into hurt/game-over states and schedules respawn behavior.
+ *
+ * @param {string} message - Status message describing the damage source.
+ * @param {object} [options={}] - Additional damage options.
+ * @param {boolean} [options.showInjured=false] - Whether to enter the injured state.
+ * @param {boolean} [options.holdPosition=false] - Whether to keep the current pose at the impact point.
+ * @param {number} [options.hitX=player.x] - Impact x-position for hurt poses.
+ * @param {number} [options.hitY=player.y] - Impact y-position for hurt poses.
+ * @param {"injured"|"attention"} [options.respawnVisual="injured"] - Respawn visual style to show during countdown.
+ */
 function loseLife(message, options = {}) {
   const {
     showInjured = false,
@@ -1114,6 +1433,7 @@ function loseLife(message, options = {}) {
   player.forceInjuredPose = showInjured;
   player.respawnVisual = respawnVisual;
 
+  // Game over freezes the last pose on screen; otherwise we enter a delayed respawn state.
   if (player.lives <= 0) {
     gameState = "lost";
     saveHighScore(getTotalScore());
@@ -1153,6 +1473,9 @@ function loseLife(message, options = {}) {
   player.y = player.checkpointY;
 }
 
+/**
+ * Draws the layered background sky, dunes, stars and clouds.
+ */
 function drawBackground() {
   const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
   sky.addColorStop(0, "#271339");
@@ -1201,6 +1524,11 @@ function drawBackground() {
   ctx.restore();
 }
 
+/**
+ * Draws a single platform segment.
+ *
+ * @param {{x:number, y:number, w:number, h:number, kind:string}} platform - Platform to render.
+ */
 function drawPlatform(platform) {
   const x = platform.x - cameraX;
   const gradient = ctx.createLinearGradient(x, platform.y, x, platform.y + platform.h);
@@ -1213,6 +1541,11 @@ function drawPlatform(platform) {
   ctx.fillRect(x, platform.y, platform.w, 6);
 }
 
+/**
+ * Draws a spike hazard.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} hazard - Hazard to render.
+ */
 function drawHazard(hazard) {
   const x = hazard.x - cameraX;
   ctx.fillStyle = "#4c170f";
@@ -1226,6 +1559,12 @@ function drawHazard(hazard) {
   }
 }
 
+/**
+ * Draws a collectible currency symbol with a small hover animation.
+ *
+ * @param {{x:number, y:number, r:number, collected:boolean}} gem - Collectible to render.
+ * @param {number} time - Current animation timestamp.
+ */
 function drawGem(gem, time) {
   if (gem.collected) {
     return;
@@ -1248,6 +1587,12 @@ function drawGem(gem, time) {
   ctx.restore();
 }
 
+/**
+ * Draws a bug enemy with a subtle idle bob.
+ *
+ * @param {{x:number, y:number, w:number, h:number, vx:number, alive:boolean}} bug - Enemy to render.
+ * @param {number} time - Current animation timestamp.
+ */
 function drawBug(bug, time) {
   if (!bug.alive) {
     return;
@@ -1272,6 +1617,11 @@ function drawBug(bug, time) {
   ctx.restore();
 }
 
+/**
+ * Draws a bonus rocket.
+ *
+ * @param {{x:number, y:number, w:number, h:number, fromLeft:boolean}} rocket - Rocket to render.
+ */
 function drawRocket(rocket) {
   const x = rocket.x - cameraX;
   const sprite = rocket.fromLeft ? sprites.rocketFromLeft : sprites.rocketFromRight;
@@ -1285,11 +1635,15 @@ function drawRocket(rocket) {
   ctx.fillRect(x, rocket.y, rocket.w, rocket.h);
 }
 
+/**
+ * Draws the player character using the current movement or hurt pose.
+ */
 function drawTiger() {
   if (!player.visible) {
     return;
   }
 
+  // Pit falls use a dedicated billboard graphic instead of drawing the tiger sprite at all.
   if (player.hurtTimer > 0 && player.respawnVisual === "attention" && gameState === "playing") {
     return;
   }
@@ -1327,6 +1681,9 @@ function drawTiger() {
   ctx.restore();
 }
 
+/**
+ * Draws the special pit-fall respawn billboard graphic during countdowns.
+ */
 function drawRespawnAttention() {
   if (player.hurtTimer <= 0 || player.respawnVisual !== "attention" || gameState !== "playing" || player.lives <= 0) {
     return;
@@ -1348,6 +1705,9 @@ function drawRespawnAttention() {
   ctx.drawImage(sprites.attentionPlease, drawX, drawY, drawWidth, drawHeight);
 }
 
+/**
+ * Draws the top HUD bar, tooltip overlays and in-canvas touch controls.
+ */
 function drawHud() {
   const stats = getHudStats();
   const leftActive = keys.left;
@@ -1384,6 +1744,7 @@ function drawHud() {
   });
 
   if (activeHudInfo) {
+    // Tooltips are rendered inside the canvas so the game stays fully self-contained.
     const stat = stats.find((entry) => entry.key === activeHudInfo);
     if (stat) {
       ctx.font = "14px Trebuchet MS";
@@ -1461,6 +1822,9 @@ function drawHud() {
   ctx.restore();
 }
 
+/**
+ * Draws the start and game-over overlay screens.
+ */
 function drawOverlay() {
   ctx.save();
   ctx.textAlign = "center";
@@ -1561,19 +1925,31 @@ function drawOverlay() {
   ctx.restore();
 }
 
+/**
+ * Placeholder portrait renderer. Portrait mode is currently handled via DOM/CSS instead.
+ */
 function drawRotateOverlay() {
   // Portrait mode is now handled via DOM/CSS with a fullscreen image.
 }
 
+/**
+ * Draws the countdown used during hurt/respawn sequences.
+ */
 function drawRespawnCountdown() {
   if (player.hurtTimer <= 0 || gameState !== "playing" || player.lives <= 0) {
     return;
   }
 
+  // Show 2 -> 1 -> 0 instead of a raw millisecond-based countdown.
   const countdown = Math.max(0, Math.ceil(player.hurtTimer / 1000) - 1);
   drawCenterCountdown(countdown);
 }
 
+/**
+ * Draws a large semi-transparent number in the center of the playfield.
+ *
+ * @param {number} countdown - Countdown number to display.
+ */
 function drawCenterCountdown(countdown) {
   if (countdown < 0) {
     return;
@@ -1591,6 +1967,9 @@ function drawCenterCountdown(countdown) {
   ctx.restore();
 }
 
+/**
+ * Draws the short countdown shown after returning from portrait mode to landscape.
+ */
 function drawResumeCountdown() {
   if (resumeCountdownTimer <= 0 || gameState !== "playing" || isPortraitMobileView()) {
     return;
@@ -1600,12 +1979,18 @@ function drawResumeCountdown() {
   drawCenterCountdown(countdown);
 }
 
+/**
+ * Renders the full frame for the current game state.
+ *
+ * @param {number} time - Current animation timestamp.
+ */
 function render(time) {
   if (isPortraitMobileView()) {
     drawRotateOverlay();
     return;
   }
 
+  // Render order matters: world first, then gameplay overlays, then HUD and modal overlays.
   drawBackground();
   level.platforms.forEach(drawPlatform);
   level.hazards.forEach(drawHazard);
@@ -1625,6 +2010,11 @@ function render(time) {
   drawHudEffects();
 }
 
+/**
+ * Main animation loop that updates simulation state and renders frames.
+ *
+ * @param {number} time - Current animation timestamp.
+ */
 function gameLoop(time) {
   const delta = time - lastTime;
   lastTime = time;
@@ -1636,6 +2026,7 @@ function gameLoop(time) {
     if (gameState === "lost") {
       player.pendingRespawn = false;
     }
+    // Delayed respawn is applied only once the countdown has finished and the run is still active.
     if (player.hurtTimer === 0 && player.pendingRespawn && gameState === "playing") {
       player.pendingRespawn = false;
       player.forceInjuredPose = false;
@@ -1655,6 +2046,9 @@ function gameLoop(time) {
   requestAnimationFrame(gameLoop);
 }
 
+/**
+ * Starts the run from the ready state or makes the tiger jump when grounded.
+ */
 function tryJump() {
   if (isPortraitMobileView()) {
     return;
@@ -1712,6 +2106,7 @@ canvas.addEventListener("pointerdown", (event) => {
   const point = getCanvasPoint(event);
   const infoHit = point ? getHudInfoHit(point) : null;
 
+  // The install CTA should win over all gameplay interactions on the start screen.
   if (point && installButtonRect && pointInRect(point, installButtonRect)) {
     event.preventDefault();
     if (deferredInstallPrompt) {
