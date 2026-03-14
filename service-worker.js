@@ -4,6 +4,7 @@ const APP_ASSETS = [
   "./index.html",
   "./styles.css",
   "./game-endless.js",
+  "./version.json",
   "./manifest.webmanifest",
   "./favicon.ico",
   "./icons/icon-128x128.png",
@@ -32,6 +33,7 @@ const NETWORK_FIRST_PATHS = new Set([
   "/index.html",
   "/styles.css",
   "/game-endless.js",
+  "/version.json",
   "/manifest.webmanifest"
 ]);
 

@@ -1,0 +1,54 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare static site
+        shell: bash
+        run: |
+          mkdir -p dist
+          rsync -av \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "dist" \
+            ./ dist/
+
+      - name: Stamp service worker cache version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_SHA::12}"
+          printf '{\n  "version": "%s"\n}\n' "${VERSION}" > dist/version.json
+          sed -i "s|^const APP_VERSION = \".*\";|const APP_VERSION = \"${VERSION}\";|" dist/game-endless.js
+          sed -i "s|^const CACHE_NAME = \".*\";|const CACHE_NAME = \"red-dune-dash-${VERSION}\";|" dist/service-worker.js
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

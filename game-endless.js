@@ -1,6 +1,7 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+const APP_VERSION = "__APP_VERSION__";
 // Runtime-only UI state for touch input, HUD effects and short-lived overlays.
 const activeTouchControls = new Map();
 const activeDirectionalInputs = new Map();
@@ -18,48 +19,16 @@ let updateButtonRect = null;
 let directionalInputSequence = 0;
 let updateReady = false;
 let isRefreshingForUpdate = false;
-let hasSeenServiceWorkerController = Boolean(navigator.serviceWorker?.controller);
 const isStandalone =
   window.matchMedia("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    checkForAppUpdate();
+
     // Register once and proactively re-check for updates when the app comes back into focus.
     navigator.serviceWorker.register("./service-worker.js").then((registration) => {
-      const watchServiceWorker = (worker) => {
-        if (!worker) {
-          return;
-        }
-
-        if (worker.state === "installed" && navigator.serviceWorker.controller) {
-          updateReady = true;
-        }
-
-        worker.addEventListener("statechange", () => {
-          if (worker.state === "installed" && navigator.serviceWorker.controller) {
-            updateReady = true;
-          }
-        });
-      };
-
-      watchServiceWorker(registration.installing);
-      watchServiceWorker(registration.waiting);
-
-      registration.addEventListener("updatefound", () => {
-        watchServiceWorker(registration.installing);
-      });
-
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        const controllerWasAlreadyPresent = hasSeenServiceWorkerController;
-        hasSeenServiceWorkerController = true;
-
-        if (controllerWasAlreadyPresent && !isRefreshingForUpdate) {
-          // A fresh service worker took over while the app stayed open; prompt for a reload.
-          updateReady = true;
-        }
-      });
-
       registration.update().catch(() => {
         // Ignore update check failures.
       });
@@ -69,11 +38,16 @@ if ("serviceWorker" in navigator) {
           registration.update().catch(() => {
             // Ignore update check failures.
           });
+          checkForAppUpdate();
         }
       });
     }).catch(() => {
       // Ignore registration failures in unsupported/local preview environments.
     });
+  });
+} else {
+  window.addEventListener("load", () => {
+    checkForAppUpdate();
   });
 }
 
@@ -111,6 +85,32 @@ function shouldShowUpdatePrompt() {
 }
 
 /**
+ * Loads the latest deployed app version descriptor and marks an update when it differs from the running build.
+ *
+ * @returns {Promise<void>} Resolves when the version check finishes.
+ */
+async function checkForAppUpdate() {
+  try {
+    const response = await fetch("./version.json", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = await response.json();
+    const version = typeof payload?.version === "string" ? payload.version.trim() : "";
+    if (!version) {
+      return;
+    }
+
+    if (version !== APP_VERSION) {
+      updateReady = true;
+    }
+  } catch {
+    // Ignore version check failures when offline or during local previews.
+  }
+}
+
+/**
  * Reloads the app so the newest service-worker-controlled assets become visible immediately.
  */
 function refreshForUpdate() {
@@ -119,6 +119,7 @@ function refreshForUpdate() {
   }
 
   isRefreshingForUpdate = true;
+  updateReady = false;
   resetDirectionalInputState();
   window.location.reload();
 }
