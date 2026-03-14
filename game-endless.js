@@ -535,7 +535,7 @@ function createRocket(fromLeft) {
   const h = 44;
   const y = randomInt(70, 170);
   const x = fromLeft ? cameraX - w - 80 : cameraX + canvas.width + 80;
-  const vx = fromLeft ? randomBetween(3.6, 4.8) : -randomBetween(3.6, 4.8);
+  const vx = fromLeft ? randomBetween(6, 12) : -randomBetween(6, 12);
   return { x, y, w, h, vx, fromLeft, active: true };
 }
 
