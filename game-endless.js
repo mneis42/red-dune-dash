@@ -7,6 +7,12 @@ let jumpButtonGlow = 0;
 let activeHudInfo = null;
 let statusMessage = "Bereit für den Start";
 let orientationLocked = false;
+let deferredInstallPrompt = null;
+let showInstallHelp = false;
+let installButtonRect = null;
+const isStandalone =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  window.navigator.standalone === true;
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -19,6 +25,26 @@ if ("serviceWorker" in navigator) {
 function syncCanvasOnlyMode() {
   document.body.classList.add("canvas-only");
 }
+
+function shouldShowInstallPrompt() {
+  return isTouchDevice && !isStandalone;
+}
+
+function isIosInstallFallback() {
+  const ua = window.navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  showInstallHelp = false;
+  installButtonRect = null;
+});
 
 const mobileHud = {
   topBar: { x: 18, y: 18, w: 924, h: 74 },
@@ -1263,6 +1289,7 @@ function drawOverlay() {
   ctx.fillStyle = "#fff6ea";
   ctx.font = "700 50px Trebuchet MS";
   if (gameState === "ready") {
+    installButtonRect = null;
     ctx.fillText("Curious Tiger: Red Dune Dash", canvas.width / 2, 150);
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
@@ -1277,7 +1304,65 @@ function drawOverlay() {
       canvas.width / 2,
       298
     );
+
+    if (shouldShowInstallPrompt()) {
+      const hintY = 344;
+      const buttonWidth = 204;
+      const buttonHeight = 44;
+      const buttonX = canvas.width / 2 - buttonWidth / 2;
+      const buttonY = 364;
+
+      ctx.font = "18px Trebuchet MS";
+      ctx.fillStyle = "rgba(255, 240, 221, 0.9)";
+      ctx.fillText(
+        deferredInstallPrompt || isIosInstallFallback()
+          ? "Installiere das Spiel fuer schnelleren Zugriff auf deinem Geraet"
+          : "Installation wird verfuegbar, sobald dein Browser sie anbietet",
+        canvas.width / 2,
+        hintY
+      );
+
+      if (deferredInstallPrompt || isIosInstallFallback()) {
+        installButtonRect = { x: buttonX, y: buttonY, w: buttonWidth, h: buttonHeight };
+        ctx.fillStyle = "rgba(255, 214, 156, 0.92)";
+        ctx.strokeStyle = "rgba(255, 247, 234, 0.75)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 18);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#4c2412";
+        ctx.font = "700 20px Trebuchet MS";
+        ctx.fillText("Als App installieren", canvas.width / 2, buttonY + 26);
+      }
+
+      if (showInstallHelp && isIosInstallFallback()) {
+        const helpWidth = 336;
+        const helpHeight = 108;
+        const helpX = canvas.width / 2 - helpWidth / 2;
+        const helpY = buttonY + 58;
+        ctx.fillStyle = "rgba(18, 12, 24, 0.96)";
+        ctx.strokeStyle = "rgba(255,255,255,0.14)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(helpX, helpY, helpWidth, helpHeight, 18);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#fff0e0";
+        ctx.font = "700 16px Trebuchet MS";
+        ctx.fillText("iPhone / iPad:", helpX + 16, helpY + 24);
+        ctx.font = "15px Trebuchet MS";
+        ctx.fillText("1. Safari Teilen-Menue oeffnen", helpX + 16, helpY + 50);
+        ctx.fillText("2. 'Zum Home-Bildschirm' waehlen", helpX + 16, helpY + 74);
+        ctx.fillText("3. Danach vom Home-Screen starten", helpX + 16, helpY + 98);
+        ctx.textAlign = "center";
+      }
+    }
   } else if (gameState === "lost") {
+    installButtonRect = null;
     ctx.fillText("Game over", canvas.width / 2, 175);
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
@@ -1410,6 +1495,19 @@ window.addEventListener("keyup", (event) => {
 canvas.addEventListener("pointerdown", (event) => {
   const point = getCanvasPoint(event);
   const infoHit = point ? getHudInfoHit(point) : null;
+
+  if (point && installButtonRect && pointInRect(point, installButtonRect)) {
+    event.preventDefault();
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.finally(() => {
+        deferredInstallPrompt = null;
+      });
+    } else if (isIosInstallFallback()) {
+      showInstallHelp = !showInstallHelp;
+    }
+    return;
+  }
 
   if (infoHit) {
     event.preventDefault();
