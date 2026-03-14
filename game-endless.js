@@ -14,7 +14,10 @@ let wasPortraitMode = false;
 let deferredInstallPrompt = null;
 let showInstallHelp = false;
 let installButtonRect = null;
+let updateButtonRect = null;
 let directionalInputSequence = 0;
+let updateReady = false;
+let isRefreshingForUpdate = false;
 const isStandalone =
   window.matchMedia("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
@@ -23,6 +26,36 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // Register once and proactively re-check for updates when the app comes back into focus.
     navigator.serviceWorker.register("./service-worker.js").then((registration) => {
+      const watchServiceWorker = (worker) => {
+        if (!worker) {
+          return;
+        }
+
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          updateReady = true;
+        }
+
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            updateReady = true;
+          }
+        });
+      };
+
+      watchServiceWorker(registration.installing);
+      watchServiceWorker(registration.waiting);
+
+      registration.addEventListener("updatefound", () => {
+        watchServiceWorker(registration.installing);
+      });
+
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (updateReady && !isRefreshingForUpdate) {
+          // A fresh service worker took over while the app stayed open; prompt for a reload.
+          updateReady = true;
+        }
+      });
+
       registration.update().catch(() => {
         // Ignore update check failures.
       });
@@ -62,6 +95,28 @@ function syncCanvasOnlyMode() {
  */
 function shouldShowInstallPrompt() {
   return isTouchDevice && !isStandalone;
+}
+
+/**
+ * Returns whether the in-app update prompt should be shown for the installed mobile PWA.
+ *
+ * @returns {boolean} True when a refreshed app version is ready to be loaded.
+ */
+function shouldShowUpdatePrompt() {
+  return isTouchDevice && isStandalone && updateReady;
+}
+
+/**
+ * Reloads the app so the newest service-worker-controlled assets become visible immediately.
+ */
+function refreshForUpdate() {
+  if (isRefreshingForUpdate) {
+    return;
+  }
+
+  isRefreshingForUpdate = true;
+  resetDirectionalInputState();
+  window.location.reload();
 }
 
 /**
@@ -1758,6 +1813,7 @@ function drawHud() {
   ctx.save();
   ctx.font = "700 18px Trebuchet MS";
   ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
 
   const panel = mobileHud.topBar;
   ctx.fillStyle = "rgba(14, 10, 18, 0.54)";
@@ -1812,6 +1868,51 @@ function drawHud() {
         ctx.fillText(line, tooltipX + 14, tooltipY + 50 + index * 22);
       });
     }
+  }
+
+  if (shouldShowUpdatePrompt()) {
+    const cardX = canvas.width - 286;
+    const cardY = panel.y + panel.h + 10;
+    const cardW = 268;
+    const cardH = 92;
+    const buttonW = 112;
+    const buttonH = 34;
+    const buttonX = cardX + cardW - buttonW - 14;
+    const buttonY = cardY + cardH - buttonH - 14;
+
+    ctx.fillStyle = "rgba(24, 17, 31, 0.95)";
+    ctx.strokeStyle = "rgba(255, 241, 220, 0.2)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff4e5";
+    ctx.font = "700 17px Trebuchet MS";
+    ctx.fillText("Update verfügbar", cardX + 16, cardY + 22);
+
+    ctx.fillStyle = "#ffd5b3";
+    ctx.font = "15px Trebuchet MS";
+    ctx.fillText("Neue Version ist bereit.", cardX + 16, cardY + 48);
+    ctx.fillText("Tippe auf Refresh.", cardX + 16, cardY + 68);
+
+    updateButtonRect = { x: buttonX, y: buttonY, w: buttonW, h: buttonH };
+    ctx.fillStyle = "rgba(255, 214, 156, 0.94)";
+    ctx.strokeStyle = "rgba(255, 246, 232, 0.78)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(buttonX, buttonY, buttonW, buttonH, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#4c2412";
+    ctx.font = "700 18px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.fillText("Refresh", buttonX + buttonW / 2, buttonY + 19);
+    ctx.textAlign = "left";
+  } else {
+    updateButtonRect = null;
   }
 
   const jumpActive = jumpButtonGlow > 0;
@@ -2157,6 +2258,12 @@ document.addEventListener("visibilitychange", () => {
 canvas.addEventListener("pointerdown", (event) => {
   const point = getCanvasPoint(event);
   const infoHit = point ? getHudInfoHit(point) : null;
+
+  if (point && updateButtonRect && pointInRect(point, updateButtonRect)) {
+    event.preventDefault();
+    refreshForUpdate();
+    return;
+  }
 
   // The install CTA should win over all gameplay interactions on the start screen.
   if (point && installButtonRect && pointInRect(point, installButtonRect)) {
