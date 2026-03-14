@@ -849,14 +849,15 @@ function platformCollides(candidate, padding = 18) {
 }
 
 /**
- * Checks whether an elevated platform sits too close to the ground to be meaningful.
+ * Checks whether an elevated platform leaves enough clearance to move underneath it.
  *
- * @param {{y:number}} platform - Platform to inspect.
+ * @param {{y:number, h:number}} platform - Platform to inspect.
  * @param {number} groundY - Ground y-position.
- * @returns {boolean} True when the platform is too close to the ground.
+ * @returns {boolean} True when the underpass would be too tight for the player.
  */
 function isTooCloseToGround(platform, groundY) {
-  return groundY - platform.y < 68;
+  const clearance = groundY - (platform.y + platform.h);
+  return clearance < player.h + 10;
 }
 
 /**
