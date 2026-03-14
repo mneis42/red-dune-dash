@@ -1,19 +1,17 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const fxLayerEl = document.getElementById("fxLayer");
-const gemCountEl = document.getElementById("gemCount");
-const lifeCountEl = document.getElementById("lifeCount");
-const scoreCountEl = document.getElementById("scoreCount");
-const highScoreCountEl = document.getElementById("highScoreCount");
-const statusTextEl = document.getElementById("statusText");
 const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 const activeTouchControls = new Map();
+const hudEffects = [];
+let jumpButtonGlow = 0;
+let activeHudInfo = null;
+let statusMessage = "Bereit für den Start";
 
 const mobileHud = {
-  topBar: { x: 18, y: 18, w: 924, h: 62 },
-  leftPad: { x: 18, y: 406, w: 138, h: 116 },
-  rightPad: { x: 172, y: 406, w: 138, h: 116 },
-  jumpPad: { x: 774, y: 388, w: 168, h: 134 },
+  topBar: { x: 18, y: 18, w: 924, h: 74 },
+  leftPad: { cx: 94, cy: 462, r: 58 },
+  rightPad: { cx: 232, cy: 462, r: 58 },
+  jumpPad: { cx: 850, cy: 450, r: 72 },
 };
 
 const STORAGE_KEY = "marsTigerHighscore";
@@ -185,18 +183,24 @@ function pointInRect(point, rect) {
   );
 }
 
+function pointInCircle(point, circle) {
+  const dx = point.x - circle.cx;
+  const dy = point.y - circle.cy;
+  return dx * dx + dy * dy <= circle.r * circle.r;
+}
+
 function getTouchAction(point) {
   if (!point) {
     return null;
   }
 
-  if (pointInRect(point, mobileHud.leftPad)) {
+  if (pointInCircle(point, mobileHud.leftPad)) {
     return "left";
   }
-  if (pointInRect(point, mobileHud.rightPad)) {
+  if (pointInCircle(point, mobileHud.rightPad)) {
     return "right";
   }
-  if (pointInRect(point, mobileHud.jumpPad)) {
+  if (pointInCircle(point, mobileHud.jumpPad)) {
     return "jump";
   }
   return "tap";
@@ -234,55 +238,116 @@ function createHitEffect(x, y, emoji) {
   return { x, y, emoji };
 }
 
-function getHudTargetPosition(targetId) {
-  const canvasRect = canvas.getBoundingClientRect();
-  const targetEl = document.getElementById(targetId);
-  if (!targetEl || canvasRect.width === 0 || canvasRect.height === 0) {
-    return null;
-  }
-
-  const layerRect = fxLayerEl.getBoundingClientRect();
-  const targetRect = targetEl.getBoundingClientRect();
-  return {
-    x: targetRect.left + targetRect.width * 0.5 - layerRect.left,
-    y: targetRect.top + targetRect.height * 0.5 - layerRect.top,
-  };
+function getHudStats() {
+  return [
+    {
+      key: "gems",
+      emoji: "💵",
+      label: "Moneten",
+      value: String(player.gems),
+      accent: "#8df28b",
+      sectionX: 30,
+      valueX: 103,
+      info: { cx: 202, cy: 41, r: 8 },
+      target: { x: 58, y: 56 },
+      tooltip: ["Jedes Dollar-Symbol erhoeht Moneten um 1.", "Zeigt alle eingesammelten Dollar-Symbole."],
+    },
+    {
+      key: "lives",
+      emoji: "🚀",
+      label: "Leben",
+      value: String(player.lives),
+      accent: "#ffd27d",
+      sectionX: 254,
+      valueX: 327,
+      info: { cx: 428, cy: 41, r: 8 },
+      target: { x: 282, y: 56 },
+      tooltip: ["Treffer und Stuerze kosten ein Leben.", "Raketen schenken dir ein Extraleben."],
+    },
+    {
+      key: "score",
+      emoji: "⭐",
+      label: "Punkte",
+      value: String(getTotalScore()),
+      accent: "#fff1b8",
+      sectionX: 478,
+      valueX: 523,
+      info: { cx: 650, cy: 41, r: 8 },
+      target: { x: 506, y: 56 },
+      tooltip: ["Dollar-Symbol: 50", "Bug besiegen: 150", "Rakete einsammeln: 250", "Distanz: laufend"],
+    },
+    {
+      key: "highscore",
+      emoji: "🏆",
+      label: "Highscore",
+      value: String(highScore),
+      accent: "#ffbc7e",
+      sectionX: 702,
+      valueX: 747,
+      info: { cx: 890, cy: 41, r: 8 },
+      target: { x: 730, y: 56 },
+      tooltip: ["Dein bester Gesamtwert.", "Wird lokal im Browser gespeichert."],
+    },
+  ];
 }
 
-function spawnHudEmoji(worldX, worldY, emoji, targetId) {
-  if (!fxLayerEl || isTouchDevice) {
+function getHudStatByKey(key) {
+  return getHudStats().find((stat) => stat.key === key) ?? null;
+}
+
+function getHudInfoHit(point) {
+  return getHudStats().find((stat) => pointInCircle(point, stat.info)) ?? null;
+}
+
+function spawnHudEmoji(worldX, worldY, emoji, statKey) {
+  const targetStat = getHudStatByKey(statKey);
+  if (!targetStat) {
     return;
   }
 
-  const target = getHudTargetPosition(targetId);
-  if (!target) {
-    return;
+  hudEffects.push({
+    emoji,
+    t: 0,
+    duration: 900,
+    startX: worldX - cameraX,
+    startY: worldY,
+    targetX: targetStat.target.x,
+    targetY: targetStat.target.y,
+  });
+}
+
+function updateHudEffects(delta) {
+  for (let i = hudEffects.length - 1; i >= 0; i -= 1) {
+    hudEffects[i].t += delta;
+    if (hudEffects[i].t >= hudEffects[i].duration) {
+      hudEffects.splice(i, 1);
+    }
   }
+}
 
-  const canvasRect = canvas.getBoundingClientRect();
-  const layerRect = fxLayerEl.getBoundingClientRect();
-  const scaleX = canvasRect.width / canvas.width;
-  const scaleY = canvasRect.height / canvas.height;
-  const startX = (worldX - cameraX) * scaleX + (canvasRect.left - layerRect.left);
-  const startY = worldY * scaleY + (canvasRect.top - layerRect.top);
-  const deltaX = target.x - startX;
-  const deltaY = target.y - startY;
+function drawHudEffects() {
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.28)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
 
-  const node = document.createElement("span");
-  node.className = "fly-emoji";
-  node.textContent = emoji;
-  node.style.left = `${startX}px`;
-  node.style.top = `${startY}px`;
-  fxLayerEl.appendChild(node);
+  hudEffects.forEach((effect) => {
+    const progress = clamp(effect.t / effect.duration, 0, 1);
+    const eased = 1 - (1 - progress) * (1 - progress);
+    const arcLift = Math.sin(progress * Math.PI) * 22;
+    const x = effect.startX + (effect.targetX - effect.startX) * eased;
+    const y = effect.startY + (effect.targetY - effect.startY) * eased - arcLift;
+    const scale = 1 - progress * 0.18;
+    const alpha = 1 - progress * 0.88;
 
-  node.animate(
-    [
-      { transform: "translate(-50%, -50%) scale(1)", opacity: 1 },
-      { transform: `translate(calc(-50% + ${deltaX * 0.45}px), calc(-50% + ${deltaY * 0.45 - 28}px)) scale(1.08)`, opacity: 1, offset: 0.55 },
-      { transform: `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(0.82)`, opacity: 0.08 },
-    ],
-    { duration: 1050, easing: "cubic-bezier(.22,.7,.1,1)", fill: "forwards" }
-  ).finished.finally(() => node.remove());
+    ctx.globalAlpha = alpha;
+    ctx.font = `${Math.round(28 * scale)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.fillText(effect.emoji, x, y);
+  });
+
+  ctx.restore();
 }
 
 function removeHazardsUnderSpan(startX, endX) {
@@ -580,9 +645,10 @@ function resetPlayer(fullReset = false) {
     player.checkpointX = level.spawn.x;
     player.checkpointY = level.spawn.y;
     gameState = "playing";
+    activeHudInfo = null;
     cameraX = 0;
     rocketSpawnTimer = 700 + randomInt(0, 320);
-    statusTextEl.textContent = "Endloslauf gestartet";
+    statusMessage = "Endloslauf gestartet";
   }
 
   player.x = player.checkpointX;
@@ -723,11 +789,11 @@ function handleMovement() {
       gem.collected = true;
       const moneyEffect = createHitEffect(gem.x, gem.y, "💵");
       const scoreEffect = createHitEffect(gem.x + 16, gem.y - 8, "⭐");
-      spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gemCount");
-      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "scoreCount");
+      spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gems");
+      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
       player.gems += 1;
       player.score += 50;
-      statusTextEl.textContent = "Moneten geborgen";
+      statusMessage = "Moneten geborgen";
     }
   });
 
@@ -750,10 +816,10 @@ function handleMovement() {
     if (stomped) {
       bug.alive = false;
       const scoreEffect = createHitEffect(bug.x + bug.w / 2, bug.y + 6, "⭐");
-      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "scoreCount");
+      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
       player.vy = -8.5;
       player.score += 150;
-      statusTextEl.textContent = "Bug besiegt. Punkte eingesackt";
+      statusMessage = "Bug besiegt. Punkte eingesackt";
       return;
     }
 
@@ -772,11 +838,11 @@ function handleMovement() {
       rocket.active = false;
       const lifeEffect = createHitEffect(rocket.x + rocket.w / 2 - 12, rocket.y + rocket.h / 2, "🚀");
       const scoreEffect = createHitEffect(rocket.x + rocket.w / 2 + 16, rocket.y + rocket.h / 2 - 10, "⭐");
-      spawnHudEmoji(lifeEffect.x, lifeEffect.y, lifeEffect.emoji, "lifeCount");
-      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "scoreCount");
+      spawnHudEmoji(lifeEffect.x, lifeEffect.y, lifeEffect.emoji, "lives");
+      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
       player.lives += 1;
       player.score += 250;
-      statusTextEl.textContent = "Rakete erwischt. Extraleben erhalten";
+      statusMessage = "Rakete erwischt. Extraleben erhalten";
     }
   });
   level.rockets = level.rockets.filter((rocket) => rocket.active);
@@ -809,13 +875,13 @@ function loseLife(message) {
   if (player.lives <= 0) {
     gameState = "lost";
     saveHighScore(getTotalScore());
-    statusTextEl.textContent = "Game over. Drücke R für einen Neustart";
+    statusMessage = "Game over. Drücke R für einen Neustart";
     player.vx = 0;
     player.vy = 0;
     return;
   }
 
-  statusTextEl.textContent = message;
+  statusMessage = message;
   player.x = player.checkpointX;
   player.y = player.checkpointY;
   player.vx = 0;
@@ -990,12 +1056,8 @@ function drawTiger() {
   ctx.restore();
 }
 
-function drawMobileHud() {
-  if (!isTouchDevice) {
-    return;
-  }
-
-  const totalScore = getTotalScore();
+function drawHud() {
+  const stats = getHudStats();
   const leftActive = keys.left;
   const rightActive = keys.right;
 
@@ -1012,58 +1074,118 @@ function drawMobileHud() {
   ctx.fill();
   ctx.stroke();
 
-  const stats = [
-    { label: "Moneten", value: player.gems, accent: "#82f07a", x: 54 },
-    { label: "Leben", value: player.lives, accent: "#ffd076", x: 278 },
-    { label: "Punkte", value: totalScore, accent: "#fff0ba", x: 486 },
-    { label: "Highscore", value: highScore, accent: "#ffb56d", x: 714 },
-  ];
-
   stats.forEach((stat) => {
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText(stat.label, stat.x, 42);
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.font = "700 16px Trebuchet MS";
+    ctx.fillText(stat.label, stat.sectionX + 28, 38);
     ctx.fillStyle = stat.accent;
+    ctx.font = `700 19px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.fillText(stat.emoji, stat.sectionX + 28, 60);
     ctx.font = "700 24px Trebuchet MS";
-    ctx.fillText(String(stat.value), stat.x, 62);
-    ctx.font = "700 18px Trebuchet MS";
-  });
+    ctx.fillText(String(stat.value), stat.valueX, 61);
 
-  const drawControl = (rect, label, active, accent) => {
-    ctx.fillStyle = active ? accent : "rgba(19, 12, 24, 0.48)";
-    ctx.strokeStyle = active ? "rgba(255, 245, 220, 0.85)" : "rgba(255,255,255,0.16)";
-    ctx.lineWidth = active ? 3 : 2;
+    ctx.fillStyle = activeHudInfo === stat.key ? "rgba(255, 201, 126, 0.95)" : "rgba(255,255,255,0.2)";
+    ctx.strokeStyle = activeHudInfo === stat.key ? "rgba(255, 241, 223, 0.9)" : "rgba(255,255,255,0.16)";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 28);
+    ctx.arc(stat.info.cx, stat.info.cy, stat.info.r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "#fff7ef";
-    ctx.font = "700 19px Trebuchet MS";
+    ctx.fillStyle = activeHudInfo === stat.key ? "#5f260d" : "rgba(255,255,255,0.9)";
+    ctx.font = "700 11px Trebuchet MS";
     ctx.textAlign = "center";
-    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+    ctx.fillText("?", stat.info.cx, stat.info.cy + 1);
+    ctx.textAlign = "left";
+  });
+
+  [241, 469, 693].forEach((x) => {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, 28);
+    ctx.lineTo(x, 88);
+    ctx.stroke();
+  });
+
+  if (statusMessage && gameState === "playing") {
+    ctx.fillStyle = "rgba(10, 7, 14, 0.44)";
+    ctx.beginPath();
+    ctx.roundRect(18, 98, 420, 32, 14);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255, 236, 214, 0.92)";
+    ctx.font = "700 15px Trebuchet MS";
+    ctx.fillText(statusMessage, 32, 119);
+  }
+
+  if (activeHudInfo) {
+    const stat = stats.find((entry) => entry.key === activeHudInfo);
+    if (stat) {
+      const lines = stat.tooltip;
+      const tooltipWidth = stat.key === "score" ? 250 : 220;
+      const tooltipX = clamp(stat.sectionX - 6, 18, canvas.width - tooltipWidth - 18);
+      const tooltipY = panel.y + panel.h + 12;
+      const tooltipHeight = 18 + lines.length * 20;
+
+      ctx.fillStyle = "rgba(18, 12, 24, 0.96)";
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#fff0e0";
+      ctx.font = "700 15px Trebuchet MS";
+      ctx.fillText(`${stat.emoji} ${stat.label}`, tooltipX + 14, tooltipY + 20);
+      ctx.font = "14px Trebuchet MS";
+      lines.forEach((line, index) => {
+        ctx.fillText(line, tooltipX + 14, tooltipY + 42 + index * 18);
+      });
+    }
+  }
+
+  const jumpActive = jumpButtonGlow > 0;
+
+  const drawControl = (circle, glyph, active, accent, glyphSize) => {
+    const glowAlpha = active ? 0.16 : 0.06;
+    const radiusBoost = active ? 8 : 0;
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${glowAlpha})`;
+    ctx.beginPath();
+    ctx.arc(circle.cx, circle.cy, circle.r + radiusBoost, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = active ? accent : "rgba(255, 255, 255, 0.24)";
+    ctx.strokeStyle = active ? "rgba(255, 255, 255, 0.48)" : "rgba(255, 255, 255, 0.24)";
+    ctx.lineWidth = active ? 4 : 3;
+    ctx.beginPath();
+    ctx.arc(circle.cx, circle.cy, circle.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = active ? "#5a2a12" : "rgba(72, 36, 18, 0.72)";
+    ctx.font = `700 ${glyphSize}px Trebuchet MS`;
+    ctx.textAlign = "center";
+    ctx.fillText(glyph, circle.cx, circle.cy + 2);
     ctx.textAlign = "left";
   };
 
-  drawControl(mobileHud.leftPad, "Links", leftActive, "rgba(206, 96, 55, 0.74)");
-  drawControl(mobileHud.rightPad, "Rechts", rightActive, "rgba(206, 96, 55, 0.74)");
-  drawControl(mobileHud.jumpPad, "Springen", false, "rgba(255, 178, 92, 0.82)");
+  if (isTouchDevice) {
+    drawControl(mobileHud.leftPad, "◀", leftActive, "rgba(255, 255, 255, 0.36)", 34);
+    drawControl(mobileHud.rightPad, "▶", rightActive, "rgba(255, 255, 255, 0.36)", 34);
+    drawControl(mobileHud.jumpPad, "▲", jumpActive, "rgba(255, 255, 255, 0.42)", 42);
 
-  if (gameState === "ready") {
-    ctx.fillStyle = "rgba(255, 244, 226, 0.92)";
-    ctx.font = "700 18px Trebuchet MS";
-    ctx.textAlign = "center";
-    ctx.fillText("Tippe auf Springen oder ins Bild zum Start", canvas.width / 2, 104);
-    ctx.textAlign = "left";
+    if (gameState === "ready") {
+      ctx.fillStyle = "rgba(255, 244, 226, 0.92)";
+      ctx.font = "700 18px Trebuchet MS";
+      ctx.textAlign = "center";
+      ctx.fillText("Tippe auf Springen oder ins Bild zum Start", canvas.width / 2, 108);
+      ctx.textAlign = "left";
+    }
   }
 
   ctx.restore();
-}
-
-function updateHud() {
-  gemCountEl.textContent = `${player.gems}`;
-  lifeCountEl.textContent = String(player.lives);
-  scoreCountEl.textContent = `${getTotalScore()}`;
-  highScoreCountEl.textContent = `${highScore}`;
 }
 
 function drawOverlay() {
@@ -1114,13 +1236,13 @@ function render(time) {
   level.bugs.forEach((bug) => drawBug(bug, time));
   level.rockets.forEach(drawRocket);
   drawTiger();
-  updateHud();
 
   if (gameState !== "playing") {
     drawOverlay();
   }
 
-  drawMobileHud();
+  drawHud();
+  drawHudEffects();
 }
 
 function gameLoop(time) {
@@ -1128,6 +1250,8 @@ function gameLoop(time) {
   lastTime = time;
 
   if (delta < 100) {
+    jumpButtonGlow = Math.max(0, jumpButtonGlow - 1);
+    updateHudEffects(delta);
     handleMovement();
     updateAnimation(delta);
   }
@@ -1139,7 +1263,7 @@ function gameLoop(time) {
 function tryJump() {
   if (gameState === "ready") {
     gameState = "playing";
-    statusTextEl.textContent = "Endloslauf gestartet";
+    statusMessage = "Endloslauf gestartet";
     player.visible = true;
     player.x = 42;
     player.y = -160;
@@ -1186,12 +1310,23 @@ window.addEventListener("keyup", (event) => {
 });
 
 canvas.addEventListener("pointerdown", (event) => {
+  const point = getCanvasPoint(event);
+  const infoHit = point ? getHudInfoHit(point) : null;
+
+  if (infoHit) {
+    event.preventDefault();
+    activeHudInfo = activeHudInfo === infoHit.key ? null : infoHit.key;
+    return;
+  }
+
+  activeHudInfo = null;
+
   if (event.pointerType === "mouse") {
     return;
   }
 
   event.preventDefault();
-  const point = getCanvasPoint(event);
+  canvas.setPointerCapture?.(event.pointerId);
   const action = getTouchAction(point);
 
   if (gameState === "lost") {
@@ -1206,11 +1341,13 @@ canvas.addEventListener("pointerdown", (event) => {
   }
 
   if (action === "jump") {
+    jumpButtonGlow = 8;
     tryJump();
     return;
   }
 
   if (gameState === "ready" || gameState === "playing") {
+    jumpButtonGlow = 8;
     tryJump();
   }
 });
@@ -1234,9 +1371,13 @@ canvas.addEventListener("pointerleave", (event) => {
   releaseTouchControl(event);
 });
 
+canvas.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+
 resetPlayer(true);
 gameState = "ready";
-statusTextEl.textContent = "Bereit für den Start";
+statusMessage = "Bereit für den Start";
 player.visible = false;
 player.x = -999;
 player.y = -999;

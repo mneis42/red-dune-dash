@@ -13,6 +13,7 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -21,6 +22,9 @@ body {
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
   color: var(--text);
   touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   background:
     radial-gradient(circle at top, rgba(255, 172, 91, 0.2), transparent 32%),
     linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
@@ -100,147 +104,9 @@ canvas {
   border-radius: 20px;
   background: linear-gradient(180deg, #261637 0%, #6f3450 45%, #cc6b44 100%);
   touch-action: none;
-}
-
-.fx-layer {
-  position: absolute;
-  inset: 0;
-  overflow: visible;
-  pointer-events: none;
-  z-index: 4;
-}
-
-.fly-emoji {
-  position: absolute;
-  left: 0;
-  top: 0;
-  font-size: 28px;
-  line-height: 1;
-  transform: translate(-50%, -50%);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
-  will-change: transform, opacity;
-}
-
-.hud {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.hud > div {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.label {
-  display: block;
-  margin-bottom: 6px;
-  color: #ffc08a;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.touch-controls {
-  display: none;
-}
-
-.info-tip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  cursor: help;
-  margin-right: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  filter: saturate(0.95);
-}
-
-.tooltip-card {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
-  transform: translateX(-50%) translateY(6px);
-  width: min(260px, 42vw);
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(20, 13, 24, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
-  color: #fff2e2;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  letter-spacing: normal;
-  text-transform: none;
-  white-space: normal;
-  text-align: left;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 140ms ease, transform 140ms ease;
-  z-index: 10;
-}
-
-.info-tip[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
-  transform: translateX(-50%) translateY(6px);
-  width: min(260px, 42vw);
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(20, 13, 24, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
-  color: #fff2e2;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  letter-spacing: normal;
-  text-transform: none;
-  white-space: normal;
-  text-align: left;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 140ms ease, transform 140ms ease;
-  z-index: 10;
-}
-
-.tooltip-card {
-  opacity: 0;
-}
-
-.info-tip[data-tooltip]:hover::after,
-.info-tip:hover .tooltip-card {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.tooltip-table table {
-  width: 100%;
-  margin-top: 8px;
-  border-collapse: collapse;
-  font-size: 0.76rem;
-}
-
-.tooltip-table td {
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.tooltip-table tr:last-child td {
-  border-bottom: 0;
-}
-
-.tooltip-table td:last-child {
-  text-align: right;
-  color: #ffd5a8;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 @media (max-width: 780px) {
@@ -267,14 +133,6 @@ canvas {
     border-radius: 0;
     background: #09060e;
     box-shadow: none;
-  }
-
-  .hud {
-    display: none;
-  }
-
-  .fx-layer {
-    inset: 0;
   }
 
   .play-area {
