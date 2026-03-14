@@ -26,24 +26,30 @@ body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   overflow: hidden;
-  background: #09060e;
+  background:
+    radial-gradient(circle at top, rgba(255, 172, 91, 0.2), transparent 32%),
+    linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
 }
 
 .game-shell {
   width: 100vw;
-  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
-  padding: 0;
+  padding: 24px;
 }
 
 .play-area {
-  width: 100vw;
-  height: 100dvh;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: #09060e;
-  box-shadow: none;
+  width: min(1240px, calc(100vw - 48px));
+  min-height: calc(100dvh - 48px);
+  margin: 0 auto;
+  padding: 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgba(255, 159, 67, 0.12), rgba(255, 95, 109, 0.08)),
+    var(--panel);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   display: grid;
   place-items: center;
 }
@@ -52,13 +58,41 @@ canvas {
   width: min(100vw, calc(100dvh * (16 / 9)));
   height: min(100dvh, calc(100vw * (9 / 16)));
   aspect-ratio: 16 / 9;
-  max-width: 100vw;
-  max-height: 100dvh;
+  max-width: 100%;
+  max-height: calc(100dvh - 84px);
   display: block;
-  border-radius: 0;
+  border-radius: 20px;
   background: linear-gradient(180deg, #261637 0%, #6f3450 45%, #cc6b44 100%);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+
+@media (max-width: 780px), (pointer: coarse) {
+  body {
+    background: #09060e;
+  }
+
+  .game-shell {
+    padding: 0;
+  }
+
+  .play-area {
+    width: 100vw;
+    min-height: 100dvh;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: #09060e;
+    box-shadow: none;
+  }
+
+  canvas {
+    width: min(100vw, calc(100dvh * (16 / 9)));
+    height: min(100dvh, calc(100vw * (9 / 16)));
+    max-width: 100vw;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
 }
