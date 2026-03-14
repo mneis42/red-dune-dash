@@ -59,7 +59,7 @@ window.addEventListener("appinstalled", () => {
 });
 
 const mobileHud = {
-  topBar: { x: 18, y: 18, w: 924, h: 74 },
+  topBar: { x: 0, y: 0, w: 960, h: 44 },
   leftPad: { cx: 94, cy: 462, r: 58 },
   rightPad: { cx: 232, cy: 462, r: 58 },
   jumpPad: { cx: 850, cy: 450, r: 72 },
@@ -328,9 +328,9 @@ function getHudStats() {
       value: String(player.gems),
       accent: "#8df28b",
       sectionX: 30,
-      valueX: 93,
-      info: { cx: 202, cy: 41, r: 8 },
-      target: { x: 58, y: 56 },
+      valueX: 70,
+      hitArea: { x: 0, y: 0, w: 241, h: 44 },
+      target: { x: 58, y: 42 },
       tooltip: ["Jedes Dollar-Symbol erhöht Moneten um 1.", "Zeigt alle eingesammelten Dollar-Symbole."],
     },
     {
@@ -340,9 +340,9 @@ function getHudStats() {
       value: String(player.lives),
       accent: "#ffd27d",
       sectionX: 254,
-      valueX: 317,
-      info: { cx: 428, cy: 41, r: 8 },
-      target: { x: 282, y: 56 },
+      valueX: 295,
+      hitArea: { x: 241, y: 0, w: 228, h: 44 },
+      target: { x: 282, y: 42 },
       tooltip: ["Treffer und Stürze kosten ein Leben.", "Raketen schenken dir ein Extraleben."],
     },
     {
@@ -352,9 +352,9 @@ function getHudStats() {
       value: String(getTotalScore()),
       accent: "#fff1b8",
       sectionX: 478,
-      valueX: 543,
-      info: { cx: 650, cy: 41, r: 8 },
-      target: { x: 506, y: 56 },
+      valueX: 518,
+      hitArea: { x: 469, y: 0, w: 224, h: 44 },
+      target: { x: 506, y: 42 },
       tooltip: ["Dollar-Symbol: 50", "Bug besiegen: 150", "Rakete einsammeln: 250", "Distanz: laufend"],
     },
     {
@@ -364,9 +364,9 @@ function getHudStats() {
       value: String(highScore),
       accent: "#ffbc7e",
       sectionX: 702,
-      valueX: 767,
-      info: { cx: 890, cy: 41, r: 8 },
-      target: { x: 730, y: 56 },
+      valueX: 742,
+      hitArea: { x: 693, y: 0, w: 267, h: 44 },
+      target: { x: 730, y: 42 },
       tooltip: ["Dein bester Gesamtwert.", "Wird lokal im Browser gespeichert."],
     },
   ];
@@ -377,7 +377,7 @@ function getHudStatByKey(key) {
 }
 
 function getHudInfoHit(point) {
-  return getHudStats().find((stat) => pointInCircle(point, stat.info)) ?? null;
+  return getHudStats().find((stat) => pointInRect(point, stat.hitArea)) ?? null;
 }
 
 function spawnHudEmoji(worldX, worldY, emoji, statKey) {
@@ -1173,53 +1173,26 @@ function drawHud() {
   ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 22);
+  ctx.rect(panel.x, panel.y, panel.w, panel.h);
   ctx.fill();
   ctx.stroke();
 
   stats.forEach((stat) => {
-    ctx.fillStyle = "rgba(255,255,255,0.72)";
-    ctx.font = "700 16px Trebuchet MS";
-    ctx.fillText(stat.label, stat.sectionX + 28, 38);
     ctx.fillStyle = stat.accent;
     ctx.font = `700 19px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
-    ctx.fillText(stat.emoji, stat.sectionX + 28, 60);
+    ctx.fillText(stat.emoji, stat.sectionX, 24);
     ctx.font = "700 24px Trebuchet MS";
-    ctx.fillText(String(stat.value), stat.valueX, 61);
-
-    ctx.fillStyle = activeHudInfo === stat.key ? "rgba(255, 201, 126, 0.95)" : "rgba(255,255,255,0.2)";
-    ctx.strokeStyle = activeHudInfo === stat.key ? "rgba(255, 241, 223, 0.9)" : "rgba(255,255,255,0.16)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(stat.info.cx, stat.info.cy, stat.info.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = activeHudInfo === stat.key ? "#5f260d" : "rgba(255,255,255,0.9)";
-    ctx.font = "700 11px Trebuchet MS";
-    ctx.textAlign = "center";
-    ctx.fillText("?", stat.info.cx, stat.info.cy + 1);
-    ctx.textAlign = "left";
+    ctx.fillText(String(stat.value), stat.valueX, 25);
   });
 
   [241, 469, 693].forEach((x) => {
     ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(x, 28);
-    ctx.lineTo(x, 88);
+    ctx.moveTo(x, 2);
+    ctx.lineTo(x, 40);
     ctx.stroke();
   });
-
-  if (statusMessage && gameState === "playing") {
-    ctx.fillStyle = "rgba(10, 7, 14, 0.44)";
-    ctx.beginPath();
-    ctx.roundRect(18, 98, 420, 32, 14);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255, 236, 214, 0.92)";
-    ctx.font = "700 15px Trebuchet MS";
-    ctx.fillText(statusMessage, 32, 119);
-  }
 
   if (activeHudInfo) {
     const stat = stats.find((entry) => entry.key === activeHudInfo);
@@ -1228,7 +1201,7 @@ function drawHud() {
       const wrappedLines = stat.tooltip.flatMap((line) => wrapTextLines(line, stat.key === "score" ? 222 : 192));
       const tooltipWidth = stat.key === "score" ? 250 : 220;
       const tooltipX = clamp(stat.sectionX - 6, 18, canvas.width - tooltipWidth - 18);
-      const tooltipY = panel.y + panel.h + 12;
+      const tooltipY = panel.y + panel.h + 8;
       const tooltipHeight = 46 + wrappedLines.length * 22;
 
       ctx.fillStyle = "rgba(18, 12, 24, 0.96)";
