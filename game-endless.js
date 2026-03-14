@@ -204,6 +204,14 @@ const world = {
   floorYMax: 474,
 };
 
+const hazardCycleConfig = {
+  exposedDuration: 2200,
+  sinkingDuration: 700,
+  hiddenDuration: 1400,
+  risingDuration: 650,
+  activeExposureThreshold: 0.55,
+};
+
 const specialEventConfig = {
   minDelay: 120_000,
   maxDelay: 600_000,
@@ -281,6 +289,7 @@ let highScore = loadHighScore();
 let cameraX = 0;
 let gameState = "ready";
 let lastTime = 0;
+let worldTimeMs = 0;
 let runFrameIndex = 0;
 let runFrameTimer = 0;
 let rocketSpawnTimer = 0;
@@ -1327,7 +1336,54 @@ function addGroundHazard(segment) {
     y: segment.y - height + 4,
     w: width,
     h: height,
+    cycleOffset: randomInt(0, 6000),
   });
+}
+
+/**
+ * Returns the current visible and dangerous portion of a spike hazard.
+ *
+ * @param {{x:number, y:number, w:number, h:number, cycleOffset?:number}} hazard - Hazard to evaluate.
+ * @param {number} [timeMs=worldTimeMs] - Elapsed game time in milliseconds.
+ * @returns {{exposure:number, active:boolean, top:number, height:number, baseY:number}} Animated hazard state.
+ */
+function getHazardState(hazard, timeMs = worldTimeMs) {
+  const totalDuration =
+    hazardCycleConfig.exposedDuration +
+    hazardCycleConfig.sinkingDuration +
+    hazardCycleConfig.hiddenDuration +
+    hazardCycleConfig.risingDuration;
+  const phaseTime = ((timeMs + (hazard.cycleOffset ?? 0)) % totalDuration + totalDuration) % totalDuration;
+
+  let exposure;
+  if (phaseTime < hazardCycleConfig.exposedDuration) {
+    exposure = 1;
+  } else if (phaseTime < hazardCycleConfig.exposedDuration + hazardCycleConfig.sinkingDuration) {
+    const sinkProgress =
+      (phaseTime - hazardCycleConfig.exposedDuration) / Math.max(1, hazardCycleConfig.sinkingDuration);
+    exposure = 1 - sinkProgress;
+  } else if (
+    phaseTime <
+    hazardCycleConfig.exposedDuration + hazardCycleConfig.sinkingDuration + hazardCycleConfig.hiddenDuration
+  ) {
+    exposure = 0;
+  } else {
+    const riseStart =
+      hazardCycleConfig.exposedDuration + hazardCycleConfig.sinkingDuration + hazardCycleConfig.hiddenDuration;
+    const riseProgress = (phaseTime - riseStart) / Math.max(1, hazardCycleConfig.risingDuration);
+    exposure = riseProgress;
+  }
+
+  const clampedExposure = clamp(exposure, 0, 1);
+  const height = hazard.h * clampedExposure;
+  const baseY = hazard.y + hazard.h;
+  return {
+    exposure: clampedExposure,
+    active: clampedExposure >= hazardCycleConfig.activeExposureThreshold,
+    top: baseY - height,
+    height,
+    baseY,
+  };
 }
 
 /**
@@ -1594,6 +1650,7 @@ function resetPlayer(fullReset = false) {
     gameState = "playing";
     activeHudInfo = null;
     cameraX = 0;
+    worldTimeMs = 0;
     rocketSpawnTimer = 700 + randomInt(0, 320);
     resumeCountdownTimer = 0;
     statusMessage = "Endloslauf gestartet";
@@ -1647,11 +1704,16 @@ function circleRectCollision(circle, rect) {
  * @returns {boolean} True when the player's center band touches the hazard span.
  */
 function hitsHazardWithPlayerCenter(hazard) {
+  const hazardState = getHazardState(hazard);
+  if (!hazardState.active || hazardState.height <= 0) {
+    return false;
+  }
+
   const centerBandRadius = 15;
   const playerCenterX = player.x + player.w / 2;
   const centerBandLeft = playerCenterX - centerBandRadius;
   const centerBandRight = playerCenterX + centerBandRadius;
-  const overlapsVertically = player.y < hazard.y + hazard.h && player.y + player.h > hazard.y;
+  const overlapsVertically = player.y < hazardState.baseY && player.y + player.h > hazardState.top;
   return overlapsVertically && centerBandRight >= hazard.x && centerBandLeft <= hazard.x + hazard.w;
 }
 
@@ -2240,13 +2302,25 @@ function drawPlatform(platform) {
  * @param {{x:number, y:number, w:number, h:number}} hazard - Hazard to render.
  */
 function drawHazard(hazard) {
+  const hazardState = getHazardState(hazard);
   const x = hazard.x - cameraX;
+  const slotY = hazardState.baseY - 4;
+  ctx.fillStyle = "rgba(74, 25, 15, 0.42)";
+  ctx.beginPath();
+  ctx.roundRect(x - 2, slotY, hazard.w + 4, 6, 3);
+  ctx.fill();
+
+  if (hazardState.height <= 0.5) {
+    return;
+  }
+
+  const topY = hazardState.top;
   ctx.fillStyle = "#4c170f";
   for (let i = 0; i < 4; i += 1) {
     ctx.beginPath();
-    ctx.moveTo(x + i * (hazard.w / 4), hazard.y + hazard.h);
-    ctx.lineTo(x + i * (hazard.w / 4) + hazard.w / 8, hazard.y);
-    ctx.lineTo(x + i * (hazard.w / 4) + hazard.w / 4, hazard.y + hazard.h);
+    ctx.moveTo(x + i * (hazard.w / 4), hazardState.baseY);
+    ctx.lineTo(x + i * (hazard.w / 4) + hazard.w / 8, topY);
+    ctx.lineTo(x + i * (hazard.w / 4) + hazard.w / 4, hazardState.baseY);
     ctx.closePath();
     ctx.fill();
   }
@@ -2891,6 +2965,7 @@ function gameLoop(time) {
   lastTime = time;
 
   if (delta < 100) {
+    worldTimeMs += delta;
     const gameplayPaused =
       gameState !== "playing" ||
       isPortraitMobileView() ||
