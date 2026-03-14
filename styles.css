@@ -146,30 +146,6 @@ canvas {
 
 .touch-controls {
   display: none;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.touch-btn {
-  min-height: 62px;
-  border: 0;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 183, 110, 0.95), rgba(211, 105, 56, 0.95));
-  color: #2e130d;
-  font: 700 1.5rem/1 "Trebuchet MS", "Segoe UI", sans-serif;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
-  touch-action: manipulation;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.touch-btn:active {
-  transform: translateY(1px) scale(0.985);
-}
-
-.touch-btn-jump {
-  background: linear-gradient(180deg, rgba(255, 242, 179, 0.98), rgba(255, 173, 83, 0.98));
 }
 
 .info-tip {
@@ -268,75 +244,47 @@ canvas {
 }
 
 @media (max-width: 780px) {
-  .game-shell {
-    width: min(100vw - 20px, 1180px);
-    padding-top: 18px;
+  body {
+    overflow: hidden;
+    background: #09060e;
   }
 
-  .controls {
+  .game-shell {
+    width: 100vw;
+    height: 100dvh;
+    padding: 0;
+  }
+
+  .hero {
     display: none;
   }
 
   .play-area {
-    padding: 12px;
-    border-radius: 20px;
+    width: 100vw;
+    height: 100dvh;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: #09060e;
+    box-shadow: none;
   }
 
   .hud {
-    grid-template-columns: 1fr;
+    display: none;
   }
 
-  .touch-controls {
-    display: grid;
-  }
-
-  .intro {
-    font-size: 0.98rem;
-  }
-
-  .label {
-    font-size: 0.76rem;
-  }
-
-  .hud > div {
-    padding: 12px 14px;
-  }
-}
-
-@media (max-width: 520px) {
-  body {
-    padding-bottom: 12px;
-  }
-
-  .game-shell {
-    width: calc(100vw - 12px);
-    padding-top: 10px;
-  }
-
-  .hero {
-    padding-bottom: 14px;
-  }
-
-  h1 {
-    font-size: clamp(1.9rem, 9vw, 2.8rem);
+  .fx-layer {
+    inset: 0;
   }
 
   .play-area {
-    padding: 10px;
-    border-radius: 18px;
+    display: grid;
+    place-items: center;
   }
 
   canvas {
-    border-radius: 16px;
-  }
-
-  .touch-controls {
-    gap: 10px;
-  }
-
-  .touch-btn {
-    min-height: 58px;
-    border-radius: 16px;
-    font-size: 1.35rem;
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
   }
 }

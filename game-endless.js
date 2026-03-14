@@ -1,15 +1,20 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const fxLayerEl = document.getElementById("fxLayer");
-const touchLeftEl = document.getElementById("touchLeft");
-const touchRightEl = document.getElementById("touchRight");
-const touchJumpEl = document.getElementById("touchJump");
 const gemCountEl = document.getElementById("gemCount");
 const lifeCountEl = document.getElementById("lifeCount");
 const scoreCountEl = document.getElementById("scoreCount");
 const highScoreCountEl = document.getElementById("highScoreCount");
 const statusTextEl = document.getElementById("statusText");
 const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+const activeTouchControls = new Map();
+
+const mobileHud = {
+  topBar: { x: 18, y: 18, w: 924, h: 62 },
+  leftPad: { x: 18, y: 406, w: 138, h: 116 },
+  rightPad: { x: 172, y: 406, w: 138, h: 116 },
+  jumpPad: { x: 774, y: 388, w: 168, h: 134 },
+};
 
 const STORAGE_KEY = "marsTigerHighscore";
 
@@ -142,6 +147,61 @@ function syncHighScore() {
   }
 }
 
+function updateTouchInputState() {
+  let leftPressed = false;
+  let rightPressed = false;
+
+  activeTouchControls.forEach((action) => {
+    if (action === "left") {
+      leftPressed = true;
+    }
+    if (action === "right") {
+      rightPressed = true;
+    }
+  });
+
+  keys.left = leftPressed;
+  keys.right = rightPressed;
+}
+
+function getCanvasPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return null;
+  }
+
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+    y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+  };
+}
+
+function pointInRect(point, rect) {
+  return (
+    point.x >= rect.x &&
+    point.x <= rect.x + rect.w &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.h
+  );
+}
+
+function getTouchAction(point) {
+  if (!point) {
+    return null;
+  }
+
+  if (pointInRect(point, mobileHud.leftPad)) {
+    return "left";
+  }
+  if (pointInRect(point, mobileHud.rightPad)) {
+    return "right";
+  }
+  if (pointInRect(point, mobileHud.jumpPad)) {
+    return "jump";
+  }
+  return "tap";
+}
+
 function createPlatform(x, y, w, h, kind) {
   return { x, y, w, h, kind };
 }
@@ -190,7 +250,7 @@ function getHudTargetPosition(targetId) {
 }
 
 function spawnHudEmoji(worldX, worldY, emoji, targetId) {
-  if (!fxLayerEl) {
+  if (!fxLayerEl || isTouchDevice) {
     return;
   }
 
@@ -930,6 +990,75 @@ function drawTiger() {
   ctx.restore();
 }
 
+function drawMobileHud() {
+  if (!isTouchDevice) {
+    return;
+  }
+
+  const totalScore = getTotalScore();
+  const leftActive = keys.left;
+  const rightActive = keys.right;
+
+  ctx.save();
+  ctx.font = "700 18px Trebuchet MS";
+  ctx.textBaseline = "middle";
+
+  const panel = mobileHud.topBar;
+  ctx.fillStyle = "rgba(14, 10, 18, 0.54)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 22);
+  ctx.fill();
+  ctx.stroke();
+
+  const stats = [
+    { label: "Moneten", value: player.gems, accent: "#82f07a", x: 54 },
+    { label: "Leben", value: player.lives, accent: "#ffd076", x: 278 },
+    { label: "Punkte", value: totalScore, accent: "#fff0ba", x: 486 },
+    { label: "Highscore", value: highScore, accent: "#ffb56d", x: 714 },
+  ];
+
+  stats.forEach((stat) => {
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillText(stat.label, stat.x, 42);
+    ctx.fillStyle = stat.accent;
+    ctx.font = "700 24px Trebuchet MS";
+    ctx.fillText(String(stat.value), stat.x, 62);
+    ctx.font = "700 18px Trebuchet MS";
+  });
+
+  const drawControl = (rect, label, active, accent) => {
+    ctx.fillStyle = active ? accent : "rgba(19, 12, 24, 0.48)";
+    ctx.strokeStyle = active ? "rgba(255, 245, 220, 0.85)" : "rgba(255,255,255,0.16)";
+    ctx.lineWidth = active ? 3 : 2;
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 28);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff7ef";
+    ctx.font = "700 19px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+    ctx.textAlign = "left";
+  };
+
+  drawControl(mobileHud.leftPad, "Links", leftActive, "rgba(206, 96, 55, 0.74)");
+  drawControl(mobileHud.rightPad, "Rechts", rightActive, "rgba(206, 96, 55, 0.74)");
+  drawControl(mobileHud.jumpPad, "Springen", false, "rgba(255, 178, 92, 0.82)");
+
+  if (gameState === "ready") {
+    ctx.fillStyle = "rgba(255, 244, 226, 0.92)";
+    ctx.font = "700 18px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.fillText("Tippe auf Springen oder ins Bild zum Start", canvas.width / 2, 104);
+    ctx.textAlign = "left";
+  }
+
+  ctx.restore();
+}
+
 function updateHud() {
   gemCountEl.textContent = `${player.gems}`;
   lifeCountEl.textContent = String(player.lives);
@@ -958,7 +1087,11 @@ function drawOverlay() {
     ctx.fillText("Game over", canvas.width / 2, 175);
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
-    ctx.fillText(`Highscore: ${highScore}. Drücke R für einen neuen Lauf`, canvas.width / 2, 220);
+    ctx.fillText(
+      isTouchDevice ? `Highscore: ${highScore}. Tippe für einen neuen Lauf` : `Highscore: ${highScore}. Drücke R für einen neuen Lauf`,
+      canvas.width / 2,
+      220
+    );
 
     if (sprites.gameOver.complete) {
       const maxWidth = 250;
@@ -986,6 +1119,8 @@ function render(time) {
   if (gameState !== "playing") {
     drawOverlay();
   }
+
+  drawMobileHud();
 }
 
 function gameLoop(time) {
@@ -1056,67 +1191,48 @@ canvas.addEventListener("pointerdown", (event) => {
   }
 
   event.preventDefault();
-  if (gameState === "ready") {
+  const point = getCanvasPoint(event);
+  const action = getTouchAction(point);
+
+  if (gameState === "lost") {
+    resetPlayer(true);
+    return;
+  }
+
+  if (action === "left" || action === "right") {
+    activeTouchControls.set(event.pointerId, action);
+    updateTouchInputState();
+    return;
+  }
+
+  if (action === "jump") {
     tryJump();
     return;
   }
 
-  if (gameState === "playing") {
+  if (gameState === "ready" || gameState === "playing") {
     tryJump();
   }
 });
 
-function bindTouchButton(button, onPress, onRelease) {
-  if (!button) {
+const releaseTouchControl = (event) => {
+  if (!activeTouchControls.has(event.pointerId)) {
     return;
   }
 
-  const release = (event) => {
-    event.preventDefault();
-    onRelease();
-  };
+  event.preventDefault();
+  activeTouchControls.delete(event.pointerId);
+  updateTouchInputState();
+};
 
-  button.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    button.setPointerCapture?.(event.pointerId);
-    onPress();
-  });
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
-  button.addEventListener("pointerleave", (event) => {
-    if (event.buttons === 0) {
-      onRelease();
-    }
-  });
-}
-
-bindTouchButton(
-  touchLeftEl,
-  () => {
-    keys.left = true;
-  },
-  () => {
-    keys.left = false;
+canvas.addEventListener("pointerup", releaseTouchControl);
+canvas.addEventListener("pointercancel", releaseTouchControl);
+canvas.addEventListener("pointerleave", (event) => {
+  if (event.pointerType === "mouse") {
+    return;
   }
-);
-
-bindTouchButton(
-  touchRightEl,
-  () => {
-    keys.right = true;
-  },
-  () => {
-    keys.right = false;
-  }
-);
-
-bindTouchButton(
-  touchJumpEl,
-  () => {
-    tryJump();
-  },
-  () => {}
-);
+  releaseTouchControl(event);
+});
 
 resetPlayer(true);
 gameState = "ready";
