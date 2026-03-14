@@ -8,6 +8,14 @@ let activeHudInfo = null;
 let statusMessage = "Bereit für den Start";
 let orientationLocked = false;
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {
+      // Ignore registration failures in unsupported/local preview environments.
+    });
+  });
+}
+
 function syncCanvasOnlyMode() {
   document.body.classList.add("canvas-only");
 }
