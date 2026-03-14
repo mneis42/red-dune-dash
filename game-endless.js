@@ -1880,10 +1880,10 @@ function drawHud() {
     const cardX = canvas.width - 286;
     const cardY = panel.y + panel.h + 10;
     const cardW = 268;
-    const cardH = 92;
-    const buttonW = 112;
+    const cardH = 122;
+    const buttonW = 128;
     const buttonH = 34;
-    const buttonX = cardX + cardW - buttonW - 14;
+    const buttonX = cardX + 16;
     const buttonY = cardY + cardH - buttonH - 14;
 
     ctx.fillStyle = "rgba(24, 17, 31, 0.95)";
@@ -1901,7 +1901,7 @@ function drawHud() {
     ctx.fillStyle = "#ffd5b3";
     ctx.font = "15px Trebuchet MS";
     ctx.fillText("Neue Version ist bereit.", cardX + 16, cardY + 48);
-    ctx.fillText("Tippe auf Refresh.", cardX + 16, cardY + 68);
+    ctx.fillText("Tippe unten auf Update.", cardX + 16, cardY + 68);
 
     updateButtonRect = { x: buttonX, y: buttonY, w: buttonW, h: buttonH };
     ctx.fillStyle = "rgba(255, 214, 156, 0.94)";
@@ -1915,7 +1915,7 @@ function drawHud() {
     ctx.fillStyle = "#4c2412";
     ctx.font = "700 18px Trebuchet MS";
     ctx.textAlign = "center";
-    ctx.fillText("Refresh", buttonX + buttonW / 2, buttonY + 19);
+    ctx.fillText("Update", buttonX + buttonW / 2, buttonY + 19);
     ctx.textAlign = "left";
   } else {
     updateButtonRect = null;
