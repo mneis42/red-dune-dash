@@ -9,8 +9,7 @@ let statusMessage = "Bereit für den Start";
 let orientationLocked = false;
 
 function syncCanvasOnlyMode() {
-  const canvasOnly = isTouchDevice && window.innerWidth > window.innerHeight;
-  document.body.classList.toggle("canvas-only", canvasOnly);
+  document.body.classList.add("canvas-only");
 }
 
 const mobileHud = {
@@ -1254,15 +1253,21 @@ function drawOverlay() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.fillStyle = "#fff6ea";
-  ctx.font = "700 42px Trebuchet MS";
+  ctx.font = "700 50px Trebuchet MS";
   if (gameState === "ready") {
-    ctx.fillText(isTouchDevice ? "Tippe zum Starten" : "Leertaste für den Start", canvas.width / 2, 210);
+    ctx.fillText("Curious Tiger: Red Dune Dash", canvas.width / 2, 150);
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
+    ctx.fillText("Bekämpfe Bugs, sammle Moneten und überlebe die Marsduenen.", canvas.width / 2, 196);
+    ctx.font = "700 34px Trebuchet MS";
+    ctx.fillStyle = "#fff6ea";
+    ctx.fillText(isTouchDevice ? "Tippe zum Starten" : "Leertaste fuer den Start", canvas.width / 2, 256);
+    ctx.font = "22px Trebuchet MS";
+    ctx.fillStyle = "#ffd1aa";
     ctx.fillText(
-      isTouchDevice ? "Tippe auf das Spiel oder auf Springen" : "Endloser Mars-Run mit Bugs, Moneten und Highscore",
+      isTouchDevice ? "Tippe auf das Spiel oder auf Springen" : "A / D laufen   W oder Leertaste springen   R neu starten",
       canvas.width / 2,
-      260
+      298
     );
   } else if (gameState === "lost") {
     ctx.fillText("Game over", canvas.width / 2, 175);
