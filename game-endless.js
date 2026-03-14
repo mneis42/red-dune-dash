@@ -247,10 +247,10 @@ function getHudStats() {
       value: String(player.gems),
       accent: "#8df28b",
       sectionX: 30,
-      valueX: 103,
+      valueX: 93,
       info: { cx: 202, cy: 41, r: 8 },
       target: { x: 58, y: 56 },
-      tooltip: ["Jedes Dollar-Symbol erhoeht Moneten um 1.", "Zeigt alle eingesammelten Dollar-Symbole."],
+      tooltip: ["Jedes Dollar-Symbol erhöht Moneten um 1.", "Zeigt alle eingesammelten Dollar-Symbole."],
     },
     {
       key: "lives",
@@ -259,10 +259,10 @@ function getHudStats() {
       value: String(player.lives),
       accent: "#ffd27d",
       sectionX: 254,
-      valueX: 327,
+      valueX: 317,
       info: { cx: 428, cy: 41, r: 8 },
       target: { x: 282, y: 56 },
-      tooltip: ["Treffer und Stuerze kosten ein Leben.", "Raketen schenken dir ein Extraleben."],
+      tooltip: ["Treffer und Stürze kosten ein Leben.", "Raketen schenken dir ein Extraleben."],
     },
     {
       key: "score",
@@ -271,7 +271,7 @@ function getHudStats() {
       value: String(getTotalScore()),
       accent: "#fff1b8",
       sectionX: 478,
-      valueX: 523,
+      valueX: 543,
       info: { cx: 650, cy: 41, r: 8 },
       target: { x: 506, y: 56 },
       tooltip: ["Dollar-Symbol: 50", "Bug besiegen: 150", "Rakete einsammeln: 250", "Distanz: laufend"],
@@ -283,7 +283,7 @@ function getHudStats() {
       value: String(highScore),
       accent: "#ffbc7e",
       sectionX: 702,
-      valueX: 747,
+      valueX: 767,
       info: { cx: 890, cy: 41, r: 8 },
       target: { x: 730, y: 56 },
       tooltip: ["Dein bester Gesamtwert.", "Wird lokal im Browser gespeichert."],
@@ -348,6 +348,28 @@ function drawHudEffects() {
   });
 
   ctx.restore();
+}
+
+function wrapTextLines(text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let currentLine = "";
+
+  words.forEach((word) => {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth || !currentLine) {
+      currentLine = candidate;
+      return;
+    }
+    lines.push(currentLine);
+    currentLine = word;
+  });
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
 }
 
 function removeHazardsUnderSpan(startX, endX) {
@@ -1121,11 +1143,12 @@ function drawHud() {
   if (activeHudInfo) {
     const stat = stats.find((entry) => entry.key === activeHudInfo);
     if (stat) {
-      const lines = stat.tooltip;
+      ctx.font = "14px Trebuchet MS";
+      const wrappedLines = stat.tooltip.flatMap((line) => wrapTextLines(line, stat.key === "score" ? 222 : 192));
       const tooltipWidth = stat.key === "score" ? 250 : 220;
       const tooltipX = clamp(stat.sectionX - 6, 18, canvas.width - tooltipWidth - 18);
       const tooltipY = panel.y + panel.h + 12;
-      const tooltipHeight = 18 + lines.length * 20;
+      const tooltipHeight = 46 + wrappedLines.length * 22;
 
       ctx.fillStyle = "rgba(18, 12, 24, 0.96)";
       ctx.strokeStyle = "rgba(255,255,255,0.12)";
@@ -1137,10 +1160,10 @@ function drawHud() {
 
       ctx.fillStyle = "#fff0e0";
       ctx.font = "700 15px Trebuchet MS";
-      ctx.fillText(`${stat.emoji} ${stat.label}`, tooltipX + 14, tooltipY + 20);
+      ctx.fillText(`${stat.emoji} ${stat.label}`, tooltipX + 14, tooltipY + 22);
       ctx.font = "14px Trebuchet MS";
-      lines.forEach((line, index) => {
-        ctx.fillText(line, tooltipX + 14, tooltipY + 42 + index * 18);
+      wrappedLines.forEach((line, index) => {
+        ctx.fillText(line, tooltipX + 14, tooltipY + 50 + index * 22);
       });
     }
   }
