@@ -323,15 +323,15 @@ function getHudStats() {
   return [
     {
       key: "gems",
-      emoji: "💵",
+      emoji: "€",
       label: "Moneten",
       value: String(player.gems),
-      accent: "#8df28b",
+      accent: "#ffe37a",
       sectionX: 30,
       valueX: 70,
       hitArea: { x: 0, y: 0, w: 241, h: 44 },
       target: { x: 58, y: 42 },
-      tooltip: ["Jedes Dollar-Symbol erhöht Moneten um 1.", "Zeigt alle eingesammelten Dollar-Symbole."],
+      tooltip: ["Jedes Euro-Symbol erhöht Moneten um 1.", "Zeigt alle eingesammelten Euro-Symbole."],
     },
     {
       key: "lives",
@@ -355,7 +355,7 @@ function getHudStats() {
       valueX: 518,
       hitArea: { x: 469, y: 0, w: 224, h: 44 },
       target: { x: 506, y: 42 },
-      tooltip: ["Dollar-Symbol: 50", "Bug besiegen: 150", "Rakete einsammeln: 250", "Distanz: laufend"],
+      tooltip: ["Euro-Symbol: 50", "Bug besiegen: 150", "Rakete einsammeln: 250", "Distanz: laufend"],
     },
     {
       key: "highscore",
@@ -890,7 +890,7 @@ function handleMovement() {
     }
     if (circleRectCollision(gem, player)) {
       gem.collected = true;
-      const moneyEffect = createHitEffect(gem.x, gem.y, "💵");
+      const moneyEffect = createHitEffect(gem.x, gem.y, "💶");
       const scoreEffect = createHitEffect(gem.x + 16, gem.y - 8, "⭐");
       spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gems");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
@@ -1075,14 +1075,14 @@ function drawGem(gem, time) {
 
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = "#77f26b";
-  ctx.strokeStyle = "#1f7c2d";
+  ctx.fillStyle = "#ffe37a";
+  ctx.strokeStyle = "#9a6a00";
   ctx.lineWidth = 2.5;
   ctx.font = "700 28px Trebuchet MS";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.strokeText("$", 0, 0);
-  ctx.fillText("$", 0, 0);
+  ctx.strokeText("€", 0, 0);
+  ctx.fillText("€", 0, 0);
   ctx.restore();
 }
 
