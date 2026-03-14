@@ -3,6 +3,7 @@ const ctx = canvas.getContext("2d");
 const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 // Runtime-only UI state for touch input, HUD effects and short-lived overlays.
 const activeTouchControls = new Map();
+const activeDirectionalInputs = new Map();
 const hudEffects = [];
 let jumpButtonGlow = 0;
 let activeHudInfo = null;
@@ -13,6 +14,7 @@ let wasPortraitMode = false;
 let deferredInstallPrompt = null;
 let showInstallHelp = false;
 let installButtonRect = null;
+let directionalInputSequence = 0;
 const isStandalone =
   window.matchMedia("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
@@ -47,6 +49,7 @@ function syncCanvasOnlyMode() {
   document.body.classList.toggle("portrait-mode", portraitMode);
   // Give players a short reaction window after rotating back into landscape mid-run.
   if (wasPortraitMode && !portraitMode && gameState === "playing") {
+    resetDirectionalInputState();
     resumeCountdownTimer = 3000;
   }
   wasPortraitMode = portraitMode;
@@ -315,23 +318,56 @@ function syncHighScore() {
 }
 
 /**
- * Rebuilds the current left/right movement flags from active touch pointers.
+ * Rebuilds the current left/right movement flags from all active directional inputs.
  */
 function updateTouchInputState() {
-  let leftPressed = false;
-  let rightPressed = false;
+  let newestInput = null;
 
-  activeTouchControls.forEach((action) => {
-    if (action === "left") {
-      leftPressed = true;
-    }
-    if (action === "right") {
-      rightPressed = true;
+  activeDirectionalInputs.forEach((entry) => {
+    if (!newestInput || entry.sequence > newestInput.sequence) {
+      newestInput = entry;
     }
   });
 
-  keys.left = leftPressed;
-  keys.right = rightPressed;
+  keys.left = newestInput?.direction === "left";
+  keys.right = newestInput?.direction === "right";
+}
+
+/**
+ * Registers or refreshes an active directional input. The most recent active direction wins.
+ *
+ * @param {string|number} token - Stable id for the active input source.
+ * @param {"left"|"right"} direction - Direction associated with the source.
+ */
+function setDirectionalInput(token, direction) {
+  activeDirectionalInputs.set(token, {
+    direction,
+    sequence: ++directionalInputSequence,
+  });
+  updateTouchInputState();
+}
+
+/**
+ * Removes a directional input source and reapplies the latest remaining active direction.
+ *
+ * @param {string|number} token - Stable id for the active input source.
+ */
+function clearDirectionalInput(token) {
+  if (!activeDirectionalInputs.has(token)) {
+    return;
+  }
+
+  activeDirectionalInputs.delete(token);
+  updateTouchInputState();
+}
+
+/**
+ * Clears any latched left/right input so countdown phases always resume from a neutral state.
+ */
+function resetDirectionalInputState() {
+  activeTouchControls.clear();
+  activeDirectionalInputs.clear();
+  updateTouchInputState();
 }
 
 /**
@@ -1026,6 +1062,8 @@ function cleanupWorld() {
  * @param {boolean} [fullReset=false] - Whether to fully restart the world and score state.
  */
 function resetPlayer(fullReset = false) {
+  resetDirectionalInputState();
+
   if (fullReset) {
     initLevel();
     player.lives = 3;
@@ -1432,6 +1470,10 @@ function loseLife(message, options = {}) {
   player.pendingRespawn = showInjured;
   player.forceInjuredPose = showInjured;
   player.respawnVisual = respawnVisual;
+
+  if (showInjured) {
+    resetDirectionalInputState();
+  }
 
   // Game over freezes the last pose on screen; otherwise we enter a delayed respawn state.
   if (player.lives <= 0) {
@@ -2078,10 +2120,10 @@ function tryJump() {
 window.addEventListener("keydown", (event) => {
   const code = event.code;
   if (code === "KeyA" || code === "ArrowLeft") {
-    keys.left = true;
+    setDirectionalInput("keyboard-left", "left");
   }
   if (code === "KeyD" || code === "ArrowRight") {
-    keys.right = true;
+    setDirectionalInput("keyboard-right", "right");
   }
   if (code === "KeyW" || code === "Space" || code === "ArrowUp") {
     event.preventDefault();
@@ -2095,10 +2137,20 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => {
   const code = event.code;
   if (code === "KeyA" || code === "ArrowLeft") {
-    keys.left = false;
+    clearDirectionalInput("keyboard-left");
   }
   if (code === "KeyD" || code === "ArrowRight") {
-    keys.right = false;
+    clearDirectionalInput("keyboard-right");
+  }
+});
+
+window.addEventListener("blur", () => {
+  resetDirectionalInputState();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    resetDirectionalInputState();
   }
 });
 
@@ -2144,7 +2196,7 @@ canvas.addEventListener("pointerdown", (event) => {
 
   if (action === "left" || action === "right") {
     activeTouchControls.set(event.pointerId, action);
-    updateTouchInputState();
+    setDirectionalInput(event.pointerId, action);
     return;
   }
 
@@ -2167,7 +2219,7 @@ const releaseTouchControl = (event) => {
 
   event.preventDefault();
   activeTouchControls.delete(event.pointerId);
-  updateTouchInputState();
+  clearDirectionalInput(event.pointerId);
 };
 
 canvas.addEventListener("pointerup", releaseTouchControl);
