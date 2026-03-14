@@ -31,6 +31,17 @@ body {
     linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
 }
 
+.rotate-screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  object-fit: cover;
+  z-index: 20;
+  background: #09060e;
+}
+
 .game-shell {
   width: 100vw;
   min-height: 100vh;
@@ -95,4 +106,16 @@ canvas {
     max-height: 100dvh;
     border-radius: 0;
   }
+}
+
+body.portrait-mode {
+  background: #09060e;
+}
+
+body.portrait-mode .rotate-screen {
+  display: block;
+}
+
+body.portrait-mode .game-shell {
+  display: none;
 }

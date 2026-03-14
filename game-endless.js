@@ -7,6 +7,8 @@ let jumpButtonGlow = 0;
 let activeHudInfo = null;
 let statusMessage = "Bereit für den Start";
 let orientationLocked = false;
+let resumeCountdownTimer = 0;
+let wasPortraitMode = false;
 let deferredInstallPrompt = null;
 let showInstallHelp = false;
 let installButtonRect = null;
@@ -35,7 +37,13 @@ if ("serviceWorker" in navigator) {
 }
 
 function syncCanvasOnlyMode() {
+  const portraitMode = isPortraitMobileView();
   document.body.classList.add("canvas-only");
+  document.body.classList.toggle("portrait-mode", portraitMode);
+  if (wasPortraitMode && !portraitMode && gameState === "playing") {
+    resumeCountdownTimer = 3000;
+  }
+  wasPortraitMode = portraitMode;
 }
 
 function shouldShowInstallPrompt() {
@@ -72,6 +80,7 @@ const spriteSources = {
   standing: "assets/standing.png",
   injured: "assets/injured.png",
   attentionPlease: "assets/attention-please.png",
+  rotate: "assets/rotate.jpg",
   jumpUp: "assets/jump-up.png",
   jumpDown: "assets/jump-down.png",
   bug: "assets/bug.png",
@@ -89,6 +98,7 @@ const sprites = {
   standing: new Image(),
   injured: new Image(),
   attentionPlease: new Image(),
+  rotate: new Image(),
   jumpUp: new Image(),
   jumpDown: new Image(),
   bug: new Image(),
@@ -100,6 +110,7 @@ const sprites = {
 sprites.standing.src = spriteSources.standing;
 sprites.injured.src = spriteSources.injured;
 sprites.attentionPlease.src = spriteSources.attentionPlease;
+sprites.rotate.src = spriteSources.rotate;
 sprites.jumpUp.src = spriteSources.jumpUp;
 sprites.jumpDown.src = spriteSources.jumpDown;
 sprites.bug.src = spriteSources.bug;
@@ -770,6 +781,7 @@ function resetPlayer(fullReset = false) {
     activeHudInfo = null;
     cameraX = 0;
     rocketSpawnTimer = 700 + randomInt(0, 320);
+    resumeCountdownTimer = 0;
     statusMessage = "Endloslauf gestartet";
   }
 
@@ -887,7 +899,7 @@ function updateCheckpoint(platform) {
 }
 
 function handleMovement() {
-  if (gameState !== "playing" || isPortraitMobileView() || player.hurtTimer > 0) {
+  if (gameState !== "playing" || isPortraitMobileView() || player.hurtTimer > 0 || resumeCountdownTimer > 0) {
     return;
   }
 
@@ -1550,21 +1562,7 @@ function drawOverlay() {
 }
 
 function drawRotateOverlay() {
-  ctx.save();
-  ctx.fillStyle = "rgba(8, 5, 12, 0.78)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#fff6ea";
-  ctx.font = `700 58px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
-  ctx.fillText("📱", canvas.width / 2, canvas.height / 2 - 56);
-  ctx.font = "700 34px Trebuchet MS";
-  ctx.fillText("Bitte ins Querformat drehen", canvas.width / 2, canvas.height / 2 + 8);
-  ctx.fillStyle = "#ffd1aa";
-  ctx.font = "22px Trebuchet MS";
-  ctx.fillText("Das Spiel ist mobil für Landscape optimiert", canvas.width / 2, canvas.height / 2 + 50);
-  ctx.restore();
+  // Portrait mode is now handled via DOM/CSS with a fullscreen image.
 }
 
 function drawRespawnCountdown() {
@@ -1573,6 +1571,13 @@ function drawRespawnCountdown() {
   }
 
   const countdown = Math.max(0, Math.ceil(player.hurtTimer / 1000) - 1);
+  drawCenterCountdown(countdown);
+}
+
+function drawCenterCountdown(countdown) {
+  if (countdown < 0) {
+    return;
+  }
 
   ctx.save();
   ctx.textAlign = "center";
@@ -1586,7 +1591,21 @@ function drawRespawnCountdown() {
   ctx.restore();
 }
 
+function drawResumeCountdown() {
+  if (resumeCountdownTimer <= 0 || gameState !== "playing" || isPortraitMobileView()) {
+    return;
+  }
+
+  const countdown = Math.max(0, Math.ceil(resumeCountdownTimer / 1000) - 1);
+  drawCenterCountdown(countdown);
+}
+
 function render(time) {
+  if (isPortraitMobileView()) {
+    drawRotateOverlay();
+    return;
+  }
+
   drawBackground();
   level.platforms.forEach(drawPlatform);
   level.hazards.forEach(drawHazard);
@@ -1596,6 +1615,7 @@ function render(time) {
   drawTiger();
   drawRespawnAttention();
   drawRespawnCountdown();
+  drawResumeCountdown();
 
   if (gameState !== "playing") {
     drawOverlay();
@@ -1603,10 +1623,6 @@ function render(time) {
 
   drawHud();
   drawHudEffects();
-
-  if (isPortraitMobileView()) {
-    drawRotateOverlay();
-  }
 }
 
 function gameLoop(time) {
@@ -1616,6 +1632,7 @@ function gameLoop(time) {
   if (delta < 100) {
     jumpButtonGlow = Math.max(0, jumpButtonGlow - 1);
     player.hurtTimer = Math.max(0, player.hurtTimer - delta);
+    resumeCountdownTimer = Math.max(0, resumeCountdownTimer - delta);
     if (gameState === "lost") {
       player.pendingRespawn = false;
     }
