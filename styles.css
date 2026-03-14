@@ -109,6 +109,40 @@ canvas {
   -webkit-touch-callout: none;
 }
 
+body.canvas-only {
+  overflow: hidden;
+  background: #09060e;
+}
+
+body.canvas-only .game-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding: 0;
+  margin: 0;
+}
+
+body.canvas-only .hero {
+  display: none;
+}
+
+body.canvas-only .play-area {
+  width: 100vw;
+  height: 100dvh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #09060e;
+  box-shadow: none;
+  display: grid;
+  place-items: center;
+}
+
+body.canvas-only canvas {
+  width: 100vw;
+  height: 100dvh;
+  border-radius: 0;
+}
+
 @media (max-width: 780px) {
   body {
     overflow: hidden;

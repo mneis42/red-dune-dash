@@ -6,6 +6,12 @@ const hudEffects = [];
 let jumpButtonGlow = 0;
 let activeHudInfo = null;
 let statusMessage = "Bereit für den Start";
+let orientationLocked = false;
+
+function syncCanvasOnlyMode() {
+  const canvasOnly = isTouchDevice && window.innerWidth > window.innerHeight;
+  document.body.classList.toggle("canvas-only", canvasOnly);
+}
 
 const mobileHud = {
   topBar: { x: 18, y: 18, w: 924, h: 74 },
@@ -133,6 +139,36 @@ function randomInt(min, max) {
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
+
+function isPortraitMobileView() {
+  return isTouchDevice && window.innerHeight > window.innerWidth;
+}
+
+async function requestLandscapeLock() {
+  if (!isTouchDevice || orientationLocked) {
+    return;
+  }
+
+  try {
+    if (!document.fullscreenElement && canvas.requestFullscreen) {
+      await canvas.requestFullscreen();
+    }
+  } catch {
+    // Ignore fullscreen failures on browsers that require stricter gestures.
+  }
+
+  try {
+    if (screen.orientation?.lock) {
+      await screen.orientation.lock("landscape");
+      orientationLocked = true;
+    }
+  } catch {
+    // Ignore unsupported orientation lock errors.
+  }
+}
+
+window.addEventListener("resize", syncCanvasOnlyMode);
+window.addEventListener("orientationchange", syncCanvasOnlyMode);
 
 function getTotalScore() {
   return player.score + Math.floor(Math.max(0, player.farthestX - level.spawn.x) / 12);
@@ -707,7 +743,7 @@ function updateCheckpoint(platform) {
 }
 
 function handleMovement() {
-  if (gameState !== "playing") {
+  if (gameState !== "playing" || isPortraitMobileView()) {
     return;
   }
 
@@ -1251,6 +1287,24 @@ function drawOverlay() {
   ctx.restore();
 }
 
+function drawRotateOverlay() {
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 5, 12, 0.78)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff6ea";
+  ctx.font = `700 58px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.fillText("📱", canvas.width / 2, canvas.height / 2 - 56);
+  ctx.font = "700 34px Trebuchet MS";
+  ctx.fillText("Bitte ins Querformat drehen", canvas.width / 2, canvas.height / 2 + 8);
+  ctx.fillStyle = "#ffd1aa";
+  ctx.font = "22px Trebuchet MS";
+  ctx.fillText("Das Spiel ist mobil fuer Landscape optimiert", canvas.width / 2, canvas.height / 2 + 50);
+  ctx.restore();
+}
+
 function render(time) {
   drawBackground();
   level.platforms.forEach(drawPlatform);
@@ -1266,6 +1320,10 @@ function render(time) {
 
   drawHud();
   drawHudEffects();
+
+  if (isPortraitMobileView()) {
+    drawRotateOverlay();
+  }
 }
 
 function gameLoop(time) {
@@ -1284,6 +1342,10 @@ function gameLoop(time) {
 }
 
 function tryJump() {
+  if (isPortraitMobileView()) {
+    return;
+  }
+
   if (gameState === "ready") {
     gameState = "playing";
     statusMessage = "Endloslauf gestartet";
@@ -1350,6 +1412,7 @@ canvas.addEventListener("pointerdown", (event) => {
 
   event.preventDefault();
   canvas.setPointerCapture?.(event.pointerId);
+  requestLandscapeLock();
   const action = getTouchAction(point);
 
   if (gameState === "lost") {
@@ -1404,4 +1467,5 @@ statusMessage = "Bereit für den Start";
 player.visible = false;
 player.x = -999;
 player.y = -999;
+syncCanvasOnlyMode();
 requestAnimationFrame(gameLoop);
