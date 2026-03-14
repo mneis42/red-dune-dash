@@ -16,7 +16,19 @@ const isStandalone =
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {
+    navigator.serviceWorker.register("./service-worker.js").then((registration) => {
+      registration.update().catch(() => {
+        // Ignore update check failures.
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          registration.update().catch(() => {
+            // Ignore update check failures.
+          });
+        }
+      });
+    }).catch(() => {
       // Ignore registration failures in unsupported/local preview environments.
     });
   });

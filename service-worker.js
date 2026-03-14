@@ -1,4 +1,4 @@
-const CACHE_NAME = "red-dune-dash-v1";
+const CACHE_NAME = "red-dune-dash-v2";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +27,53 @@ const APP_ASSETS = [
   "./assets/rocket-from-right.png"
 ];
 
+const NETWORK_FIRST_PATHS = new Set([
+  "/",
+  "/index.html",
+  "/styles.css",
+  "/game-endless.js",
+  "/manifest.webmanifest"
+]);
+
+function isCoreAppRequest(requestUrl) {
+  const url = new URL(requestUrl);
+  return NETWORK_FIRST_PATHS.has(url.pathname) || NETWORK_FIRST_PATHS.has(`${url.pathname}${url.search}`);
+}
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    const response = await fetch(request, { cache: "no-store" });
+    if (response && response.status === 200 && response.type === "basic") {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    throw new Error("Network request failed and no cache entry was available.");
+  }
+}
+
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cachedResponse = await cache.match(request);
+
+  const networkPromise = fetch(request)
+    .then((response) => {
+      if (response && response.status === 200 && response.type === "basic") {
+        cache.put(request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => cachedResponse);
+
+  return cachedResponse || networkPromise;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_ASSETS))
@@ -52,21 +99,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
 
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== "basic") {
-          return networkResponse;
-        }
+  if (event.request.mode === "navigate" || isCoreAppRequest(event.request.url)) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
 
-        const responseClone = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-        return networkResponse;
-      });
-    })
-  );
+  event.respondWith(staleWhileRevalidate(event.request));
 });
