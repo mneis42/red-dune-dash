@@ -9,6 +9,7 @@ const lifeCountEl = document.getElementById("lifeCount");
 const scoreCountEl = document.getElementById("scoreCount");
 const highScoreCountEl = document.getElementById("highScoreCount");
 const statusTextEl = document.getElementById("statusText");
+const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 
 const STORAGE_KEY = "marsTigerHighscore";
 
@@ -945,10 +946,14 @@ function drawOverlay() {
   ctx.fillStyle = "#fff6ea";
   ctx.font = "700 42px Trebuchet MS";
   if (gameState === "ready") {
-    ctx.fillText("Leertaste für den Start", canvas.width / 2, 210);
+    ctx.fillText(isTouchDevice ? "Tippe zum Starten" : "Leertaste für den Start", canvas.width / 2, 210);
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
-    ctx.fillText("Endloser Mars-Run mit Bugs, Moneten und Highscore", canvas.width / 2, 260);
+    ctx.fillText(
+      isTouchDevice ? "Tippe auf das Spiel oder auf Springen" : "Endloser Mars-Run mit Bugs, Moneten und Highscore",
+      canvas.width / 2,
+      260
+    );
   } else if (gameState === "lost") {
     ctx.fillText("Game over", canvas.width / 2, 175);
     ctx.font = "24px Trebuchet MS";
@@ -1042,6 +1047,22 @@ window.addEventListener("keyup", (event) => {
   }
   if (code === "KeyD" || code === "ArrowRight") {
     keys.right = false;
+  }
+});
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "mouse") {
+    return;
+  }
+
+  event.preventDefault();
+  if (gameState === "ready") {
+    tryJump();
+    return;
+  }
+
+  if (gameState === "playing") {
+    tryJump();
   }
 });
 

@@ -273,6 +273,10 @@ canvas {
     padding-top: 18px;
   }
 
+  .controls {
+    display: none;
+  }
+
   .play-area {
     padding: 12px;
     border-radius: 20px;
@@ -284,15 +288,6 @@ canvas {
 
   .touch-controls {
     display: grid;
-  }
-
-  .controls {
-    gap: 8px;
-    font-size: 0.92rem;
-  }
-
-  .controls span {
-    padding: 8px 10px;
   }
 
   .intro {
