@@ -71,6 +71,7 @@ const spriteSources = {
   run: ["assets/run1.png", "assets/run2.png", "assets/run3.png", "assets/run4.png", "assets/run5.png", "assets/run6.png"],
   standing: "assets/standing.png",
   injured: "assets/injured.png",
+  attentionPlease: "assets/attention-please.png",
   jumpUp: "assets/jump-up.png",
   jumpDown: "assets/jump-down.png",
   bug: "assets/bug.png",
@@ -87,6 +88,7 @@ const sprites = {
   }),
   standing: new Image(),
   injured: new Image(),
+  attentionPlease: new Image(),
   jumpUp: new Image(),
   jumpDown: new Image(),
   bug: new Image(),
@@ -97,6 +99,7 @@ const sprites = {
 
 sprites.standing.src = spriteSources.standing;
 sprites.injured.src = spriteSources.injured;
+sprites.attentionPlease.src = spriteSources.attentionPlease;
 sprites.jumpUp.src = spriteSources.jumpUp;
 sprites.jumpDown.src = spriteSources.jumpDown;
 sprites.bug.src = spriteSources.bug;
@@ -146,6 +149,7 @@ const player = {
   hurtTimer: 0,
   pendingRespawn: false,
   forceInjuredPose: false,
+  respawnVisual: "injured",
   farthestX: level.spawn.x,
   checkpointX: level.spawn.x,
   checkpointY: level.spawn.y,
@@ -779,6 +783,7 @@ function resetPlayer(fullReset = false) {
   player.hurtTimer = 0;
   player.pendingRespawn = false;
   player.forceInjuredPose = false;
+  player.respawnVisual = "injured";
   player.visible = true;
 }
 
@@ -962,7 +967,11 @@ function handleMovement() {
   player.farthestX = Math.max(player.farthestX, player.x);
 
   if (player.y > canvas.height + 180) {
-    loseLife("Der Tiger ist in einen Krater gestürzt");
+    loseLife("Der Tiger ist in einen Krater gestürzt", {
+      showInjured: true,
+      holdPosition: false,
+      respawnVisual: "attention",
+    });
   }
 
   if (player.invincible > 0) {
@@ -1083,6 +1092,7 @@ function loseLife(message, options = {}) {
     holdPosition = false,
     hitX = player.x,
     hitY = player.y,
+    respawnVisual = "injured",
   } = options;
 
   player.lives -= 1;
@@ -1090,6 +1100,7 @@ function loseLife(message, options = {}) {
   player.hurtTimer = showInjured ? 3000 : 0;
   player.pendingRespawn = showInjured;
   player.forceInjuredPose = showInjured;
+  player.respawnVisual = respawnVisual;
 
   if (player.lives <= 0) {
     gameState = "lost";
@@ -1117,7 +1128,15 @@ function loseLife(message, options = {}) {
     return;
   }
 
+  if (showInjured) {
+    player.vx = 0;
+    player.vy = 0;
+    return;
+  }
+
   player.pendingRespawn = false;
+  player.forceInjuredPose = false;
+  player.respawnVisual = "injured";
   player.x = player.checkpointX;
   player.y = player.checkpointY;
 }
@@ -1259,6 +1278,10 @@ function drawTiger() {
     return;
   }
 
+  if (player.hurtTimer > 0 && player.respawnVisual === "attention" && gameState === "playing") {
+    return;
+  }
+
   const x = player.x - cameraX;
   const blink = player.invincible > 0 && Math.floor(player.invincible / 5) % 2 === 0;
 
@@ -1290,6 +1313,27 @@ function drawTiger() {
   }
 
   ctx.restore();
+}
+
+function drawRespawnAttention() {
+  if (player.hurtTimer <= 0 || player.respawnVisual !== "attention" || gameState !== "playing" || player.lives <= 0) {
+    return;
+  }
+
+  if (!sprites.attentionPlease.complete) {
+    return;
+  }
+
+  const maxWidth = 325;
+  const aspectRatio =
+    sprites.attentionPlease.naturalWidth > 0
+      ? sprites.attentionPlease.naturalHeight / sprites.attentionPlease.naturalWidth
+      : 1;
+  const drawWidth = maxWidth;
+  const drawHeight = drawWidth * aspectRatio;
+  const drawX = canvas.width - drawWidth - 18;
+  const drawY = canvas.height - drawHeight - 18;
+  ctx.drawImage(sprites.attentionPlease, drawX, drawY, drawWidth, drawHeight);
 }
 
 function drawHud() {
@@ -1550,6 +1594,7 @@ function render(time) {
   level.bugs.forEach((bug) => drawBug(bug, time));
   level.rockets.forEach(drawRocket);
   drawTiger();
+  drawRespawnAttention();
   drawRespawnCountdown();
 
   if (gameState !== "playing") {
@@ -1577,6 +1622,7 @@ function gameLoop(time) {
     if (player.hurtTimer === 0 && player.pendingRespawn && gameState === "playing") {
       player.pendingRespawn = false;
       player.forceInjuredPose = false;
+      player.respawnVisual = "injured";
       player.x = player.checkpointX;
       player.y = player.checkpointY;
       player.vx = 0;
