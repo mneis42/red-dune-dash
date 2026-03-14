@@ -1895,7 +1895,7 @@ function drawHud() {
     const cardX = canvas.width - 286;
     const cardY = panel.y + panel.h + 10;
     const cardW = 268;
-    const cardH = 122;
+    const cardH = 136;
     const buttonW = 128;
     const buttonH = 34;
     const buttonX = cardX + 16;
@@ -1916,7 +1916,7 @@ function drawHud() {
     ctx.fillStyle = "#ffd5b3";
     ctx.font = "15px Trebuchet MS";
     ctx.fillText("Neue Version ist bereit.", cardX + 16, cardY + 48);
-    ctx.fillText("Tippe unten auf Update.", cardX + 16, cardY + 68);
+    ctx.fillText("Tippe unten auf Update.", cardX + 16, cardY + 64);
 
     updateButtonRect = { x: buttonX, y: buttonY, w: buttonW, h: buttonH };
     ctx.fillStyle = "rgba(255, 214, 156, 0.94)";
