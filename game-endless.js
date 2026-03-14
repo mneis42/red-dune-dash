@@ -1248,17 +1248,14 @@ function getSafeCheckpointX(platform) {
 }
 
 /**
- * Finds the y-position of the closest supporting ground under the player at a given x-position.
+ * Finds the y-position of the closest supporting platform under the player at a given x-position.
  *
  * @param {number} playerX - Candidate player x-position.
- * @returns {number|null} Ground-aligned player y-position or null when unsupported.
+ * @returns {number|null} Platform-aligned player y-position or null when unsupported.
  */
 function getStableGroundYAt(playerX) {
-  // Hurt poses should snap to real ground instead of hovering above gaps or enemies.
+  // Hurt poses should snap to solid platforms instead of hovering above gaps or enemies.
   const supportingPlatforms = level.platforms.filter((platform) => {
-    if (platform.kind !== "ground") {
-      return false;
-    }
     const overlapsX = playerX + player.w > platform.x && playerX < platform.x + platform.w;
     return overlapsX;
   });
