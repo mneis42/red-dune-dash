@@ -70,6 +70,7 @@ const STORAGE_KEY = "marsTigerHighscore";
 const spriteSources = {
   run: ["assets/run1.png", "assets/run2.png", "assets/run3.png", "assets/run4.png", "assets/run5.png", "assets/run6.png"],
   standing: "assets/standing.png",
+  injured: "assets/injured.png",
   jumpUp: "assets/jump-up.png",
   jumpDown: "assets/jump-down.png",
   bug: "assets/bug.png",
@@ -85,6 +86,7 @@ const sprites = {
     return image;
   }),
   standing: new Image(),
+  injured: new Image(),
   jumpUp: new Image(),
   jumpDown: new Image(),
   bug: new Image(),
@@ -94,6 +96,7 @@ const sprites = {
 };
 
 sprites.standing.src = spriteSources.standing;
+sprites.injured.src = spriteSources.injured;
 sprites.jumpUp.src = spriteSources.jumpUp;
 sprites.jumpDown.src = spriteSources.jumpDown;
 sprites.bug.src = spriteSources.bug;
@@ -140,6 +143,9 @@ const player = {
   gems: 0,
   score: 0,
   invincible: 0,
+  hurtTimer: 0,
+  pendingRespawn: false,
+  forceInjuredPose: false,
   farthestX: level.spawn.x,
   checkpointX: level.spawn.x,
   checkpointY: level.spawn.y,
@@ -770,6 +776,9 @@ function resetPlayer(fullReset = false) {
   player.grounded = false;
   player.direction = 1;
   player.invincible = 0;
+  player.hurtTimer = 0;
+  player.pendingRespawn = false;
+  player.forceInjuredPose = false;
   player.visible = true;
 }
 
@@ -828,6 +837,39 @@ function getSafeCheckpointX(platform) {
   return clamp(safeX, minX, maxX);
 }
 
+function getStableGroundYAt(playerX) {
+  const supportingPlatforms = level.platforms.filter((platform) => {
+    if (platform.kind !== "ground") {
+      return false;
+    }
+    const overlapsX = playerX + player.w > platform.x && playerX < platform.x + platform.w;
+    return overlapsX;
+  });
+
+  if (supportingPlatforms.length === 0) {
+    return null;
+  }
+
+  supportingPlatforms.sort((a, b) => a.y - b.y);
+  return supportingPlatforms[0].y - player.h;
+}
+
+function moveToSafeInjuredPose(preferredX, preferredY) {
+  const clampedX = Math.max(0, preferredX);
+  const groundY = getStableGroundYAt(clampedX);
+  if (groundY === null) {
+    return {
+      x: player.checkpointX,
+      y: player.checkpointY,
+    };
+  }
+
+  return {
+    x: clampedX,
+    y: Math.min(preferredY, groundY),
+  };
+}
+
 function updateCheckpoint(platform) {
   if (platform.kind !== "ground") {
     return;
@@ -840,7 +882,7 @@ function updateCheckpoint(platform) {
 }
 
 function handleMovement() {
-  if (gameState !== "playing" || isPortraitMobileView()) {
+  if (gameState !== "playing" || isPortraitMobileView() || player.hurtTimer > 0) {
     return;
   }
 
@@ -932,7 +974,13 @@ function handleMovement() {
       return;
     }
     if (overlaps(player, hazard)) {
-      loseLife("Autsch, scharfe Lavasteine");
+      const safePose = moveToSafeInjuredPose(player.x, hazard.y + hazard.h - player.h + 10);
+      loseLife("Autsch, scharfe Lavasteine", {
+        showInjured: true,
+        holdPosition: true,
+        hitX: safePose.x,
+        hitY: safePose.y,
+      });
     }
   });
 
@@ -979,7 +1027,13 @@ function handleMovement() {
     }
 
     if (player.invincible <= 0) {
-      loseLife("Ein Bug hat den Tiger erwischt");
+      const safePose = moveToSafeInjuredPose(player.x, player.y);
+      loseLife("Ein Bug hat den Tiger erwischt", {
+        showInjured: true,
+        holdPosition: true,
+        hitX: safePose.x,
+        hitY: safePose.y,
+      });
     }
   });
 
@@ -1023,24 +1077,49 @@ function updateAnimation(delta) {
   }
 }
 
-function loseLife(message) {
+function loseLife(message, options = {}) {
+  const {
+    showInjured = false,
+    holdPosition = false,
+    hitX = player.x,
+    hitY = player.y,
+  } = options;
+
   player.lives -= 1;
-  player.invincible = 75;
+  player.invincible = showInjured ? 135 : 75;
+  player.hurtTimer = showInjured ? 3000 : 0;
+  player.pendingRespawn = showInjured;
+  player.forceInjuredPose = showInjured;
 
   if (player.lives <= 0) {
     gameState = "lost";
     saveHighScore(getTotalScore());
     statusMessage = "Game over. Drücke R für einen Neustart";
+    if (showInjured && holdPosition) {
+      player.x = hitX;
+      player.y = hitY;
+      player.grounded = true;
+    }
     player.vx = 0;
     player.vy = 0;
     return;
   }
 
   statusMessage = message;
-  player.x = player.checkpointX;
-  player.y = player.checkpointY;
   player.vx = 0;
   player.vy = 0;
+  player.grounded = false;
+
+  if (showInjured && holdPosition) {
+    player.x = hitX;
+    player.y = hitY;
+    player.grounded = true;
+    return;
+  }
+
+  player.pendingRespawn = false;
+  player.x = player.checkpointX;
+  player.y = player.checkpointY;
 }
 
 function drawBackground() {
@@ -1193,7 +1272,9 @@ function drawTiger() {
   ctx.translate(-player.w / 2, -player.h);
 
   let sprite = sprites.run[runFrameIndex];
-  if (!player.grounded) {
+  if (player.hurtTimer > 0 || player.forceInjuredPose) {
+    sprite = sprites.injured;
+  } else if (!player.grounded) {
     sprite = player.vy < 0 ? sprites.jumpUp : sprites.jumpDown;
   } else if (Math.abs(player.vx) <= 0.35) {
     sprite = sprites.standing;
@@ -1442,6 +1523,25 @@ function drawRotateOverlay() {
   ctx.restore();
 }
 
+function drawRespawnCountdown() {
+  if (player.hurtTimer <= 0 || gameState !== "playing" || player.lives <= 0) {
+    return;
+  }
+
+  const countdown = Math.max(0, Math.ceil(player.hurtTimer / 1000) - 1);
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(255, 246, 234, 0.38)";
+  ctx.strokeStyle = "rgba(60, 26, 18, 0.28)";
+  ctx.lineWidth = 6;
+  ctx.font = "700 124px Trebuchet MS";
+  ctx.strokeText(String(countdown), canvas.width / 2, canvas.height / 2);
+  ctx.fillText(String(countdown), canvas.width / 2, canvas.height / 2);
+  ctx.restore();
+}
+
 function render(time) {
   drawBackground();
   level.platforms.forEach(drawPlatform);
@@ -1450,6 +1550,7 @@ function render(time) {
   level.bugs.forEach((bug) => drawBug(bug, time));
   level.rockets.forEach(drawRocket);
   drawTiger();
+  drawRespawnCountdown();
 
   if (gameState !== "playing") {
     drawOverlay();
@@ -1469,6 +1570,19 @@ function gameLoop(time) {
 
   if (delta < 100) {
     jumpButtonGlow = Math.max(0, jumpButtonGlow - 1);
+    player.hurtTimer = Math.max(0, player.hurtTimer - delta);
+    if (gameState === "lost") {
+      player.pendingRespawn = false;
+    }
+    if (player.hurtTimer === 0 && player.pendingRespawn && gameState === "playing") {
+      player.pendingRespawn = false;
+      player.forceInjuredPose = false;
+      player.x = player.checkpointX;
+      player.y = player.checkpointY;
+      player.vx = 0;
+      player.vy = 0;
+      player.grounded = false;
+    }
     updateHudEffects(delta);
     handleMovement();
     updateAnimation(delta);
