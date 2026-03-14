@@ -217,6 +217,7 @@ const specialEventConfig = {
   maxDelay: 600_000,
   announceDuration: 10_000,
   activeDuration: 30_000,
+  bugWaveRocketSpawnMultiplier: 2,
   bugWaveMaxFalling: 7,
   bugWaveGroundSpawnIntervalMin: 1_000,
   bugWaveGroundSpawnIntervalMax: 5_000,
@@ -568,6 +569,24 @@ function getVisibleBugSpawnPlatform() {
   }
 
   return candidates[randomInt(0, candidates.length - 1)];
+}
+
+/**
+ * Returns the current rocket spawn interval, with bug-wave countdowns and active bug-waves doubling the rate.
+ *
+ * @returns {number} Frames until the next rocket spawn.
+ */
+function getNextRocketSpawnDelay() {
+  const baseDelay = randomInt(850, 1450);
+  const bugWaveIncoming =
+    specialEventState.type === "bug-wave" &&
+    (specialEventState.phase === "announce" || specialEventState.phase === "active");
+
+  if (!bugWaveIncoming) {
+    return baseDelay;
+  }
+
+  return Math.max(425, Math.round(baseDelay / specialEventConfig.bugWaveRocketSpawnMultiplier));
 }
 
 /**
@@ -1936,7 +1955,7 @@ function handleMovement() {
   rocketSpawnTimer -= 1;
   if (rocketSpawnTimer <= 0) {
     level.rockets.push(createRocket(Math.random() > 0.5));
-    rocketSpawnTimer = randomInt(850, 1450);
+    rocketSpawnTimer = getNextRocketSpawnDelay();
   }
 
   if (keys.left) {
