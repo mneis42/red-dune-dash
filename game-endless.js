@@ -204,6 +204,36 @@ const world = {
   floorYMax: 474,
 };
 
+const specialEventConfig = {
+  minDelay: 120_000,
+  maxDelay: 600_000,
+  announceDuration: 10_000,
+  activeDuration: 30_000,
+  bugWaveMaxFalling: 7,
+  bugWaveGroundSpawnIntervalMin: 1_000,
+  bugWaveGroundSpawnIntervalMax: 5_000,
+  spawnTelegraphDuration: 1_000,
+  bigOrder: {
+    groundGemChance: 1,
+    groundBugChance: 0.5,
+    plateGemChance: 1,
+    plateExtraGemChance: 0.9,
+    plateBugChance: 0.42,
+    bonusPlatformChance: 0.44,
+    bonusExtraGemChance: 1,
+    bonusBugChance: 0.3,
+    visibleExtraGemChance: 0.75,
+    visibleGemSpawnIntervalMin: 450,
+    visibleGemSpawnIntervalMax: 900,
+    visibleExtraBugChance: 0.2,
+    visibleBugSpawnIntervalMin: 1100,
+    visibleBugSpawnIntervalMax: 1800,
+  },
+};
+
+const debugSpecialEventDelayMs = null; // Set to a number to force a specific delay for testing, or null for random scheduling.
+const debugSpecialEventType = null; // "big-order" or "bug-wave" to force a specific event for testing, or null for random selection.
+
 const keys = {
   left: false,
   right: false,
@@ -254,6 +284,15 @@ let lastTime = 0;
 let runFrameIndex = 0;
 let runFrameTimer = 0;
 let rocketSpawnTimer = 0;
+const specialEventState = {
+  type: null,
+  phase: "idle",
+  timer: randomInt(specialEventConfig.minDelay, specialEventConfig.maxDelay),
+  bugWaveSpawnTimer: 1400,
+  bugWaveGroundSpawnTimer: 1100,
+  bigOrderSpawnTimer: 900,
+  bigOrderBugSpawnTimer: 1200,
+};
 
 /**
  * Loads the locally stored high score.
@@ -316,6 +355,344 @@ function randomInt(min, max) {
  */
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Linearly interpolates between two values.
+ *
+ * @param {number} start - Start value.
+ * @param {number} end - End value.
+ * @param {number} alpha - Blend factor from 0 to 1.
+ * @returns {number} Interpolated value.
+ */
+function lerp(start, end, alpha) {
+  return start + (end - start) * alpha;
+}
+
+/**
+ * Picks a special-event type.
+ *
+ * @returns {"bug-wave"|"big-order"} Event type.
+ */
+function pickSpecialEventType() {
+  if (debugSpecialEventType === "bug-wave" || debugSpecialEventType === "big-order") {
+    return debugSpecialEventType;
+  }
+
+  return Math.random() < 0.5 ? "bug-wave" : "big-order";
+}
+
+/**
+ * Returns the localized display title for a special event.
+ *
+ * @param {"bug-wave"|"big-order"|null} type - Event type.
+ * @param {boolean} [forAnnouncement=false] - Whether the title is used for the warning phase.
+ * @returns {string} Event title.
+ */
+function getSpecialEventTitle(type, forAnnouncement = false) {
+  if (type === "bug-wave") {
+    return forAnnouncement ? "Bugwelle rollt an" : "Bugwelle";
+  }
+  if (type === "big-order") {
+    return forAnnouncement ? "Großauftrag kommt rein" : "Großauftrag";
+  }
+  return "";
+}
+
+/**
+ * Returns whether a special event is currently active.
+ *
+ * @param {"bug-wave"|"big-order"} type - Event type to compare.
+ * @returns {boolean} True when the requested event is currently active.
+ */
+function isSpecialEventActive(type) {
+  return specialEventState.phase === "active" && specialEventState.type === type;
+}
+
+/**
+ * Schedules the next special event after a random cool-down window.
+ */
+function scheduleNextSpecialEvent() {
+  specialEventState.type = null;
+  specialEventState.phase = "idle";
+  specialEventState.timer =
+    debugSpecialEventDelayMs ?? randomInt(specialEventConfig.minDelay, specialEventConfig.maxDelay);
+  specialEventState.bugWaveSpawnTimer = 1400;
+  specialEventState.bugWaveGroundSpawnTimer = 1100;
+  specialEventState.bigOrderSpawnTimer = 900;
+  specialEventState.bigOrderBugSpawnTimer = 1200;
+}
+
+/**
+ * Resets the special-event scheduler to a fresh run.
+ */
+function resetSpecialEventState() {
+  specialEventState.type = null;
+  specialEventState.phase = "idle";
+  specialEventState.timer =
+    debugSpecialEventDelayMs ?? randomInt(specialEventConfig.minDelay, specialEventConfig.maxDelay);
+  specialEventState.bugWaveSpawnTimer = 1400;
+  specialEventState.bugWaveGroundSpawnTimer = 1100;
+  specialEventState.bigOrderSpawnTimer = 900;
+  specialEventState.bigOrderBugSpawnTimer = 1200;
+}
+
+/**
+ * Starts the announcement phase of a new special event.
+ */
+function startSpecialEventAnnouncement() {
+  specialEventState.type = pickSpecialEventType();
+  specialEventState.phase = "announce";
+  specialEventState.timer = specialEventConfig.announceDuration;
+  specialEventState.bugWaveSpawnTimer = 1400;
+  specialEventState.bugWaveGroundSpawnTimer = 1100;
+  specialEventState.bigOrderSpawnTimer = 900;
+  specialEventState.bigOrderBugSpawnTimer = 1200;
+  statusMessage = `${getSpecialEventTitle(specialEventState.type, true)} in 10 Sekunden`;
+}
+
+/**
+ * Activates the currently announced special event.
+ */
+function activateSpecialEvent() {
+  specialEventState.phase = "active";
+  specialEventState.timer = specialEventConfig.activeDuration;
+  specialEventState.bugWaveSpawnTimer = 1200;
+  specialEventState.bugWaveGroundSpawnTimer = 950;
+  specialEventState.bigOrderSpawnTimer = 700;
+  specialEventState.bigOrderBugSpawnTimer = 1000;
+  statusMessage =
+    specialEventState.type === "bug-wave"
+      ? "Bugwelle aktiv. Ausweichen und Bugs auf Plattformen zertrampeln"
+      : "Großauftrag aktiv. Mehr Moneten und mehr Bugs unterwegs";
+}
+
+/**
+ * Returns the number of currently falling bugs.
+ *
+ * @returns {number} Active falling bug count.
+ */
+function getFallingBugCount() {
+  return level.bugs.filter((bug) => bug.alive && bug.falling).length;
+}
+
+/**
+ * Chooses a platform ahead of the camera that can receive a falling bug.
+ *
+ * @returns {{x:number, y:number, w:number, h:number, kind:string}|null} Target platform or null when none is suitable.
+ */
+function getBugWaveSpawnPlatform() {
+  const candidates = level.platforms.filter((platform) => {
+    if (platform.w < 128) {
+      return false;
+    }
+    if (platform.x + platform.w < cameraX + 120) {
+      return false;
+    }
+    return platform.x < cameraX + canvas.width + 320;
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates[randomInt(0, candidates.length - 1)];
+}
+
+/**
+ * Spawns one falling bug for the bug-wave special event when capacity allows it.
+ */
+function spawnBugWaveBug() {
+  if (getFallingBugCount() >= specialEventConfig.bugWaveMaxFalling) {
+    return;
+  }
+
+  const platform = getBugWaveSpawnPlatform();
+  if (!platform) {
+    return;
+  }
+
+  level.bugs.push(createFallingBug(platform));
+}
+
+/**
+ * Chooses a currently visible platform for extra Großauftrag gem spawns.
+ *
+ * @returns {{x:number, y:number, w:number, h:number, kind:string}|null} Visible target platform or null when none fits.
+ */
+function getVisibleBigOrderPlatform() {
+  const candidates = level.platforms.filter((platform) => {
+    if (platform.w < 90) {
+      return false;
+    }
+    if (platform.x + platform.w < cameraX - 20) {
+      return false;
+    }
+    return platform.x <= cameraX + canvas.width + 20;
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates[randomInt(0, candidates.length - 1)];
+}
+
+/**
+ * Chooses a currently visible platform that can host a walking bug.
+ *
+ * @returns {{x:number, y:number, w:number, h:number, kind:string}|null} Visible bug platform or null when none fits.
+ */
+function getVisibleBugSpawnPlatform() {
+  const candidates = level.platforms.filter((platform) => {
+    if (platform.w < 120) {
+      return false;
+    }
+    if (platform.x + platform.w < cameraX - 20) {
+      return false;
+    }
+    return platform.x <= cameraX + canvas.width + 20;
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates[randomInt(0, candidates.length - 1)];
+}
+
+/**
+ * Spawns extra visible gems during the Großauftrag event, including on already-traversed screen space.
+ */
+function spawnBigOrderGem() {
+  const platform = getVisibleBigOrderPlatform();
+  if (!platform) {
+    return;
+  }
+
+  addGemOnPlatform(platform, true);
+}
+
+/**
+ * Spawns an extra visible walking bug on a currently visible platform.
+ */
+function spawnVisiblePlatformBug() {
+  const platform = getVisibleBugSpawnPlatform();
+  if (!platform) {
+    return;
+  }
+
+  const patrolMargin = 18;
+  const minX = platform.x + patrolMargin;
+  const maxX = platform.x + platform.w - 46 - patrolMargin;
+  if (maxX <= minX) {
+    return;
+  }
+
+  const bugX = randomBetween(minX, maxX);
+  const speed = (Math.random() > 0.5 ? 1 : -1) * randomBetween(0.8, 1.5);
+  level.bugs.push(
+    createBug(bugX, platform.y - 38, platform.x + patrolMargin, platform.x + platform.w - patrolMargin, speed, {
+      telegraph: true,
+    })
+  );
+}
+
+/**
+ * Spawns an extra visible bug during Großauftrag without dropping it directly onto the tiger.
+ */
+function spawnBigOrderBug() {
+  spawnVisiblePlatformBug();
+}
+
+/**
+ * Spawns an extra visible walking bug during the bug-wave event.
+ */
+function spawnBugWaveGroundBug() {
+  spawnVisiblePlatformBug();
+}
+
+/**
+ * Advances active special events and their cooldown scheduling.
+ *
+ * @param {number} delta - Frame delta in milliseconds.
+ */
+function updateSpecialEvents(delta) {
+  const bigOrderConfig = specialEventConfig.bigOrder;
+
+  if (specialEventState.phase === "idle") {
+    specialEventState.timer = Math.max(0, specialEventState.timer - delta);
+    if (specialEventState.timer === 0) {
+      startSpecialEventAnnouncement();
+    }
+    return;
+  }
+
+  specialEventState.timer = Math.max(0, specialEventState.timer - delta);
+
+  if (specialEventState.phase === "announce") {
+    if (specialEventState.timer === 0) {
+      activateSpecialEvent();
+    }
+    return;
+  }
+
+  if (specialEventState.type === "bug-wave") {
+    const progress = 1 - specialEventState.timer / specialEventConfig.activeDuration;
+    const spawnInterval = Math.round(lerp(1700, 320, clamp(progress, 0, 1)));
+    specialEventState.bugWaveSpawnTimer -= delta;
+    specialEventState.bugWaveGroundSpawnTimer -= delta;
+
+    while (
+      specialEventState.bugWaveSpawnTimer <= 0 &&
+      getFallingBugCount() < specialEventConfig.bugWaveMaxFalling
+    ) {
+      spawnBugWaveBug();
+      specialEventState.bugWaveSpawnTimer += spawnInterval;
+    }
+
+    while (specialEventState.bugWaveGroundSpawnTimer <= 0) {
+      spawnBugWaveGroundBug();
+      specialEventState.bugWaveGroundSpawnTimer += randomInt(
+        specialEventConfig.bugWaveGroundSpawnIntervalMin,
+        specialEventConfig.bugWaveGroundSpawnIntervalMax
+      );
+    }
+  }
+
+  if (specialEventState.type === "big-order") {
+    specialEventState.bigOrderSpawnTimer -= delta;
+    while (specialEventState.bigOrderSpawnTimer <= 0) {
+      spawnBigOrderGem();
+      if (Math.random() < bigOrderConfig.visibleExtraGemChance) {
+        spawnBigOrderGem();
+      }
+      specialEventState.bigOrderSpawnTimer += randomInt(
+        bigOrderConfig.visibleGemSpawnIntervalMin,
+        bigOrderConfig.visibleGemSpawnIntervalMax
+      );
+    }
+
+    specialEventState.bigOrderBugSpawnTimer -= delta;
+    while (specialEventState.bigOrderBugSpawnTimer <= 0) {
+      spawnBigOrderBug();
+      if (Math.random() < bigOrderConfig.visibleExtraBugChance) {
+        spawnBigOrderBug();
+      }
+      specialEventState.bigOrderBugSpawnTimer += randomInt(
+        bigOrderConfig.visibleBugSpawnIntervalMin,
+        bigOrderConfig.visibleBugSpawnIntervalMax
+      );
+    }
+  }
+
+  if (specialEventState.timer === 0) {
+    statusMessage =
+      specialEventState.type === "bug-wave"
+        ? "Bugwelle vorbei"
+        : "Großauftrag abgeschlossen";
+    scheduleNextSpecialEvent();
+  }
 }
 
 /**
@@ -523,10 +900,52 @@ function createPlatform(x, y, w, h, kind) {
  * @param {number} minX - Patrol minimum x-position.
  * @param {number} maxX - Patrol maximum x-position.
  * @param {number} speed - Initial horizontal speed.
- * @returns {{x:number, y:number, w:number, h:number, minX:number, maxX:number, vx:number, alive:boolean}} Bug object.
+ * @param {{telegraph?: boolean, markerX?: number, markerY?: number}} [options={}] - Optional spawn preview settings.
+ * @returns {{x:number, y:number, w:number, h:number, minX:number, maxX:number, vx:number, vy:number, alive:boolean, falling:boolean, targetPlatformMinX:number, targetPlatformMaxX:number, targetGroundY:number}} Bug object.
  */
-function createBug(x, y, minX, maxX, speed) {
-  return { x, y, w: 46, h: 38, minX, maxX, vx: speed, alive: true };
+function createBug(x, y, minX, maxX, speed, options = {}) {
+  const { telegraph = false, markerX = x + 23, markerY = y + 19 } = options;
+  return {
+    x,
+    y,
+    w: 46,
+    h: 38,
+    minX,
+    maxX,
+    vx: speed,
+    vy: 0,
+    alive: true,
+    falling: false,
+    targetPlatformMinX: minX,
+    targetPlatformMaxX: maxX,
+    targetGroundY: y,
+    spawnTimer: telegraph ? specialEventConfig.spawnTelegraphDuration : 0,
+    spawnDuration: specialEventConfig.spawnTelegraphDuration,
+    spawnMarkerX: markerX,
+    spawnMarkerY: markerY,
+  };
+}
+
+/**
+ * Creates a bug that drops from the sky and starts patrolling after landing.
+ *
+ * @param {{x:number, y:number, w:number}} platform - Platform that should receive the falling bug.
+ * @returns {{x:number, y:number, w:number, h:number, minX:number, maxX:number, vx:number, vy:number, alive:boolean, falling:boolean, targetPlatformMinX:number, targetPlatformMaxX:number, targetGroundY:number}} Bug object.
+ */
+function createFallingBug(platform) {
+  const patrolMargin = 18;
+  const minX = platform.x + patrolMargin;
+  const maxX = platform.x + platform.w - patrolMargin;
+  const spawnX = clamp(randomBetween(minX, maxX - 46), minX, maxX - 46);
+  const spawnY = randomBetween(-58, -22);
+  const bug = createBug(spawnX, spawnY, minX, maxX, 0);
+
+  bug.falling = true;
+  bug.vy = randomBetween(0.6, 1.2);
+  bug.targetPlatformMinX = minX;
+  bug.targetPlatformMaxX = maxX;
+  bug.targetGroundY = platform.y - bug.h;
+  return bug;
 }
 
 /**
@@ -962,8 +1381,9 @@ function getSafeGemX(platform) {
  * Places a collectible on a platform when a safe location exists.
  *
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
+ * @param {boolean} [telegraph=false] - Whether the item should fade and scale in before becoming active.
  */
-function addGemOnPlatform(platform) {
+function addGemOnPlatform(platform, telegraph = false) {
   if (platform.w < 90) {
     return;
   }
@@ -978,6 +1398,27 @@ function addGemOnPlatform(platform) {
     y: platform.y - 32,
     r: 14,
     collected: false,
+    spawnTimer: telegraph ? specialEventConfig.spawnTelegraphDuration : 0,
+    spawnDuration: specialEventConfig.spawnTelegraphDuration,
+  });
+}
+
+/**
+ * Advances pending spawn telegraphs for gems and bugs.
+ *
+ * @param {number} delta - Frame delta in milliseconds.
+ */
+function updateSpawnTelegraphs(delta) {
+  level.gems.forEach((gem) => {
+    if (gem.spawnTimer > 0) {
+      gem.spawnTimer = Math.max(0, gem.spawnTimer - delta);
+    }
+  });
+
+  level.bugs.forEach((bug) => {
+    if (bug.spawnTimer > 0) {
+      bug.spawnTimer = Math.max(0, bug.spawnTimer - delta);
+    }
   });
 }
 
@@ -985,8 +1426,9 @@ function addGemOnPlatform(platform) {
  * Places a bug patrol on a platform when the platform is large enough.
  *
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
+ * @param {boolean} [telegraph=false] - Whether the bug should fade and scale in before becoming active.
  */
-function addBugOnPlatform(platform) {
+function addBugOnPlatform(platform, telegraph = false) {
   if (platform.w < 120) {
     return;
   }
@@ -994,7 +1436,11 @@ function addBugOnPlatform(platform) {
   const patrolMargin = 18;
   const bugX = clamp(platform.x + platform.w * 0.5 - 23, platform.x + patrolMargin, platform.x + platform.w - 46 - patrolMargin);
   const speed = (Math.random() > 0.5 ? 1 : -1) * randomBetween(0.8, 1.5);
-  level.bugs.push(createBug(bugX, platform.y - 38, platform.x + patrolMargin, platform.x + platform.w - patrolMargin, speed));
+  level.bugs.push(
+    createBug(bugX, platform.y - 38, platform.x + patrolMargin, platform.x + platform.w - patrolMargin, speed, {
+      telegraph,
+    })
+  );
 }
 
 /**
@@ -1002,6 +1448,8 @@ function addBugOnPlatform(platform) {
  */
 function generateChunk() {
   // Endless terrain is generated one chunk ahead of the camera at a time.
+  const bigOrderActive = isSpecialEventActive("big-order");
+  const bigOrderConfig = specialEventConfig.bigOrder;
   const gapWidth = randomInt(78, 122);
   const x = level.nextChunkX + gapWidth;
   const width = randomInt(180, 340);
@@ -1014,10 +1462,10 @@ function generateChunk() {
     addGroundHazard(ground);
     groundHasHazard = true;
   }
-  if (Math.random() < 0.55) {
+  if (Math.random() < (bigOrderActive ? bigOrderConfig.groundGemChance : 0.55)) {
     addGemOnPlatform(ground);
   }
-  if (Math.random() < 0.33) {
+  if (Math.random() < (bigOrderActive ? bigOrderConfig.groundBugChance : 0.33)) {
     addBugOnPlatform(ground);
   }
 
@@ -1055,16 +1503,19 @@ function generateChunk() {
 
       level.platforms.push(plate);
 
-      if (Math.random() < 0.72) {
+      if (Math.random() < (bigOrderActive ? bigOrderConfig.plateGemChance : 0.72)) {
         addGemOnPlatform(plate);
+        if (bigOrderActive && Math.random() < bigOrderConfig.plateExtraGemChance) {
+          addGemOnPlatform(plate);
+        }
       }
-      if (Math.random() < 0.3) {
+      if (Math.random() < (bigOrderActive ? bigOrderConfig.plateBugChance : 0.3)) {
         addBugOnPlatform(plate);
       }
     }
   }
 
-  if (Math.random() < 0.22) {
+  if (Math.random() < (bigOrderActive ? bigOrderConfig.bonusPlatformChance : 0.22)) {
     const bonusWidth = randomInt(82, 130);
     const bonusX = x + width + randomInt(26, 80);
     const bonusY = clamp(groundY - randomInt(96, 152), 240, 390);
@@ -1087,6 +1538,12 @@ function generateChunk() {
       }
       level.platforms.push(bonus);
       addGemOnPlatform(bonus);
+      if (bigOrderActive && Math.random() < bigOrderConfig.bonusExtraGemChance) {
+        addGemOnPlatform(bonus);
+      }
+      if (bigOrderActive && Math.random() < bigOrderConfig.bonusBugChance) {
+        addBugOnPlatform(bonus);
+      }
     }
   }
 
@@ -1126,6 +1583,7 @@ function resetPlayer(fullReset = false) {
   resetDirectionalInputState();
 
   if (fullReset) {
+    resetSpecialEventState();
     initLevel();
     player.lives = 3;
     player.gems = 0;
@@ -1321,6 +1779,29 @@ function getSafePlatformPoseX(platform, preferredX) {
     }
   });
 
+  const stillBlocked = blockers.some((blocker) => {
+    return safeX < blocker.x + blocker.w + blocker.padding && safeX + player.w > blocker.x - blocker.padding;
+  });
+
+  if (stillBlocked) {
+    const leftEscape = blockers
+      .map((blocker) => blocker.x - player.w - blocker.padding)
+      .filter((candidate) => candidate >= minX)
+      .sort((a, b) => Math.abs(a - preferredX) - Math.abs(b - preferredX))[0];
+    const rightEscape = blockers
+      .map((blocker) => blocker.x + blocker.w + blocker.padding)
+      .filter((candidate) => candidate <= maxX)
+      .sort((a, b) => Math.abs(a - preferredX) - Math.abs(b - preferredX))[0];
+
+    if (leftEscape !== undefined && rightEscape !== undefined) {
+      safeX = Math.abs(leftEscape - preferredX) < Math.abs(rightEscape - preferredX) ? leftEscape : rightEscape;
+    } else if (leftEscape !== undefined) {
+      safeX = leftEscape;
+    } else if (rightEscape !== undefined) {
+      safeX = rightEscape;
+    }
+  }
+
   return clamp(safeX, minX, maxX);
 }
 
@@ -1343,7 +1824,7 @@ function moveToSafeInjuredPose(preferredX, preferredY) {
 
   return {
     x: getSafePlatformPoseX(platform, clampedX),
-    y: Math.min(preferredY, platform.y - player.h),
+    y: platform.y - player.h,
   };
 }
 
@@ -1476,7 +1957,7 @@ function handleMovement() {
   });
 
   level.gems.forEach((gem) => {
-    if (gem.collected) {
+    if (gem.collected || gem.spawnTimer > 0) {
       return;
     }
     if (circleRectCollision(gem, player)) {
@@ -1491,29 +1972,61 @@ function handleMovement() {
     }
   });
 
+  let stompedAnyBug = false;
+
   level.bugs.forEach((bug) => {
-    if (!bug.alive) {
+    if (!bug.alive || bug.spawnTimer > 0) {
       return;
     }
 
-    bug.x += bug.vx;
-    if (bug.x <= bug.minX || bug.x + bug.w >= bug.maxX) {
-      bug.vx *= -1;
-      bug.x = clamp(bug.x, bug.minX, bug.maxX - bug.w);
+    if (bug.falling) {
+      bug.vy = Math.min(4.75, bug.vy + world.gravity * 0.21);
+      bug.y += bug.vy;
+
+      if (bug.y >= bug.targetGroundY) {
+        bug.y = bug.targetGroundY;
+        bug.falling = false;
+        bug.vy = 0;
+        bug.minX = bug.targetPlatformMinX;
+        bug.maxX = bug.targetPlatformMaxX;
+        bug.vx = (Math.random() > 0.5 ? 1 : -1) * randomBetween(0.9, 1.6);
+      }
+    } else {
+      bug.x += bug.vx;
+      if (bug.x <= bug.minX || bug.x + bug.w >= bug.maxX) {
+        bug.vx *= -1;
+        bug.x = clamp(bug.x, bug.minX, bug.maxX - bug.w);
+      }
     }
 
     if (!overlaps(player, bug)) {
       return;
     }
 
-    const stomped = player.vy > 1 && previousY + player.h <= bug.y + 10;
+    if (bug.falling) {
+      if (player.invincible <= 0) {
+        const safePose = moveToSafeInjuredPose(player.x, player.y);
+        loseLife("Ein fallender Bug hat den Tiger erwischt", {
+          showInjured: true,
+          holdPosition: true,
+          hitX: safePose.x,
+          hitY: safePose.y,
+        });
+      }
+      return;
+    }
+
+    const stomped = player.vy > 1 && previousY + player.h <= bug.y + 14;
     if (stomped) {
       bug.alive = false;
       const scoreEffect = createHitEffect(bug.x + bug.w / 2, bug.y + 6, "⭐");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-      player.vy = -8.5;
       player.score += 150;
-      statusMessage = "Bug besiegt. Punkte eingesackt";
+      stompedAnyBug = true;
+      return;
+    }
+
+    if (stompedAnyBug) {
       return;
     }
 
@@ -1527,6 +2040,11 @@ function handleMovement() {
       });
     }
   });
+
+  if (stompedAnyBug) {
+    player.vy = -8.5;
+    statusMessage = "Bug besiegt. Punkte eingesackt";
+  }
 
   level.rockets.forEach((rocket) => {
     if (!rocket.active) {
@@ -1592,6 +2110,10 @@ function loseLife(message, options = {}) {
     hitY = player.y,
     respawnVisual = "injured",
   } = options;
+  const injuredPose =
+    showInjured && respawnVisual === "injured"
+      ? moveToSafeInjuredPose(hitX, hitY)
+      : { x: hitX, y: hitY };
 
   player.lives -= 1;
   player.invincible = showInjured ? 135 : 75;
@@ -1609,9 +2131,9 @@ function loseLife(message, options = {}) {
     gameState = "lost";
     saveHighScore(getTotalScore());
     statusMessage = "Game over. Drücke R für einen Neustart";
-    if (showInjured && holdPosition) {
-      player.x = hitX;
-      player.y = hitY;
+    if (showInjured && (holdPosition || respawnVisual === "injured")) {
+      player.x = injuredPose.x;
+      player.y = injuredPose.y;
       player.grounded = true;
     }
     player.vx = 0;
@@ -1624,9 +2146,9 @@ function loseLife(message, options = {}) {
   player.vy = 0;
   player.grounded = false;
 
-  if (showInjured && holdPosition) {
-    player.x = hitX;
-    player.y = hitY;
+  if (showInjured && (holdPosition || respawnVisual === "injured")) {
+    player.x = injuredPose.x;
+    player.y = injuredPose.y;
     player.grounded = true;
     return;
   }
@@ -1731,6 +2253,23 @@ function drawHazard(hazard) {
 }
 
 /**
+ * Returns the current alpha and scale for a spawning entity preview.
+ *
+ * @param {number} timer - Remaining telegraph time in milliseconds.
+ * @param {number} duration - Total telegraph time in milliseconds.
+ * @param {number} time - Current animation timestamp.
+ * @returns {{alpha:number, scale:number}} Preview opacity and scale.
+ */
+function getSpawnPreviewState(timer, duration, time) {
+  const progress = 1 - clamp(timer / Math.max(1, duration), 0, 1);
+  const pulse = 1 + Math.sin(time / 95) * 0.08;
+  return {
+    alpha: 0.2 + progress * 0.8,
+    scale: (0.45 + progress * 0.55) * pulse,
+  };
+}
+
+/**
  * Draws a collectible currency symbol with a small hover animation.
  *
  * @param {{x:number, y:number, r:number, collected:boolean}} gem - Collectible to render.
@@ -1738,6 +2277,26 @@ function drawHazard(hazard) {
  */
 function drawGem(gem, time) {
   if (gem.collected) {
+    return;
+  }
+
+  if (gem.spawnTimer > 0) {
+    const preview = getSpawnPreviewState(gem.spawnTimer, gem.spawnDuration, time);
+    const x = gem.x - cameraX;
+
+    ctx.save();
+    ctx.translate(x, gem.y);
+    ctx.scale(preview.scale, preview.scale);
+    ctx.globalAlpha = preview.alpha;
+    ctx.fillStyle = "#ffe37a";
+    ctx.strokeStyle = "#9a6a00";
+    ctx.lineWidth = 2.5;
+    ctx.font = "700 42px Trebuchet MS";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeText("€", 0, 0);
+    ctx.fillText("€", 0, 0);
+    ctx.restore();
     return;
   }
 
@@ -1769,8 +2328,31 @@ function drawBug(bug, time) {
     return;
   }
 
+  if (bug.spawnTimer > 0) {
+    const preview = getSpawnPreviewState(bug.spawnTimer, bug.spawnDuration, time);
+    const x = (bug.spawnMarkerX ?? bug.x + bug.w / 2) - cameraX;
+    const y = bug.spawnMarkerY ?? bug.y + bug.h / 2;
+    const facing = bug.vx < 0 ? -1 : 1;
+
+    ctx.save();
+    ctx.globalAlpha = preview.alpha;
+    ctx.translate(x, y + bug.h / 2);
+    ctx.scale(facing * preview.scale, preview.scale);
+    ctx.translate(-bug.w / 2, -bug.h / 2);
+
+    if (sprites.bug.complete) {
+      ctx.drawImage(sprites.bug, -10, -14, 66, 52);
+    } else {
+      ctx.fillStyle = "#5d1f14";
+      ctx.fillRect(0, 0, bug.w, bug.h);
+    }
+
+    ctx.restore();
+    return;
+  }
+
   const x = bug.x - cameraX;
-  const y = bug.y + Math.sin(time / 170 + bug.x * 0.03) * 1.5;
+  const y = bug.falling ? bug.y : bug.y + Math.sin(time / 170 + bug.x * 0.03) * 1.5;
   const facing = bug.vx < 0 ? -1 : 1;
 
   ctx.save();
@@ -2197,6 +2779,67 @@ function drawResumeCountdown() {
 }
 
 /**
+ * Draws the warning countdown that announces an upcoming special event.
+ */
+function drawSpecialEventAnnouncement() {
+  if (
+    specialEventState.phase !== "announce" ||
+    gameState !== "playing" ||
+    player.hurtTimer > 0 ||
+    resumeCountdownTimer > 0
+  ) {
+    return;
+  }
+
+  const countdown = Math.max(0, Math.ceil(specialEventState.timer / 1000));
+  drawCenterCountdown(countdown);
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#fff4e5";
+  ctx.font = "700 34px Trebuchet MS";
+  ctx.fillText(getSpecialEventTitle(specialEventState.type, true), canvas.width / 2, canvas.height / 2 - 92);
+  ctx.fillStyle = "#ffd5b3";
+  ctx.font = "20px Trebuchet MS";
+  ctx.fillText("Bereite dich vor", canvas.width / 2, canvas.height / 2 + 82);
+  ctx.restore();
+}
+
+/**
+ * Draws a compact HUD badge for currently active special events.
+ */
+function drawSpecialEventStatus() {
+  if (specialEventState.phase !== "active" || player.hurtTimer > 0 || resumeCountdownTimer > 0) {
+    return;
+  }
+
+  const remaining = Math.max(0, Math.ceil(specialEventState.timer / 1000));
+  const badgeX = 18;
+  const badgeY = mobileHud.topBar.y + mobileHud.topBar.h + 10;
+  const badgeW = 238;
+  const badgeH = 52;
+
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(28, 17, 22, 0.92)";
+  ctx.strokeStyle = "rgba(255, 231, 201, 0.22)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 16);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#fff3e3";
+  ctx.font = "700 18px Trebuchet MS";
+  ctx.fillText(getSpecialEventTitle(specialEventState.type), badgeX + 14, badgeY + 21);
+  ctx.fillStyle = "#ffd5b3";
+  ctx.font = "15px Trebuchet MS";
+  ctx.fillText(`${remaining}s verbleibend`, badgeX + 14, badgeY + 40);
+  ctx.restore();
+}
+
+/**
  * Renders the full frame for the current game state.
  *
  * @param {number} time - Current animation timestamp.
@@ -2212,18 +2855,29 @@ function render(time) {
   level.platforms.forEach(drawPlatform);
   level.hazards.forEach(drawHazard);
   level.gems.forEach((gem) => drawGem(gem, time));
-  level.bugs.forEach((bug) => drawBug(bug, time));
+  level.bugs.forEach((bug) => {
+    if (bug.spawnTimer <= 0) {
+      drawBug(bug, time);
+    }
+  });
   level.rockets.forEach(drawRocket);
   drawTiger();
+  level.bugs.forEach((bug) => {
+    if (bug.spawnTimer > 0) {
+      drawBug(bug, time);
+    }
+  });
   drawRespawnAttention();
   drawRespawnCountdown();
   drawResumeCountdown();
+  drawSpecialEventAnnouncement();
 
   if (gameState !== "playing") {
     drawOverlay();
   }
 
   drawHud();
+  drawSpecialEventStatus();
   drawHudEffects();
 }
 
@@ -2237,6 +2891,12 @@ function gameLoop(time) {
   lastTime = time;
 
   if (delta < 100) {
+    const gameplayPaused =
+      gameState !== "playing" ||
+      isPortraitMobileView() ||
+      player.hurtTimer > 0 ||
+      resumeCountdownTimer > 0;
+
     jumpButtonGlow = Math.max(0, jumpButtonGlow - 1);
     player.hurtTimer = Math.max(0, player.hurtTimer - delta);
     resumeCountdownTimer = Math.max(0, resumeCountdownTimer - delta);
@@ -2253,6 +2913,10 @@ function gameLoop(time) {
       player.vx = 0;
       player.vy = 0;
       player.grounded = false;
+    }
+    updateSpawnTelegraphs(delta);
+    if (!gameplayPaused) {
+      updateSpecialEvents(delta);
     }
     updateHudEffects(delta);
     handleMovement();
