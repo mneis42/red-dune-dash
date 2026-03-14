@@ -1183,6 +1183,21 @@ function circleRectCollision(circle, rect) {
 }
 
 /**
+ * Checks whether the tiger's center band intersects a spike hazard.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} hazard - Hazard rectangle.
+ * @returns {boolean} True when the player's center band touches the hazard span.
+ */
+function hitsHazardWithPlayerCenter(hazard) {
+  const centerBandRadius = 15;
+  const playerCenterX = player.x + player.w / 2;
+  const centerBandLeft = playerCenterX - centerBandRadius;
+  const centerBandRight = playerCenterX + centerBandRadius;
+  const overlapsVertically = player.y < hazard.y + hazard.h && player.y + player.h > hazard.y;
+  return overlapsVertically && centerBandRight >= hazard.x && centerBandLeft <= hazard.x + hazard.w;
+}
+
+/**
  * Computes a safe checkpoint x-position on a ground platform.
  *
  * @param {{x:number, y:number, w:number, h:number}} platform - Ground platform used as checkpoint source.
@@ -1396,7 +1411,7 @@ function handleMovement() {
     if (player.invincible > 0) {
       return;
     }
-    if (overlaps(player, hazard)) {
+    if (hitsHazardWithPlayerCenter(hazard)) {
       const safePose = moveToSafeInjuredPose(player.x, hazard.y + hazard.h - player.h + 10);
       loseLife("Autsch, scharfe Lavasteine", {
         showInjured: true,
