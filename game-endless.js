@@ -1239,7 +1239,7 @@ function drawHud() {
 
   const jumpActive = jumpButtonGlow > 0;
 
-  const drawControl = (circle, glyph, active, accent, glyphSize) => {
+  const drawControl = (circle, active, accent, kind) => {
     const glowAlpha = active ? 0.16 : 0.06;
     const radiusBoost = active ? 8 : 0;
 
@@ -1257,24 +1257,31 @@ function drawHud() {
     ctx.stroke();
 
     ctx.fillStyle = active ? "#5a2a12" : "rgba(72, 36, 18, 0.72)";
-    ctx.font = `700 ${glyphSize}px Trebuchet MS`;
-    ctx.textAlign = "center";
-    ctx.fillText(glyph, circle.cx, circle.cy + 2);
-    ctx.textAlign = "left";
+    if (kind === "jump") {
+      ctx.font = "700 42px Trebuchet MS";
+      ctx.textAlign = "center";
+      ctx.fillText("▲", circle.cx, circle.cy + 2);
+      ctx.textAlign = "left";
+      return;
+    }
+
+    const direction = kind === "left" ? 1 : -1;
+    ctx.save();
+    ctx.translate(circle.cx, circle.cy);
+    ctx.scale(direction, 1);
+    ctx.beginPath();
+    ctx.moveTo(-12, 0);
+    ctx.lineTo(10, -16);
+    ctx.lineTo(10, 16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   };
 
-  if (isTouchDevice) {
-    drawControl(mobileHud.leftPad, "◀", leftActive, "rgba(255, 255, 255, 0.36)", 34);
-    drawControl(mobileHud.rightPad, "▶", rightActive, "rgba(255, 255, 255, 0.36)", 34);
-    drawControl(mobileHud.jumpPad, "▲", jumpActive, "rgba(255, 255, 255, 0.42)", 42);
-
-    if (gameState === "ready") {
-      ctx.fillStyle = "rgba(255, 244, 226, 0.92)";
-      ctx.font = "700 18px Trebuchet MS";
-      ctx.textAlign = "center";
-      ctx.fillText("Tippe auf Springen oder ins Bild zum Start", canvas.width / 2, 108);
-      ctx.textAlign = "left";
-    }
+  if (isTouchDevice && gameState !== "lost") {
+    drawControl(mobileHud.leftPad, leftActive, "rgba(255, 255, 255, 0.36)", "left");
+    drawControl(mobileHud.rightPad, rightActive, "rgba(255, 255, 255, 0.36)", "right");
+    drawControl(mobileHud.jumpPad, jumpActive, "rgba(255, 255, 255, 0.42)", "jump");
   }
 
   ctx.restore();
@@ -1293,17 +1300,12 @@ function drawOverlay() {
     ctx.fillText("Curious Tiger: Red Dune Dash", canvas.width / 2, 150);
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
-    ctx.fillText("Bekämpfe Bugs, sammle Moneten und überlebe die Marsduenen.", canvas.width / 2, 196);
+    ctx.fillText("Bekämpfe Bugs, sammle Moneten und überlebe die Marsdünen.", canvas.width / 2, 196);
     ctx.font = "700 34px Trebuchet MS";
     ctx.fillStyle = "#fff6ea";
-    ctx.fillText(isTouchDevice ? "Tippe zum Starten" : "Leertaste fuer den Start", canvas.width / 2, 256);
+    ctx.fillText(isTouchDevice ? "Tippe zum Starten" : "Leertaste für den Start", canvas.width / 2, 286);
     ctx.font = "22px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
-    ctx.fillText(
-      isTouchDevice ? "Tippe auf das Spiel oder auf Springen" : "A / D laufen   W oder Leertaste springen   R neu starten",
-      canvas.width / 2,
-      298
-    );
 
     if (shouldShowInstallPrompt()) {
       const hintY = 344;
@@ -1316,8 +1318,8 @@ function drawOverlay() {
       ctx.fillStyle = "rgba(255, 240, 221, 0.9)";
       ctx.fillText(
         deferredInstallPrompt || isIosInstallFallback()
-          ? "Installiere das Spiel fuer schnelleren Zugriff auf deinem Geraet"
-          : "Installation wird verfuegbar, sobald dein Browser sie anbietet",
+          ? "Installiere das Spiel für schnelleren Zugriff auf deinem Gerät"
+          : "",
         canvas.width / 2,
         hintY
       );
@@ -1355,8 +1357,8 @@ function drawOverlay() {
         ctx.font = "700 16px Trebuchet MS";
         ctx.fillText("iPhone / iPad:", helpX + 16, helpY + 24);
         ctx.font = "15px Trebuchet MS";
-        ctx.fillText("1. Safari Teilen-Menue oeffnen", helpX + 16, helpY + 50);
-        ctx.fillText("2. 'Zum Home-Bildschirm' waehlen", helpX + 16, helpY + 74);
+        ctx.fillText("1. Safari Teilen-Menü öffnen", helpX + 16, helpY + 50);
+        ctx.fillText("2. 'Zum Home-Bildschirm' wählen", helpX + 16, helpY + 74);
         ctx.fillText("3. Danach vom Home-Screen starten", helpX + 16, helpY + 98);
         ctx.textAlign = "center";
       }
@@ -1399,7 +1401,7 @@ function drawRotateOverlay() {
   ctx.fillText("Bitte ins Querformat drehen", canvas.width / 2, canvas.height / 2 + 8);
   ctx.fillStyle = "#ffd1aa";
   ctx.font = "22px Trebuchet MS";
-  ctx.fillText("Das Spiel ist mobil fuer Landscape optimiert", canvas.width / 2, canvas.height / 2 + 50);
+  ctx.fillText("Das Spiel ist mobil für Landscape optimiert", canvas.width / 2, canvas.height / 2 + 50);
   ctx.restore();
 }
 
