@@ -1248,12 +1248,13 @@ function getSafeCheckpointX(platform) {
 }
 
 /**
- * Finds the y-position of the closest supporting platform under the player at a given x-position.
+ * Finds the closest supporting platform under the player at a given x-position.
  *
  * @param {number} playerX - Candidate player x-position.
- * @returns {number|null} Platform-aligned player y-position or null when unsupported.
+ * @param {number} preferredY - Preferred player y-position.
+ * @returns {{x:number, y:number, w:number, h:number, kind:string}|null} Supporting platform or null when unsupported.
  */
-function getStableGroundYAt(playerX) {
+function getSupportingPlatformAt(playerX, preferredY) {
   // Hurt poses should snap to solid platforms instead of hovering above gaps or enemies.
   const supportingPlatforms = level.platforms.filter((platform) => {
     const overlapsX = playerX + player.w > platform.x && playerX < platform.x + platform.w;
@@ -1264,8 +1265,63 @@ function getStableGroundYAt(playerX) {
     return null;
   }
 
-  supportingPlatforms.sort((a, b) => a.y - b.y);
-  return supportingPlatforms[0].y - player.h;
+  const playerFeetY = preferredY + player.h;
+  const platformsBelow = supportingPlatforms.filter((platform) => platform.y >= playerFeetY - 8);
+  const candidatePlatforms = platformsBelow.length > 0 ? platformsBelow : supportingPlatforms;
+  candidatePlatforms.sort((a, b) => a.y - b.y);
+  return candidatePlatforms[0];
+}
+
+/**
+ * Computes a safe hurt-pose x-position on a platform while avoiding hazards and living bugs.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Supporting platform.
+ * @param {number} preferredX - Preferred player x-position.
+ * @returns {number} Safe player x-position on the platform.
+ */
+function getSafePlatformPoseX(platform, preferredX) {
+  const edgeMargin = 28;
+  const minX = platform.x + edgeMargin;
+  const maxX = platform.x + platform.w - player.w - edgeMargin;
+  let safeX = clamp(preferredX, minX, maxX);
+
+  const blockers = [
+    ...level.hazards
+      .filter((hazard) => Math.abs(hazard.y + hazard.h - platform.y) < 36)
+      .map((hazard) => ({ x: hazard.x, w: hazard.w, padding: 24 })),
+    ...level.bugs
+      .filter((bug) => bug.alive && Math.abs(bug.y + bug.h - platform.y) < 24)
+      .map((bug) => ({ x: bug.x, w: bug.w, padding: 18 })),
+  ];
+
+  blockers.forEach((blocker) => {
+    const overlapsBlocker =
+      safeX < blocker.x + blocker.w + blocker.padding &&
+      safeX + player.w > blocker.x - blocker.padding;
+
+    if (!overlapsBlocker) {
+      return;
+    }
+
+    const leftOption = blocker.x - player.w - blocker.padding;
+    const rightOption = blocker.x + blocker.w + blocker.padding;
+    const canUseLeft = leftOption >= minX;
+    const canUseRight = rightOption <= maxX;
+
+    if (canUseLeft && canUseRight) {
+      safeX = Math.abs(safeX - leftOption) < Math.abs(rightOption - safeX) ? leftOption : rightOption;
+      return;
+    }
+    if (canUseLeft) {
+      safeX = leftOption;
+      return;
+    }
+    if (canUseRight) {
+      safeX = rightOption;
+    }
+  });
+
+  return clamp(safeX, minX, maxX);
 }
 
 /**
@@ -1277,8 +1333,8 @@ function getStableGroundYAt(playerX) {
  */
 function moveToSafeInjuredPose(preferredX, preferredY) {
   const clampedX = Math.max(0, preferredX);
-  const groundY = getStableGroundYAt(clampedX);
-  if (groundY === null) {
+  const platform = getSupportingPlatformAt(clampedX, preferredY);
+  if (platform === null) {
     return {
       x: player.checkpointX,
       y: player.checkpointY,
@@ -1286,8 +1342,8 @@ function moveToSafeInjuredPose(preferredX, preferredY) {
   }
 
   return {
-    x: clampedX,
-    y: Math.min(preferredY, groundY),
+    x: getSafePlatformPoseX(platform, clampedX),
+    y: Math.min(preferredY, platform.y - player.h),
   };
 }
 
