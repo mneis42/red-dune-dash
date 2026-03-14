@@ -315,8 +315,8 @@ function createCloud(x) {
   };
 }
 
-function createHitEffect(x, y, emoji) {
-  return { x, y, emoji };
+function createHitEffect(x, y, emoji, color = null) {
+  return { x, y, emoji, color };
 }
 
 function getHudStats() {
@@ -388,6 +388,7 @@ function spawnHudEmoji(worldX, worldY, emoji, statKey) {
 
   hudEffects.push({
     emoji,
+    color: targetStat.key === "gems" ? "#ffe37a" : null,
     t: 0,
     duration: 900,
     startX: worldX - cameraX,
@@ -424,7 +425,15 @@ function drawHudEffects() {
     const alpha = 1 - progress * 0.88;
 
     ctx.globalAlpha = alpha;
-    ctx.font = `${Math.round(28 * scale)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.fillStyle = effect.color ?? "#fff6ea";
+    ctx.strokeStyle = effect.color ? "#9a6a00" : "transparent";
+    ctx.lineWidth = effect.color ? 2 : 0;
+    ctx.font = effect.color
+      ? `${Math.round(28 * scale)}px Trebuchet MS`
+      : `${Math.round(28 * scale)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    if (effect.color) {
+      ctx.strokeText(effect.emoji, x, y);
+    }
     ctx.fillText(effect.emoji, x, y);
   });
 
@@ -776,13 +785,56 @@ function circleRectCollision(circle, rect) {
   return dx * dx + dy * dy < circle.r * circle.r;
 }
 
+function getSafeCheckpointX(platform) {
+  const edgeMargin = 28;
+  const respawnWidth = player.w;
+  const minX = platform.x + edgeMargin;
+  const maxX = platform.x + platform.w - respawnWidth - edgeMargin;
+  let safeX = clamp(player.x, minX, maxX);
+
+  const overlappingHazards = level.hazards.filter((hazard) => {
+    const sameLane = Math.abs(hazard.y + hazard.h - platform.y) < 36;
+    const overlapsPlatform = hazard.x < platform.x + platform.w && hazard.x + hazard.w > platform.x;
+    return sameLane && overlapsPlatform;
+  });
+
+  overlappingHazards.forEach((hazard) => {
+    const overlapsHazard =
+      safeX < hazard.x + hazard.w + 18 &&
+      safeX + respawnWidth > hazard.x - 18;
+
+    if (!overlapsHazard) {
+      return;
+    }
+
+    const leftOption = hazard.x - respawnWidth - 24;
+    const rightOption = hazard.x + hazard.w + 24;
+    const canUseLeft = leftOption >= minX;
+    const canUseRight = rightOption <= maxX;
+
+    if (canUseLeft && canUseRight) {
+      safeX = Math.abs(safeX - leftOption) < Math.abs(rightOption - safeX) ? leftOption : rightOption;
+      return;
+    }
+    if (canUseLeft) {
+      safeX = leftOption;
+      return;
+    }
+    if (canUseRight) {
+      safeX = rightOption;
+    }
+  });
+
+  return clamp(safeX, minX, maxX);
+}
+
 function updateCheckpoint(platform) {
   if (platform.kind !== "ground") {
     return;
   }
 
   if (player.x > player.checkpointX + 80) {
-    player.checkpointX = player.x;
+    player.checkpointX = getSafeCheckpointX(platform);
     player.checkpointY = platform.y - player.h;
   }
 }
@@ -890,7 +942,7 @@ function handleMovement() {
     }
     if (circleRectCollision(gem, player)) {
       gem.collected = true;
-      const moneyEffect = createHitEffect(gem.x, gem.y, "💶");
+      const moneyEffect = createHitEffect(gem.x, gem.y, "€", "#ffe37a");
       const scoreEffect = createHitEffect(gem.x + 16, gem.y - 8, "⭐");
       spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gems");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
@@ -1078,7 +1130,7 @@ function drawGem(gem, time) {
   ctx.fillStyle = "#ffe37a";
   ctx.strokeStyle = "#9a6a00";
   ctx.lineWidth = 2.5;
-  ctx.font = "700 28px Trebuchet MS";
+  ctx.font = "700 42px Trebuchet MS";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.strokeText("€", 0, 0);
@@ -1182,7 +1234,7 @@ function drawHud() {
     ctx.font = `700 19px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
     ctx.fillText(stat.emoji, stat.sectionX, 24);
     ctx.font = "700 24px Trebuchet MS";
-    ctx.fillText(String(stat.value), stat.valueX, 25);
+    ctx.fillText(String(stat.value), stat.valueX, 23);
   });
 
   [241, 469, 693].forEach((x) => {
