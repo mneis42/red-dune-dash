@@ -254,9 +254,123 @@ const specialEventConfig = {
     visibleBugSpawnIntervalMax: 1800,
   },
 };
+const baseChunkGenerationConfig = {
+  groundGemChance: 0.55,
+  groundBugChance: 0.33,
+  plateGemChance: 0.72,
+  plateExtraGemChance: 0,
+  plateBugChance: 0.3,
+  bonusPlatformChance: 0.22,
+  bonusExtraGemChance: 0,
+  bonusBugChance: 0,
+};
+const SPECIAL_EVENT_PHASE = {
+  IDLE: "idle",
+  ANNOUNCE: "announce",
+  ACTIVE: "active",
+};
+const SPECIAL_EVENT_DEFINITIONS = {
+  "bug-wave": {
+    title: "Bugwelle",
+    announcementTitle: "Bugwelle rollt an",
+    announcementPrompt: "Bereite dich vor",
+    activeStatusMessage: "Bugwelle aktiv. Ausweichen und Bugs auf Plattformen zertrampeln",
+    completionStatusMessage: "Bugwelle vorbei",
+    rocketSpawnMultiplier: specialEventConfig.bugWaveRocketSpawnMultiplier,
+    rocketSpawnPhases: [SPECIAL_EVENT_PHASE.ANNOUNCE, SPECIAL_EVENT_PHASE.ACTIVE],
+    createRuntime(phase) {
+      if (phase === SPECIAL_EVENT_PHASE.ANNOUNCE) {
+        return {
+          fallingSpawnTimer: 1400,
+          groundSpawnTimer: 1100,
+        };
+      }
+      if (phase === SPECIAL_EVENT_PHASE.ACTIVE) {
+        return {
+          fallingSpawnTimer: 1200,
+          groundSpawnTimer: 950,
+        };
+      }
+      return {};
+    },
+    updateActive(delta, state) {
+      const progress = 1 - state.timer / getSpecialEventPhaseDuration(state.type, SPECIAL_EVENT_PHASE.ACTIVE);
+      const spawnInterval = Math.round(lerp(1700, 320, clamp(progress, 0, 1)));
+
+      state.runtime.fallingSpawnTimer -= delta;
+      state.runtime.groundSpawnTimer -= delta;
+
+      while (
+        state.runtime.fallingSpawnTimer <= 0 &&
+        getFallingBugCount() < specialEventConfig.bugWaveMaxFalling
+      ) {
+        spawnBugWaveBug();
+        state.runtime.fallingSpawnTimer += spawnInterval;
+      }
+
+      while (state.runtime.groundSpawnTimer <= 0) {
+        spawnBugWaveGroundBug();
+        state.runtime.groundSpawnTimer += randomInt(
+          specialEventConfig.bugWaveGroundSpawnIntervalMin,
+          specialEventConfig.bugWaveGroundSpawnIntervalMax
+        );
+      }
+    },
+  },
+  "big-order": {
+    title: "Großauftrag",
+    announcementTitle: "Großauftrag kommt rein",
+    announcementPrompt: "Bereite dich vor",
+    activeStatusMessage: "Großauftrag aktiv. Mehr Moneten und mehr Bugs unterwegs",
+    completionStatusMessage: "Großauftrag abgeschlossen",
+    chunkGeneration: specialEventConfig.bigOrder,
+    createRuntime(phase) {
+      if (phase === SPECIAL_EVENT_PHASE.ANNOUNCE) {
+        return {
+          gemSpawnTimer: 900,
+          bugSpawnTimer: 1200,
+        };
+      }
+      if (phase === SPECIAL_EVENT_PHASE.ACTIVE) {
+        return {
+          gemSpawnTimer: 700,
+          bugSpawnTimer: 1000,
+        };
+      }
+      return {};
+    },
+    updateActive(delta, state) {
+      const bigOrderConfig = specialEventConfig.bigOrder;
+
+      state.runtime.gemSpawnTimer -= delta;
+      while (state.runtime.gemSpawnTimer <= 0) {
+        spawnBigOrderGem();
+        if (Math.random() < bigOrderConfig.visibleExtraGemChance) {
+          spawnBigOrderGem();
+        }
+        state.runtime.gemSpawnTimer += randomInt(
+          bigOrderConfig.visibleGemSpawnIntervalMin,
+          bigOrderConfig.visibleGemSpawnIntervalMax
+        );
+      }
+
+      state.runtime.bugSpawnTimer -= delta;
+      while (state.runtime.bugSpawnTimer <= 0) {
+        spawnBigOrderBug();
+        if (Math.random() < bigOrderConfig.visibleExtraBugChance) {
+          spawnBigOrderBug();
+        }
+        state.runtime.bugSpawnTimer += randomInt(
+          bigOrderConfig.visibleBugSpawnIntervalMin,
+          bigOrderConfig.visibleBugSpawnIntervalMax
+        );
+      }
+    },
+  },
+};
 
 const debugSpecialEventDelayMs = null; // Set to a number to force a specific delay for testing, or null for random scheduling.
-const debugSpecialEventType = null; // "big-order" or "bug-wave" to force a specific event for testing, or null for random selection.
+const debugSpecialEventType = null; // Set to an event type id to force a specific event for testing, or null for random selection.
 
 const keys = {
   left: false,
@@ -304,6 +418,17 @@ const runState = {
   progressScore: 0,
   farthestX: level.spawn.x,
 };
+const BUG_STATUS = {
+  ACTIVE_WORLD: "active-world",
+  MISSED: "missed",
+  BACKLOG: "backlog",
+  RESOLVED: "resolved",
+  REACTIVATED: "reactivated",
+};
+const bugLifecycle = {
+  nextId: 1,
+  records: new Map(),
+};
 
 let highScore = loadHighScore();
 let cameraX = 0;
@@ -314,18 +439,11 @@ let worldTimeMs = 0;
 let runFrameIndex = 0;
 let runFrameTimer = 0;
 let rocketSpawnTimer = 0;
-const runBugStats = {
-  spawned: 0,
-  defeated: 0,
-};
 const specialEventState = {
   type: null,
-  phase: "idle",
-  timer: randomInt(specialEventConfig.minDelay, specialEventConfig.maxDelay),
-  bugWaveSpawnTimer: 1400,
-  bugWaveGroundSpawnTimer: 1100,
-  bigOrderSpawnTimer: 900,
-  bigOrderBugSpawnTimer: 1200,
+  phase: SPECIAL_EVENT_PHASE.IDLE,
+  timer: getNextSpecialEventDelay(),
+  runtime: {},
 };
 
 /**
@@ -416,99 +534,250 @@ function lerp(start, end, alpha) {
 /**
  * Picks a special-event type.
  *
- * @returns {"bug-wave"|"big-order"} Event type.
+ * @returns {string|null} Event type id or null when no events are registered.
  */
 function pickSpecialEventType() {
-  if (debugSpecialEventType === "bug-wave" || debugSpecialEventType === "big-order") {
+  if (getSpecialEventDefinition(debugSpecialEventType)) {
     return debugSpecialEventType;
   }
 
-  return Math.random() < 0.5 ? "bug-wave" : "big-order";
+  const eventTypes = Object.keys(SPECIAL_EVENT_DEFINITIONS);
+  if (eventTypes.length === 0) {
+    return null;
+  }
+
+  return eventTypes[randomInt(0, eventTypes.length - 1)];
 }
 
 /**
  * Returns the localized display title for a special event.
  *
- * @param {"bug-wave"|"big-order"|null} type - Event type.
+ * @param {string|null} type - Event type id.
  * @param {boolean} [forAnnouncement=false] - Whether the title is used for the warning phase.
  * @returns {string} Event title.
  */
 function getSpecialEventTitle(type, forAnnouncement = false) {
-  if (type === "bug-wave") {
-    return forAnnouncement ? "Bugwelle rollt an" : "Bugwelle";
+  const definition = getSpecialEventDefinition(type);
+  if (!definition) {
+    return "";
   }
-  if (type === "big-order") {
-    return forAnnouncement ? "Großauftrag kommt rein" : "Großauftrag";
+
+  return forAnnouncement ? definition.announcementTitle : definition.title;
+}
+
+/**
+ * Looks up a special-event definition by its type id.
+ *
+ * @param {string|null} type - Event type id.
+ * @returns {object|null} Event definition or null when the id is unknown.
+ */
+function getSpecialEventDefinition(type) {
+  if (typeof type !== "string") {
+    return null;
   }
-  return "";
+
+  return SPECIAL_EVENT_DEFINITIONS[type] ?? null;
+}
+
+/**
+ * Returns the currently selected special-event definition, regardless of phase.
+ *
+ * @returns {object|null} Current event definition or null when no event is selected.
+ */
+function getCurrentSpecialEventDefinition() {
+  return getSpecialEventDefinition(specialEventState.type);
+}
+
+/**
+ * Returns the active special-event definition when an event is currently running.
+ *
+ * @returns {object|null} Active event definition or null while idle/announcing.
+ */
+function getActiveSpecialEventDefinition() {
+  if (specialEventState.phase !== SPECIAL_EVENT_PHASE.ACTIVE) {
+    return null;
+  }
+
+  return getCurrentSpecialEventDefinition();
+}
+
+/**
+ * Returns the configured duration for one event phase.
+ *
+ * @param {string|null} type - Event type id.
+ * @param {"idle"|"announce"|"active"} phase - Event phase.
+ * @returns {number} Phase duration in milliseconds.
+ */
+function getSpecialEventPhaseDuration(type, phase) {
+  const definition = getSpecialEventDefinition(type);
+  if (phase === SPECIAL_EVENT_PHASE.ANNOUNCE) {
+    return definition?.announceDuration ?? specialEventConfig.announceDuration;
+  }
+  if (phase === SPECIAL_EVENT_PHASE.ACTIVE) {
+    return definition?.activeDuration ?? specialEventConfig.activeDuration;
+  }
+  return 0;
+}
+
+/**
+ * Returns the next cool-down before another special event may be announced.
+ *
+ * @returns {number} Delay in milliseconds.
+ */
+function getNextSpecialEventDelay() {
+  return debugSpecialEventDelayMs ?? randomInt(specialEventConfig.minDelay, specialEventConfig.maxDelay);
+}
+
+/**
+ * Creates the per-event runtime state for one phase transition.
+ *
+ * @param {string|null} type - Event type id.
+ * @param {"idle"|"announce"|"active"} phase - Target phase.
+ * @returns {object} Mutable runtime state for the selected phase.
+ */
+function createSpecialEventRuntime(type, phase) {
+  const definition = getSpecialEventDefinition(type);
+  return definition?.createRuntime ? definition.createRuntime(phase) : {};
+}
+
+/**
+ * Writes the core special-event state in one place so phase transitions stay consistent.
+ *
+ * @param {string|null} type - Event type id.
+ * @param {"idle"|"announce"|"active"} phase - Target phase.
+ * @param {number} timer - Remaining phase time in milliseconds.
+ */
+function setSpecialEventState(type, phase, timer) {
+  specialEventState.type = type;
+  specialEventState.phase = phase;
+  specialEventState.timer = timer;
+  specialEventState.runtime = createSpecialEventRuntime(type, phase);
+}
+
+/**
+ * Returns the UI snapshot for the current special event.
+ *
+ * @returns {{type:string, phase:string, timer:number, title:string, announcementTitle:string, announcementPrompt:string}|null} Event UI model or null when idle.
+ */
+function getCurrentSpecialEventInfo() {
+  const definition = getCurrentSpecialEventDefinition();
+  if (!definition || specialEventState.phase === SPECIAL_EVENT_PHASE.IDLE) {
+    return null;
+  }
+
+  return {
+    type: specialEventState.type,
+    phase: specialEventState.phase,
+    timer: specialEventState.timer,
+    title: definition.title,
+    announcementTitle: definition.announcementTitle,
+    announcementPrompt: definition.announcementPrompt ?? "Bereite dich vor",
+  };
+}
+
+/**
+ * Returns the chunk-generation overrides contributed by the currently active event.
+ *
+ * @returns {{groundGemChance:number,groundBugChance:number,plateGemChance:number,plateExtraGemChance:number,plateBugChance:number,bonusPlatformChance:number,bonusExtraGemChance:number,bonusBugChance:number}} Effective chunk-generation rules.
+ */
+function getChunkGenerationRules() {
+  const activeDefinition = getActiveSpecialEventDefinition();
+  if (!activeDefinition?.chunkGeneration) {
+    return baseChunkGenerationConfig;
+  }
+
+  return { ...baseChunkGenerationConfig, ...activeDefinition.chunkGeneration };
+}
+
+/**
+ * Returns the rocket-spawn multiplier contributed by the current event and phase.
+ *
+ * @returns {number} Multiplier where 1 means no event-specific change.
+ */
+function getSpecialEventRocketSpawnMultiplier() {
+  const definition = getCurrentSpecialEventDefinition();
+  if (!definition?.rocketSpawnMultiplier) {
+    return 1;
+  }
+
+  if (!definition.rocketSpawnPhases?.includes(specialEventState.phase)) {
+    return 1;
+  }
+
+  return definition.rocketSpawnMultiplier;
+}
+
+/**
+ * Returns the localized announcement status text for one event type.
+ *
+ * @param {string} type - Event type id.
+ * @returns {string} Announcement message shown in the HUD.
+ */
+function getSpecialEventAnnouncementMessage(type) {
+  const seconds = Math.ceil(getSpecialEventPhaseDuration(type, SPECIAL_EVENT_PHASE.ANNOUNCE) / 1000);
+  return `${getSpecialEventTitle(type, true)} in ${seconds} Sekunden`;
 }
 
 /**
  * Returns whether a special event is currently active.
  *
- * @param {"bug-wave"|"big-order"} type - Event type to compare.
+ * @param {string} type - Event type id to compare.
  * @returns {boolean} True when the requested event is currently active.
  */
 function isSpecialEventActive(type) {
-  return specialEventState.phase === "active" && specialEventState.type === type;
+  return specialEventState.phase === SPECIAL_EVENT_PHASE.ACTIVE && specialEventState.type === type;
 }
 
 /**
  * Schedules the next special event after a random cool-down window.
  */
 function scheduleNextSpecialEvent() {
-  specialEventState.type = null;
-  specialEventState.phase = "idle";
-  specialEventState.timer =
-    debugSpecialEventDelayMs ?? randomInt(specialEventConfig.minDelay, specialEventConfig.maxDelay);
-  specialEventState.bugWaveSpawnTimer = 1400;
-  specialEventState.bugWaveGroundSpawnTimer = 1100;
-  specialEventState.bigOrderSpawnTimer = 900;
-  specialEventState.bigOrderBugSpawnTimer = 1200;
+  setSpecialEventState(null, SPECIAL_EVENT_PHASE.IDLE, getNextSpecialEventDelay());
 }
 
 /**
  * Resets the special-event scheduler to a fresh run.
  */
 function resetSpecialEventState() {
-  specialEventState.type = null;
-  specialEventState.phase = "idle";
-  specialEventState.timer =
-    debugSpecialEventDelayMs ?? randomInt(specialEventConfig.minDelay, specialEventConfig.maxDelay);
-  specialEventState.bugWaveSpawnTimer = 1400;
-  specialEventState.bugWaveGroundSpawnTimer = 1100;
-  specialEventState.bigOrderSpawnTimer = 900;
-  specialEventState.bigOrderBugSpawnTimer = 1200;
+  scheduleNextSpecialEvent();
 }
 
 /**
  * Starts the announcement phase of a new special event.
  */
 function startSpecialEventAnnouncement() {
-  specialEventState.type = pickSpecialEventType();
-  specialEventState.phase = "announce";
-  specialEventState.timer = specialEventConfig.announceDuration;
-  specialEventState.bugWaveSpawnTimer = 1400;
-  specialEventState.bugWaveGroundSpawnTimer = 1100;
-  specialEventState.bigOrderSpawnTimer = 900;
-  specialEventState.bigOrderBugSpawnTimer = 1200;
-  statusMessage = `${getSpecialEventTitle(specialEventState.type, true)} in 10 Sekunden`;
+  const nextType = pickSpecialEventType();
+  if (!nextType) {
+    scheduleNextSpecialEvent();
+    return;
+  }
+
+  setSpecialEventState(nextType, SPECIAL_EVENT_PHASE.ANNOUNCE, getSpecialEventPhaseDuration(nextType, SPECIAL_EVENT_PHASE.ANNOUNCE));
+  statusMessage = getSpecialEventAnnouncementMessage(nextType);
 }
 
 /**
  * Activates the currently announced special event.
  */
 function activateSpecialEvent() {
-  specialEventState.phase = "active";
-  specialEventState.timer = specialEventConfig.activeDuration;
-  specialEventState.bugWaveSpawnTimer = 1200;
-  specialEventState.bugWaveGroundSpawnTimer = 950;
-  specialEventState.bigOrderSpawnTimer = 700;
-  specialEventState.bigOrderBugSpawnTimer = 1000;
-  statusMessage =
-    specialEventState.type === "bug-wave"
-      ? "Bugwelle aktiv. Ausweichen und Bugs auf Plattformen zertrampeln"
-      : "Großauftrag aktiv. Mehr Moneten und mehr Bugs unterwegs";
+  const currentType = specialEventState.type;
+  const definition = getCurrentSpecialEventDefinition();
+  if (!currentType || !definition) {
+    scheduleNextSpecialEvent();
+    return;
+  }
+
+  setSpecialEventState(currentType, SPECIAL_EVENT_PHASE.ACTIVE, getSpecialEventPhaseDuration(currentType, SPECIAL_EVENT_PHASE.ACTIVE));
+  statusMessage = definition.activeStatusMessage;
+}
+
+/**
+ * Completes the currently active special event and schedules the next cooldown.
+ */
+function completeSpecialEvent() {
+  const definition = getCurrentSpecialEventDefinition();
+  statusMessage = definition?.completionStatusMessage ?? "Sonderevent abgeschlossen";
+  scheduleNextSpecialEvent();
 }
 
 /**
@@ -612,18 +881,12 @@ function getVisibleBugSpawnPlatform() {
  */
 function getNextRocketSpawnDelay() {
   const baseDelay = framesToMs(randomInt(850, 1450));
-  const bugWaveIncoming =
-    specialEventState.type === "bug-wave" &&
-    (specialEventState.phase === "announce" || specialEventState.phase === "active");
-
-  if (!bugWaveIncoming) {
+  const rocketSpawnMultiplier = getSpecialEventRocketSpawnMultiplier();
+  if (rocketSpawnMultiplier <= 1) {
     return baseDelay;
   }
 
-  return Math.max(
-    framesToMs(425),
-    Math.round(baseDelay / specialEventConfig.bugWaveRocketSpawnMultiplier)
-  );
+  return Math.max(framesToMs(425), Math.round(baseDelay / rocketSpawnMultiplier));
 }
 
 /**
@@ -683,9 +946,7 @@ function spawnBugWaveGroundBug() {
  * @param {number} delta - Frame delta in milliseconds.
  */
 function updateSpecialEvents(delta) {
-  const bigOrderConfig = specialEventConfig.bigOrder;
-
-  if (specialEventState.phase === "idle") {
+  if (specialEventState.phase === SPECIAL_EVENT_PHASE.IDLE) {
     specialEventState.timer = Math.max(0, specialEventState.timer - delta);
     if (specialEventState.timer === 0) {
       startSpecialEventAnnouncement();
@@ -695,68 +956,18 @@ function updateSpecialEvents(delta) {
 
   specialEventState.timer = Math.max(0, specialEventState.timer - delta);
 
-  if (specialEventState.phase === "announce") {
+  if (specialEventState.phase === SPECIAL_EVENT_PHASE.ANNOUNCE) {
     if (specialEventState.timer === 0) {
       activateSpecialEvent();
     }
     return;
   }
 
-  if (specialEventState.type === "bug-wave") {
-    const progress = 1 - specialEventState.timer / specialEventConfig.activeDuration;
-    const spawnInterval = Math.round(lerp(1700, 320, clamp(progress, 0, 1)));
-    specialEventState.bugWaveSpawnTimer -= delta;
-    specialEventState.bugWaveGroundSpawnTimer -= delta;
-
-    while (
-      specialEventState.bugWaveSpawnTimer <= 0 &&
-      getFallingBugCount() < specialEventConfig.bugWaveMaxFalling
-    ) {
-      spawnBugWaveBug();
-      specialEventState.bugWaveSpawnTimer += spawnInterval;
-    }
-
-    while (specialEventState.bugWaveGroundSpawnTimer <= 0) {
-      spawnBugWaveGroundBug();
-      specialEventState.bugWaveGroundSpawnTimer += randomInt(
-        specialEventConfig.bugWaveGroundSpawnIntervalMin,
-        specialEventConfig.bugWaveGroundSpawnIntervalMax
-      );
-    }
-  }
-
-  if (specialEventState.type === "big-order") {
-    specialEventState.bigOrderSpawnTimer -= delta;
-    while (specialEventState.bigOrderSpawnTimer <= 0) {
-      spawnBigOrderGem();
-      if (Math.random() < bigOrderConfig.visibleExtraGemChance) {
-        spawnBigOrderGem();
-      }
-      specialEventState.bigOrderSpawnTimer += randomInt(
-        bigOrderConfig.visibleGemSpawnIntervalMin,
-        bigOrderConfig.visibleGemSpawnIntervalMax
-      );
-    }
-
-    specialEventState.bigOrderBugSpawnTimer -= delta;
-    while (specialEventState.bigOrderBugSpawnTimer <= 0) {
-      spawnBigOrderBug();
-      if (Math.random() < bigOrderConfig.visibleExtraBugChance) {
-        spawnBigOrderBug();
-      }
-      specialEventState.bigOrderBugSpawnTimer += randomInt(
-        bigOrderConfig.visibleBugSpawnIntervalMin,
-        bigOrderConfig.visibleBugSpawnIntervalMax
-      );
-    }
-  }
+  const definition = getCurrentSpecialEventDefinition();
+  definition?.updateActive?.(delta, specialEventState);
 
   if (specialEventState.timer === 0) {
-    statusMessage =
-      specialEventState.type === "bug-wave"
-        ? "Bugwelle vorbei"
-        : "Großauftrag abgeschlossen";
-    scheduleNextSpecialEvent();
+    completeSpecialEvent();
   }
 }
 
@@ -1147,6 +1358,112 @@ function createPlatform(x, y, w, h, kind) {
 }
 
 /**
+ * Resets the bug lifecycle ledger for a fresh run.
+ */
+function resetBugLifecycle() {
+  bugLifecycle.nextId = 1;
+  bugLifecycle.records.clear();
+}
+
+/**
+ * Registers a new bug in the lifecycle ledger.
+ *
+ * @param {"active-world"|"missed"|"backlog"|"resolved"|"reactivated"} [status=BUG_STATUS.ACTIVE_WORLD] - Initial lifecycle status.
+ * @returns {number} Stable lifecycle id for the bug.
+ */
+function registerBugLifecycle(status = BUG_STATUS.ACTIVE_WORLD) {
+  const bugId = bugLifecycle.nextId;
+  bugLifecycle.nextId += 1;
+  bugLifecycle.records.set(bugId, {
+    id: bugId,
+    status,
+  });
+  return bugId;
+}
+
+/**
+ * Updates the lifecycle status for a known bug.
+ *
+ * @param {number|undefined} bugId - Lifecycle id of the bug.
+ * @param {"active-world"|"missed"|"backlog"|"resolved"|"reactivated"} status - Next lifecycle status.
+ */
+function setBugLifecycleStatus(bugId, status) {
+  if (bugId === undefined) {
+    return;
+  }
+
+  const record = bugLifecycle.records.get(bugId);
+  if (!record) {
+    return;
+  }
+
+  record.status = status;
+}
+
+/**
+ * Marks an active world bug as resolved.
+ *
+ * @param {{bugId?: number}} bug - Bug world entity.
+ */
+function markBugResolved(bug) {
+  setBugLifecycleStatus(bug?.bugId, BUG_STATUS.RESOLVED);
+}
+
+/**
+ * Marks an unresolved world bug as missed after it leaves the active world.
+ *
+ * @param {{bugId?: number}} bug - Bug world entity.
+ */
+function markBugMissed(bug) {
+  const record = bugLifecycle.records.get(bug?.bugId);
+  if (!record || record.status === BUG_STATUS.RESOLVED) {
+    return;
+  }
+
+  setBugLifecycleStatus(bug.bugId, BUG_STATUS.MISSED);
+}
+
+/**
+ * Counts bugs by lifecycle state for HUD, balance and future bug-systems.
+ *
+ * @returns {{activeWorld:number, missed:number, backlog:number, resolved:number, reactivated:number, totalKnown:number}} Lifecycle counters.
+ */
+function getBugLifecycleCounts() {
+  const counts = {
+    activeWorld: 0,
+    missed: 0,
+    backlog: 0,
+    resolved: 0,
+    reactivated: 0,
+    totalKnown: bugLifecycle.records.size,
+  };
+
+  bugLifecycle.records.forEach((record) => {
+    if (record.status === BUG_STATUS.ACTIVE_WORLD) {
+      counts.activeWorld += 1;
+      return;
+    }
+    if (record.status === BUG_STATUS.MISSED) {
+      counts.missed += 1;
+      return;
+    }
+    if (record.status === BUG_STATUS.BACKLOG) {
+      counts.backlog += 1;
+      return;
+    }
+    if (record.status === BUG_STATUS.RESOLVED) {
+      counts.resolved += 1;
+      return;
+    }
+    if (record.status === BUG_STATUS.REACTIVATED) {
+      counts.reactivated += 1;
+    }
+  });
+
+  return counts;
+}
+
+/**
  * Creates an enemy patrol descriptor.
  *
  * @param {number} x - Initial x-position.
@@ -1154,13 +1471,18 @@ function createPlatform(x, y, w, h, kind) {
  * @param {number} minX - Patrol minimum x-position.
  * @param {number} maxX - Patrol maximum x-position.
  * @param {number} speed - Initial horizontal speed.
- * @param {{telegraph?: boolean, markerX?: number, markerY?: number}} [options={}] - Optional spawn preview settings.
+ * @param {{telegraph?: boolean, markerX?: number, markerY?: number, lifecycleStatus?:"active-world"|"missed"|"backlog"|"resolved"|"reactivated"}} [options={}] - Optional spawn preview settings.
  * @returns {{x:number, y:number, w:number, h:number, minX:number, maxX:number, vx:number, vy:number, alive:boolean, falling:boolean, targetPlatformMinX:number, targetPlatformMaxX:number, targetGroundY:number}} Bug object.
  */
 function createBug(x, y, minX, maxX, speed, options = {}) {
-  const { telegraph = false, markerX = x + 23, markerY = y + 19 } = options;
-  runBugStats.spawned += 1;
+  const {
+    telegraph = false,
+    markerX = x + 23,
+    markerY = y + 19,
+    lifecycleStatus = BUG_STATUS.ACTIVE_WORLD,
+  } = options;
   return {
+    bugId: registerBugLifecycle(lifecycleStatus),
     x,
     y,
     w: 46,
@@ -1291,15 +1613,19 @@ function formatEuroAmount(cents) {
  * `openInRun` tracks unresolved bugs from this run. Backlog exists as an explicit future extension point
  * but is not gameplay-active yet.
  *
- * @returns {{spawnedInRun:number, resolvedInRun:number, openInRun:number, backlog:number}} Bug ledger snapshot.
+ * @returns {{spawnedInRun:number, resolvedInRun:number, openInRun:number, activeInWorld:number, missedInRun:number, backlog:number, reactivatedInRun:number}} Bug ledger snapshot.
  */
 function getBugLedger() {
-  const openInRun = Math.max(0, runBugStats.spawned - runBugStats.defeated);
+  const counts = getBugLifecycleCounts();
+  const openInRun = counts.activeWorld + counts.missed + counts.backlog + counts.reactivated;
   return {
-    spawnedInRun: runBugStats.spawned,
-    resolvedInRun: runBugStats.defeated,
+    spawnedInRun: counts.totalKnown,
+    resolvedInRun: counts.resolved,
     openInRun,
-    backlog: 0,
+    activeInWorld: counts.activeWorld,
+    missedInRun: counts.missed,
+    backlog: counts.backlog,
+    reactivatedInRun: counts.reactivated,
   };
 }
 
@@ -1353,7 +1679,7 @@ function formatEuroRatePerHour() {
 /**
  * Returns the current run model used by HUD, scoring and future resource-oriented systems.
  *
- * @returns {{resources:{currencyCents:number,lives:number,euroRatePerHour:number},bugs:{spawnedInRun:number,resolvedInRun:number,openInRun:number,backlog:number},score:{action:number,progress:number,total:number},balanceMultiplier:number}} Run snapshot.
+ * @returns {{resources:{currencyCents:number,lives:number,euroRatePerHour:number},bugs:{spawnedInRun:number,resolvedInRun:number,openInRun:number,activeInWorld:number,missedInRun:number,backlog:number,reactivatedInRun:number},score:{action:number,progress:number,total:number},balanceMultiplier:number}} Run snapshot.
  */
 function getRunModel() {
   return {
@@ -1390,7 +1716,10 @@ function getHudStats() {
       tooltip: [
         "Zeigt offene Bugs im aktuellen Run.",
         `Im Run gespawnt: ${runModel.bugs.spawnedInRun}`,
+        `Aktiv in der Welt: ${runModel.bugs.activeInWorld}`,
+        `Verpasst: ${runModel.bugs.missedInRun}`,
         `Im Run geloest: ${runModel.bugs.resolvedInRun}`,
+        `Backlog: ${runModel.bugs.backlog}`,
         "Je mehr offene Bugs, desto seltener kommen Einnahmequellen um Moneten zu verdienen.",
       ],
     },
@@ -1602,7 +1931,7 @@ function removeHazardsUnderSpan(startX, endX) {
 /**
  * Captures the mutable generation state that optional chunk features may change.
  *
- * @returns {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugSpawned:number}} Snapshot.
+ * @returns {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugLifecycleNextId:number}} Snapshot.
  */
 function createChunkFeatureSnapshot() {
   return {
@@ -1610,21 +1939,26 @@ function createChunkFeatureSnapshot() {
     hazards: [...level.hazards],
     gemCount: level.gems.length,
     bugCount: level.bugs.length,
-    bugSpawned: runBugStats.spawned,
+    bugLifecycleNextId: bugLifecycle.nextId,
   };
 }
 
 /**
  * Restores the mutable generation state after a failed optional chunk feature attempt.
  *
- * @param {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugSpawned:number}} snapshot - State to restore.
+ * @param {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugLifecycleNextId:number}} snapshot - State to restore.
  */
 function restoreChunkFeatureSnapshot(snapshot) {
   level.platforms.length = snapshot.platformCount;
   level.hazards = snapshot.hazards;
   level.gems.length = snapshot.gemCount;
   level.bugs.length = snapshot.bugCount;
-  runBugStats.spawned = snapshot.bugSpawned;
+  bugLifecycle.records.forEach((record, bugId) => {
+    if (bugId >= snapshot.bugLifecycleNextId) {
+      bugLifecycle.records.delete(bugId);
+    }
+  });
+  bugLifecycle.nextId = snapshot.bugLifecycleNextId;
 }
 
 /**
@@ -1954,8 +2288,7 @@ function addBugOnPlatform(platform, telegraph = false) {
  */
 function generateChunk() {
   // Endless terrain is generated one chunk ahead of the camera at a time.
-  const bigOrderActive = isSpecialEventActive("big-order");
-  const bigOrderConfig = specialEventConfig.bigOrder;
+  const chunkRules = getChunkGenerationRules();
   const gapWidth = randomInt(78, 122);
   const x = level.nextChunkX + gapWidth;
   const width = randomInt(180, 340);
@@ -1968,10 +2301,10 @@ function generateChunk() {
     addGroundHazard(ground);
     groundHasHazard = true;
   }
-  if (Math.random() < (bigOrderActive ? bigOrderConfig.groundGemChance : 0.55)) {
+  if (Math.random() < chunkRules.groundGemChance) {
     addGemOnPlatform(ground);
   }
-  if (Math.random() < (bigOrderActive ? bigOrderConfig.groundBugChance : 0.33)) {
+  if (Math.random() < chunkRules.groundBugChance) {
     addBugOnPlatform(ground);
   }
 
@@ -2014,13 +2347,13 @@ function generateChunk() {
 
       level.platforms.push(plate);
 
-      if (Math.random() < (bigOrderActive ? bigOrderConfig.plateGemChance : 0.72)) {
+      if (Math.random() < chunkRules.plateGemChance) {
         addGemOnPlatform(plate);
-        if (bigOrderActive && Math.random() < bigOrderConfig.plateExtraGemChance) {
+        if (Math.random() < chunkRules.plateExtraGemChance) {
           addGemOnPlatform(plate);
         }
       }
-      if (Math.random() < (bigOrderActive ? bigOrderConfig.plateBugChance : 0.3)) {
+      if (Math.random() < chunkRules.plateBugChance) {
         addBugOnPlatform(plate);
       }
 
@@ -2028,7 +2361,7 @@ function generateChunk() {
     });
   }
 
-  if (Math.random() < (bigOrderActive ? bigOrderConfig.bonusPlatformChance : 0.22)) {
+  if (Math.random() < chunkRules.bonusPlatformChance) {
     commitChunkFeatureAttempt(() => {
       const bonusWidth = randomInt(82, 130);
       const bonusX = x + width + randomInt(26, 80);
@@ -2057,10 +2390,10 @@ function generateChunk() {
 
       level.platforms.push(bonus);
       addGemOnPlatform(bonus);
-      if (bigOrderActive && Math.random() < bigOrderConfig.bonusExtraGemChance) {
+      if (Math.random() < chunkRules.bonusExtraGemChance) {
         addGemOnPlatform(bonus);
       }
-      if (bigOrderActive && Math.random() < bigOrderConfig.bonusBugChance) {
+      if (Math.random() < chunkRules.bonusBugChance) {
         addBugOnPlatform(bonus);
       }
 
@@ -2092,6 +2425,11 @@ function cleanupWorld() {
   level.hazards = level.hazards.filter((hazard) => hazard.x + hazard.w > cutoffX);
   // Collected pickups and defeated bugs should leave the active world immediately; historical run state lives elsewhere.
   level.gems = level.gems.filter((gem) => !gem.collected && gem.x + gem.r > cutoffX);
+  level.bugs.forEach((bug) => {
+    if (bug.alive && bug.x + bug.w <= cutoffX) {
+      markBugMissed(bug);
+    }
+  });
   level.bugs = level.bugs.filter((bug) => bug.alive && bug.x + bug.w > cutoffX);
   level.rockets = level.rockets.filter(
     (rocket) => rocket.active && rocket.x + rocket.w > cutoffX && rocket.x < cameraX + canvas.width + 900
@@ -2108,8 +2446,7 @@ function resetPlayer(fullReset = false) {
 
   if (fullReset) {
     resetSpecialEventState();
-    runBugStats.spawned = 0;
-    runBugStats.defeated = 0;
+    resetBugLifecycle();
     initLevel();
     player.lives = 3;
     runState.currencyCents = 0;
@@ -2565,7 +2902,7 @@ function handleMovement(delta) {
     const stomped = player.vy > 1 && previousY + player.h <= bug.y + 14;
     if (stomped) {
       bug.alive = false;
-      runBugStats.defeated += 1;
+      markBugResolved(bug);
       const scoreEffect = createHitEffect(bug.x + bug.w / 2, bug.y + 6, "⭐");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
       runState.actionScore += scoreConfig.bugDefeat;
@@ -3356,8 +3693,10 @@ function drawResumeCountdown() {
  * Draws the warning countdown that announces an upcoming special event.
  */
 function drawSpecialEventAnnouncement() {
+  const eventInfo = getCurrentSpecialEventInfo();
   if (
-    specialEventState.phase !== "announce" ||
+    !eventInfo ||
+    eventInfo.phase !== SPECIAL_EVENT_PHASE.ANNOUNCE ||
     gameState !== "playing" ||
     player.hurtTimer > 0 ||
     resumeCountdownTimer > 0
@@ -3365,17 +3704,17 @@ function drawSpecialEventAnnouncement() {
     return;
   }
 
-  const countdown = Math.max(0, Math.ceil(specialEventState.timer / 1000));
+  const countdown = Math.max(0, Math.ceil(eventInfo.timer / 1000));
   drawCenterCountdown(countdown);
 
   ctx.save();
   ctx.textAlign = "center";
   ctx.fillStyle = "#fff4e5";
   ctx.font = "700 34px Trebuchet MS";
-  ctx.fillText(getSpecialEventTitle(specialEventState.type, true), canvas.width / 2, canvas.height / 2 - 92);
+  ctx.fillText(eventInfo.announcementTitle, canvas.width / 2, canvas.height / 2 - 92);
   ctx.fillStyle = "#ffd5b3";
   ctx.font = "20px Trebuchet MS";
-  ctx.fillText("Bereite dich vor", canvas.width / 2, canvas.height / 2 + 82);
+  ctx.fillText(eventInfo.announcementPrompt, canvas.width / 2, canvas.height / 2 + 82);
   ctx.restore();
 }
 
@@ -3383,11 +3722,18 @@ function drawSpecialEventAnnouncement() {
  * Draws a compact HUD badge for currently active special events.
  */
 function drawSpecialEventStatus() {
-  if (specialEventState.phase !== "active" || gameState !== "playing" || player.hurtTimer > 0 || resumeCountdownTimer > 0) {
+  const eventInfo = getCurrentSpecialEventInfo();
+  if (
+    !eventInfo ||
+    eventInfo.phase !== SPECIAL_EVENT_PHASE.ACTIVE ||
+    gameState !== "playing" ||
+    player.hurtTimer > 0 ||
+    resumeCountdownTimer > 0
+  ) {
     return;
   }
 
-  const remaining = Math.max(0, Math.ceil(specialEventState.timer / 1000));
+  const remaining = Math.max(0, Math.ceil(eventInfo.timer / 1000));
   const badgeX = 18;
   const badgeY = mobileHud.topBar.y + mobileHud.topBar.h + 10;
   const badgeW = 238;
@@ -3406,7 +3752,7 @@ function drawSpecialEventStatus() {
 
   ctx.fillStyle = "#fff3e3";
   ctx.font = "700 18px Trebuchet MS";
-  ctx.fillText(getSpecialEventTitle(specialEventState.type), badgeX + 14, badgeY + 21);
+  ctx.fillText(eventInfo.title, badgeX + 14, badgeY + 21);
   ctx.fillStyle = "#ffd5b3";
   ctx.font = "15px Trebuchet MS";
   ctx.fillText(`${remaining}s verbleibend`, badgeX + 14, badgeY + 40);

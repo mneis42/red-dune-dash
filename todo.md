@@ -34,8 +34,8 @@ Statusuebersicht. Die Detailbeschreibungen zu jedem Punkt folgen direkt darunter
 - [x] P0 - Mobile Resume-Pfad fuer Hintergrund-/App-Wechsel loesen
 - [x] P0 - Alle gameplay-relevanten Timer und Counter auf echte Zeitbasis umstellen
 - [x] P1 - Score-, Ressourcen- und Fortschrittsmodell fachlich sauber definieren
-- [ ] P1 - Bug-Lebenszyklus als eigenes Fachsystem modellieren
-- [ ] P1 - Event-System von hart codierten Sonderfaellen zu einer erweiterbaren Struktur umbauen
+- [x] P1 - Bug-Lebenszyklus als eigenes Fachsystem modellieren
+- [x] P1 - Event-System von hart codierten Sonderfaellen zu einer erweiterbaren Struktur umbauen
 - [ ] P1 - Dead Code und unklare Regelpfade bei Platzierung und Kollision aufraeumen
 - [ ] P1 - Offline-/PWA-Assets an die tatsaechlich verwendeten Inhalte angleichen
 - [ ] P2 - Den Monolithen in klar getrennte Spielsysteme zerlegen

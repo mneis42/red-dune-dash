@@ -115,6 +115,9 @@ Leben bleiben bewusst beim `player`, weil sie in erster Linie eine unmittelbare 
 
 ## Bug-Modell
 
+Die fachliche Aufschluesselung der Bug-Status ist zusaetzlich in [bug-lifecycle.md](./bug-lifecycle.md) beschrieben.
+Der Lebenszyklus und die Haken fuer Sonderevents sind zusaetzlich in [event-model.md](./event-model.md) beschrieben.
+
 Der aktuelle Run fuehrt ein Bug-Ledger mit folgenden Bedeutungen:
 
 - `spawnedInRun`
