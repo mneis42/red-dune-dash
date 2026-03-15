@@ -90,6 +90,33 @@ Each TODO should contain:
 Follow this workflow in order.
 Do not skip steps.
 
+### Stop-Prevention Checklist (mandatory before ending a response)
+
+Before ending any response during a full-code-review run, explicitly verify all of the following:
+
+- `todo.md` was created and committed locally.
+- The highest-priority open TODO is actively being executed.
+- If no TODO is in progress, confirm all TODOs are complete and final verification has passed.
+- If final verification passed, `todo.md` was moved into `reviews/` using `yyyyMMdd-HHmmss-complete.md` and that move is left uncommitted.
+- If work is paused, a real blocker is documented (permissions, conflicting instructions, missing critical information, or hard platform/runtime limit).
+
+If any checklist item is not satisfied, continue working instead of stopping.
+
+### Go/No-Go Self-Test (run this immediately before any final response)
+
+Answer each item with `YES` or `NO`:
+
+1. Is the review backlog in `todo.md` fully up to date and committed locally?
+2. Is there no higher-priority open TODO than the one currently being worked on?
+3. If all TODOs are marked done, has full final verification actually been executed and passed?
+4. If verification passed, has `todo.md` already been moved to `reviews/yyyyMMdd-HHmmss-complete.md` and left uncommitted?
+5. If any work remains, is there a real blocker documented (and not just a pause for confirmation)?
+
+Decision rule:
+
+- If any answer is `NO`, do not end the run; continue working.
+- End the run only when all applicable answers are `YES`.
+
 ### 1. Perform the full review
 
 - Inspect the whole repository except `reviews/`.
