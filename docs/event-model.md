@@ -54,6 +54,7 @@ Optional kann eine Definition ausserdem spezielle Regelbereiche liefern, zum Bei
 - `chunkGeneration`
 - `rocketSpawnMultiplier`
 - `rocketSpawnPhases`
+- ein Scheduler-Hook fuer gewichtete Event-Auswahl
 - spaeter auch Erfolgs-/Fehlschlag-Hooks oder Reward-Profile
 
 ## Aktuelle Event-Typen
@@ -65,6 +66,9 @@ Die Bugwelle ist ein Druck-Event:
 - beschleunigt Raketen bereits in Vorwarnung und Aktivphase
 - spawnet waehrend der Aktivphase fallende und laufende Bugs
 - nutzt dafuer einen eigenen Runtime-State fuer Spawn-Timer
+- kann pro Spawn mit 50% Chance einen historischen ungelosten Bug statt eines komplett neuen Bugs einsetzen
+- darf dafuer Lifecycle-Eintraege aus `missed`, `backlog` und `reactivated` wiederverwenden
+- zeigt reaktivierte Bugs nicht gesondert an, behaelt intern aber deren Lifecycle-Identitaet bei
 
 ### `big-order`
 
@@ -86,6 +90,13 @@ Der Scheduler arbeitet fuer alle Events gleich:
 6. Event-spezifische `updateActive`-Logik laeuft
 7. Abschlussmeldung
 8. zurueck nach `idle`
+
+Fuer die aktuellen Live-Events gilt zusaetzlich:
+
+- die Wartezeit zwischen zwei Events liegt produktiv zwischen 2 und 5 Minuten
+- die Typ-Auswahl ist nicht mehr rein gleichverteilt
+- bei vielen offenen Bugs (`active-world`, `missed`, `backlog`, `reactivated`) bekommt `bug-wave` ein hoeheres Gewicht als `big-order`
+- Debug-Overrides fuer Delay oder Event-Typ haben weiterhin Vorrang
 
 Wichtig:
 
