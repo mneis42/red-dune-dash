@@ -1,41 +1,28 @@
-const CACHE_NAME = "red-dune-dash-v2";
-const APP_ASSETS = [
+importScripts("./app-assets.js");
+
+const CACHE_NAME = globalThis.RED_DUNE_ASSET_MANIFEST?.cacheName ?? "red-dune-dash-v3";
+const APP_ASSETS = globalThis.RED_DUNE_ASSET_MANIFEST?.offlineCacheAssets ?? [
   "./",
   "./index.html",
   "./styles.css",
+  "./app-assets.js",
   "./game-endless.js",
   "./version.json",
   "./manifest.webmanifest",
   "./favicon.ico",
-  "./icons/icon-128x128.png",
-  "./icons/icon-144x144.png",
-  "./icons/icon-152x152.png",
-  "./icons/icon-192x192.png",
-  "./icons/icon-256x256.png",
-  "./icons/icon-384x384.png",
-  "./icons/icon-512x512.png",
-  "./assets/run1.png",
-  "./assets/run2.png",
-  "./assets/run3.png",
-  "./assets/run4.png",
-  "./assets/run5.png",
-  "./assets/run6.png",
-  "./assets/jump-up.png",
-  "./assets/jump-down.png",
-  "./assets/bug.png",
-  "./assets/game-over.png",
-  "./assets/rocket-from-left.png",
-  "./assets/rocket-from-right.png"
 ];
 
-const NETWORK_FIRST_PATHS = new Set([
-  "/",
-  "/index.html",
-  "/styles.css",
-  "/game-endless.js",
-  "/version.json",
-  "/manifest.webmanifest"
-]);
+const NETWORK_FIRST_PATHS = new Set(
+  globalThis.RED_DUNE_ASSET_MANIFEST?.networkFirstPaths ?? [
+    "/",
+    "/index.html",
+    "/styles.css",
+    "/app-assets.js",
+    "/game-endless.js",
+    "/version.json",
+    "/manifest.webmanifest",
+  ]
+);
 
 function isCoreAppRequest(requestUrl) {
   const url = new URL(requestUrl);

@@ -169,8 +169,7 @@ const mobileHud = {
 };
 
 const STORAGE_KEY = "marsTigerHighscore";
-
-const spriteSources = {
+const spriteSources = globalThis.RED_DUNE_ASSET_MANIFEST?.spriteSources ?? {
   run: ["assets/run1.png", "assets/run2.png", "assets/run3.png", "assets/run4.png", "assets/run5.png", "assets/run6.png"],
   standing: "assets/standing.png",
   injured: "assets/injured.png",
