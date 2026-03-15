@@ -25,6 +25,7 @@
   function createSpecialEventDefinitions(specialEventConfig, hooks) {
     const {
       randomInt,
+      randomChance = Math.random,
       lerp,
       clamp,
       getFallingBugCount,
@@ -110,7 +111,7 @@
           state.runtime.gemSpawnTimer -= delta;
           while (state.runtime.gemSpawnTimer <= 0) {
             spawnBigOrderGem();
-            if (Math.random() < bigOrderConfig.visibleExtraGemChance) {
+            if (randomChance() < bigOrderConfig.visibleExtraGemChance) {
               spawnBigOrderGem();
             }
             state.runtime.gemSpawnTimer += randomInt(
@@ -122,7 +123,7 @@
           state.runtime.bugSpawnTimer -= delta;
           while (state.runtime.bugSpawnTimer <= 0) {
             spawnBigOrderBug();
-            if (Math.random() < bigOrderConfig.visibleExtraBugChance) {
+            if (randomChance() < bigOrderConfig.visibleExtraBugChance) {
               spawnBigOrderBug();
             }
             state.runtime.bugSpawnTimer += randomInt(

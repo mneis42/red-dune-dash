@@ -58,6 +58,20 @@ Nutzen:
 
 - Platzierungslogik fuer Gems, Checkpoints und Hurt-Posen lebt nicht mehr als verteilte Mathematik im Hauptfile
 
+### `systems/simulation-core.js`
+
+Zustaendig fuer browserfreie Kernregeln und deterministische Balancing-Logik:
+
+- Score- und Fortschrittsregeln
+- Balance-Multiplikatoren
+- Einkommens-Spawn-Regeln
+- deterministische Zufallshelfer
+
+Nutzen:
+
+- zentrale Regeln sind ohne Canvas und DOM pruefbar
+- Balancing-Aenderungen koennen ueber Node-Tests abgesichert werden
+
 ### `systems/special-event-system.js`
 
 Zustaendig fuer Event-Lebenszyklus und Event-Definitionen:
@@ -95,7 +109,6 @@ Wichtig ist aber:
 
 Die naechsten groesseren Kandidaten fuer weitere Schnitte sind:
 
-- testbarer Simulationskern
 - Pickup-/Item-System
 - Rendering-/HUD-System
 - Input-System

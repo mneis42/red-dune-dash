@@ -257,6 +257,7 @@ const debugSpecialEventDelayMs = null; // Set to a number to force a specific de
 const debugSpecialEventType = null; // Set to an event type id to force a specific event for testing, or null for random selection.
 const placementSystem = globalThis.RedDunePlacement.createPlacementSystem();
 const placementSafetyConfig = placementSystem.config;
+const simulationCore = globalThis.RedDuneSimulationCore;
 
 const keys = {
   left: false,
@@ -370,6 +371,7 @@ const specialEventDefinitions = globalThis.RedDuneSpecialEvents.createSpecialEve
   specialEventConfig,
   {
     randomInt,
+    randomChance: () => Math.random(),
     lerp,
     clamp,
     getFallingBugCount,
@@ -689,11 +691,7 @@ window.addEventListener("orientationchange", syncCanvasOnlyMode);
  * @returns {number} Current euros per hour rounded to a whole number.
  */
 function getEuroRatePerHourValue() {
-  if (worldTimeMs <= 0 || runState.currencyCents <= 0) {
-    return 0;
-  }
-
-  return Math.round((runState.currencyCents * 3_600_000) / worldTimeMs / 100);
+  return simulationCore.calculateEuroRatePerHour(runState.currencyCents, worldTimeMs);
 }
 
 /**
@@ -702,20 +700,7 @@ function getEuroRatePerHourValue() {
  * @returns {number} Bug-side score multiplier.
  */
 function getBugBalanceMultiplier() {
-  const outstandingBugs = getOutstandingBugTotal();
-  if (outstandingBugs === 0) {
-    return 1.35;
-  }
-  if (outstandingBugs <= 2) {
-    return 1.15;
-  }
-  if (outstandingBugs <= 4) {
-    return 1;
-  }
-  if (outstandingBugs <= 6) {
-    return 0.8;
-  }
-  return 0.6;
+  return simulationCore.calculateBugBalanceMultiplier(getOutstandingBugTotal());
 }
 
 /**
@@ -724,20 +709,7 @@ function getBugBalanceMultiplier() {
  * @returns {number} Income-side score multiplier.
  */
 function getIncomeBalanceMultiplier() {
-  const euroRate = getEuroRatePerHourValue();
-  if (euroRate >= 90) {
-    return 1.25;
-  }
-  if (euroRate >= 60) {
-    return 1.1;
-  }
-  if (euroRate >= 30) {
-    return 1;
-  }
-  if (euroRate >= 15) {
-    return 0.9;
-  }
-  return 0.75;
+  return simulationCore.calculateIncomeBalanceMultiplier(getEuroRatePerHourValue());
 }
 
 /**
@@ -746,7 +718,10 @@ function getIncomeBalanceMultiplier() {
  * @returns {number} Current balance multiplier.
  */
 function getRunBalanceMultiplier() {
-  return (getBugBalanceMultiplier() + getIncomeBalanceMultiplier()) / 2;
+  return simulationCore.calculateRunBalanceMultiplier({
+    outstandingBugs: getOutstandingBugTotal(),
+    euroRatePerHour: getEuroRatePerHourValue(),
+  });
 }
 
 /**
@@ -755,8 +730,12 @@ function getRunBalanceMultiplier() {
  * @returns {number} Current progress-score target.
  */
 function getProgressScoreTarget() {
-  const baseDistanceScore = Math.floor(Math.max(0, runState.farthestX - level.spawn.x) / scoreConfig.distanceDivisor);
-  return Math.floor(baseDistanceScore * getRunBalanceMultiplier());
+  return simulationCore.calculateProgressScoreTarget({
+    farthestX: runState.farthestX,
+    spawnX: level.spawn.x,
+    distanceDivisor: scoreConfig.distanceDivisor,
+    runBalanceMultiplier: getRunBalanceMultiplier(),
+  });
 }
 
 /**
@@ -765,7 +744,10 @@ function getProgressScoreTarget() {
  * @returns {number} Current stored progress score.
  */
 function syncProgressScore() {
-  runState.progressScore = Math.max(runState.progressScore, getProgressScoreTarget());
+  runState.progressScore = simulationCore.lockProgressScore(
+    runState.progressScore,
+    getProgressScoreTarget()
+  );
   return runState.progressScore;
 }
 
@@ -784,12 +766,7 @@ function getProgressScore() {
  * @returns {{action:number, progress:number, total:number}} Score breakdown.
  */
 function getScoreBreakdown() {
-  const progress = getProgressScore();
-  return {
-    action: runState.actionScore,
-    progress,
-    total: runState.actionScore + progress,
-  };
+  return simulationCore.calculateScoreBreakdown(runState.actionScore, getProgressScore());
 }
 
 /**
@@ -1273,8 +1250,7 @@ function getOutstandingBugCount() {
  * @returns {number} Chance multiplier in the range 0.18..1.
  */
 function getIncomeSourceSpawnMultiplier() {
-  const outstandingBugs = getOutstandingBugTotal();
-  return clamp(1 - outstandingBugs * 0.08, 0.18, 1);
+  return simulationCore.calculateIncomeSourceSpawnMultiplier(getOutstandingBugTotal());
 }
 
 /**
@@ -1284,7 +1260,11 @@ function getIncomeSourceSpawnMultiplier() {
  * @returns {boolean} True when the source should spawn.
  */
 function shouldSpawnIncomeSource(baseChance = 1) {
-  return Math.random() < clamp(baseChance * getIncomeSourceSpawnMultiplier(), 0, 1);
+  return simulationCore.shouldSpawnIncomeSource({
+    baseChance,
+    outstandingBugs: getOutstandingBugTotal(),
+    randomValue: Math.random(),
+  });
 }
 
 /**
