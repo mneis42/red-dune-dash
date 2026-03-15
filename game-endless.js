@@ -2186,7 +2186,6 @@ function getSafePickupX(type, platform) {
  *
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
  * @param {string} [type=PICKUP_TYPE.CURRENCY] - Pickup type id.
- * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
  * @param {boolean} [telegraph=false] - Whether the item should fade and scale in before becoming active.
  */
 function addPickupOnPlatform(platform, type = PICKUP_TYPE.CURRENCY, telegraph = false) {

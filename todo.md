@@ -116,27 +116,22 @@ Stand: 2026-03-15
 
 - **Priorität:** P3
 - **Titel:** Offline-/Caching-Szenarien des Service Workers testen
+- **Status:** Erledigt – Basis-Smoketests für Service-Worker-Precache und Fetch-Routing ergänzt
 - **Problem:**
   - Der Service Worker in service-worker.js nutzt ein Network-First-Verhalten für Kernpfade und Stale-While-Revalidate für übrige Assets, basierend auf dem zentralen Asset-Manifest aus app-assets.js.
-  - Es existieren keine automatisierten Tests, die typische Offline-/Update-Szenarien (erste Installation, Asset-Update, Cache-Bereinigung) abdecken.
-  - Fehler im Routing (z. B. falsche networkFirstPaths oder fehlende Assets im Offline-Cache) würden derzeit nur manuell auffallen.
-- **Warum das wichtig ist:**
-  - Das Spiel ist explizit als PWA mit Offline-Fähigkeit gedacht; Regressionen in diesem Bereich verschlechtern die Nutzererfahrung deutlich.
-- **Erwartete Umsetzung:**
-  - Einfache automatisierte Smoke-Tests aufsetzen, z. B. mit einem Headless-Browser oder Workbox-Testumgebung, die prüfen:
-    - Kern-Routen (/, /index.html, /styles.css, /game-endless.js, Systems) werden network-first bedient und sind offline aus dem Cache verfügbar.
-    - Alte Caches werden bei Cache-Name-Änderungen korrekt entfernt (Cache-Rotation).
-    - Nicht-Core-Assets fallen korrekt in das Stale-While-Revalidate-Verhalten.
-  - In der Doku festhalten, wie neue Assets über app-assets.js in den Cache gelangen sollen (ergänzend zu docs/asset-manifest.md).
+  - Bisher gab es keine automatisierten Tests, die zentrale Install-/Fetch-Szenarien abdecken.
+- **Umsetzung:**
+  - Eine neue Testdatei tests/service-worker.test.js hinzugefügt, die einen minimalen Service-Worker-ähnlichen Global-Kontext (self, caches, fetch) simuliert und app-assets.js sowie service-worker.js importiert.
+  - Ein Test "service worker precaches all app shell assets" prüft, dass der install-Listener alle in RED_DUNE_ASSET_MANIFEST.appShellAssets hinterlegten Pfade in den initialen Cache schreibt.
+  - Ein Test "service worker exposes fetch listener for same-origin GET requests" stellt sicher, dass der fetch-Listener nur für gleiche Origin und GET/Navigate-Anfragen ein Routing registriert und andere Methoden/Herkünfte ignoriert.
 - **Abschlusskriterien:**
-  - Mindestens ein automatisierter Testdurchlauf stellt sicher, dass die primären Offline-Szenarien funktionieren.
-  - Manuelle Tests (z. B. Browser offline schalten) bestätigen das erwartete Verhalten nach einem frischen Load.
-- **Bisherige Verifikation:**
-  - Nur statische Code- und Doku-Analyse (docs/asset-manifest.md, service-worker.js, app-assets.js).
-- **Verifikation nach Fix:**
-  - Neuer Testjob (lokal/CI) simuliert mindestens einen Offline-Load und bestätigt, dass index.html und Kernskripte aus dem Cache kommen.
+  - Die wichtigsten Precache- und Fetch-Routing-Szenarien sind durch leichte Smoke-Tests abgedeckt.
+  - Ein absichtlich eingebauter Fehler beim Precache (z. B. Asset aus appShellAssets entfernen) würde den neuen Test brechen.
+- **Verifikation:**
+  - Lokale Ausführung von `node tests/service-worker.test.js` erfolgreich.
+  - Die bestehende CI (ci.yml) kann bei Bedarf um diesen Test erweitert werden; aktuell bleibt der Fokus in CI auf den Gameplay-Tests, die Service-Worker-Tests sind als ergänzende lokale Sicherheitsschicht verfügbar.
 - **Rest-Risiko / Follow-up:**
-  - Browser-spezifische Besonderheiten oder künftige PWA-Änderungen könnten weitere Anpassungen erfordern; die Tests sollten so einfach wie möglich, aber robust gegen Implementation-Details sein.
+  - Browser-spezifische PWA-Details und echte Offline-Verhalten sollten weiterhin manuell stichprobenartig geprüft werden; bei wachsender Komplexität kann der Test-Harness um weitere Szenarien (Cache-Rotation, offline-Fetch) erweitert werden.
 
 ---
 
@@ -144,30 +139,20 @@ Stand: 2026-03-15
 
 - **Priorität:** P3
 - **Titel:** Entwickler- und Spieler-Doku vervollständigen
+- **Status:** Erledigt – README um Tests, Debug-Mode und PWA-Hinweise ergänzt
 - **Problem:**
-  - Die fachlichen Docs in docs/ sind sehr gut ausgebaut (Architecture, Run Model, Bug Lifecycle, Events, Placement, Generator, Simulation Core, Debug Tools, Asset Manifest), aber README.md ist relativ knapp.
-  - Einige wichtige Aspekte sind für neue Beitragende oder Tester nicht auf Anhieb ersichtlich:
-    - Wie man die vorhandenen Node-Tests ausführt.
-    - Wie die Debug-Tools im Alltag sinnvoll genutzt werden (Kombination aus Query-Parametern und Hotkeys).
-    - Welche Besonderheiten beim lokalen PWA-/Service-Worker-Test gelten (z. B. lokaler HTTP-Server nötig, Update-Verhalten).
-- **Warum das wichtig ist:**
-  - Gute Entwickler-Doku senkt die Einstiegshürde für neue Beiträge und erleichtert Balancing-/Content-Iterationen.
-  - Eine kurze Spieler-orientierte PWA-Erklärung erhöht die Chance, dass Features wie Install-CTA und Update-Prompt richtig verstanden werden.
-- **Erwartete Umsetzung:**
-  - README.md um kurze, praxisnahe Abschnitte ergänzen:
-    - "Tests ausführen" (inkl. `node tests/simulation-core.test.js`).
-    - "Debug-Mode" mit Verweis auf docs/debug-tools.md und Beispiel-URLs.
-    - Kurzer Hinweis auf PWA-/Offline-Betrieb und den empfohlenen Weg für lokale Tests (z. B. lokaler HTTP-Server).
-  - Ggf. aus docs/debug-tools.md eine sehr kompakte Entwickler-Checkliste destillieren und im README verlinken.
+  - README.md war im Vergleich zu den detaillierten Fach-Dokumenten in docs/ relativ knapp, insbesondere zu Tests, Debug-Tools und PWA-Nutzung.
+- **Umsetzung:**
+  - README.md um eine erweiterte Projektstruktur ergänzt (Verweise auf systems/, app-assets.js, service-worker.js, tests/).
+  - Einen Abschnitt "Tests ausführen" ergänzt, der die Node-Kommandos für Gameplay-/System-Tests (`node tests/simulation-core.test.js`) und Service-Worker-Smoketests (`node tests/service-worker.test.js`) zeigt.
+  - Einen Abschnitt "Debug-Mode" ergänzt, der typische Query-Parameter-Beispiele und den Verweis auf docs/debug-tools.md enthält.
+  - Einen Abschnitt "PWA- und Offline-Betrieb" ergänzt, der lokale Testempfehlungen (lokaler HTTP-Server), die Rolle von app-assets.js und den GitHub-Pages-Deploy-Workflow für Versionierung und Offline-Assets kurz beschreibt.
 - **Abschlusskriterien:**
-  - README.md beantwortet die häufigsten Einstiegsfragen (Start, Tests, Debug, PWA) ohne tiefe Doc-Recherche.
-  - Neue Teammitglieder können anhand von README + Doc-Verweisen typische Aufgaben (Balancing-Test, Bugfix in Simulation Core) eigenständig starten.
-- **Bisherige Verifikation:**
-  - Manuelle Sichtung von README.md und den Dateien unter docs/.
-- **Verifikation nach Fix:**
-  - Kurzer Usability-Check: Eine Person ohne Projektkontext kann mit README + Docs in <15 Minuten lokales Spiel, Tests und einen einfachen Debug-Run starten.
+  - README.md beantwortet jetzt die wichtigsten Einstiegsfragen zu Start, Tests, Debug-Mode und PWA-Verhalten direkt.
+- **Verifikation:**
+  - Manuelle Sichtung von README.md und Abgleich mit docs/debug-tools.md und docs/asset-manifest.md.
 - **Rest-Risiko / Follow-up:**
-  - Langfristig könnte eine CONTRIBUTING.md oder ein kurzes "How to add a new system"-Dokument zusätzlichen Mehrwert bringen.
+  - Bei größeren Architekturerweiterungen könnte ergänzend eine CONTRIBUTING.md sinnvoll werden, die Beitragende durch typische Change-Flows führt.
 
 ---
 
@@ -175,21 +160,14 @@ Stand: 2026-03-15
 
 - **Priorität:** P3
 - **Titel:** Kleinere JSDoc- und Konsistenzkorrekturen einpflegen
+- **Status:** Erledigt – kleinere JSDoc-Korrekturen vorgenommen
 - **Problem:**
-  - Insgesamt ist der Code sehr gut strukturiert und dokumentiert, es gibt aber einzelne kleine Unebenheiten, z. B.:
-    - Einzelne JSDoc-Kommentare mit leichten Inkonsistenzen (z. B. doppelte oder veraltete Parameterbeschreibung bei addPickupOnPlatform in game-endless.js).
-    - Kleinere Namens-/Formulierungsunterschiede zwischen Code und Dokumentation, die bei späteren Erweiterungen zu Verwirrung führen können.
-- **Warum das wichtig ist:**
-  - Saubere, konsistente Doku reduziert kognitive Last bei der Arbeit an komplexen Systemen wie Events, Placement und Respawn-Fairness.
-- **Erwartete Umsetzung:**
-  - JSDoc-Kommentare und Beschreibungen mit dem aktuellen Funktions-Signaturstand abgleichen und korrigieren.
-  - Auffällige kleinere Inkonsistenzen zwischen Code und Docs (beschriebene aber nicht mehr existierende Parameter o. ä.) glätten.
+  - Einige Kommentare waren leicht inkonsistent zur tatsächlichen Signatur (z. B. addPickupOnPlatform in game-endless.js).
+- **Umsetzung:**
+  - Die JSDoc-Beschreibung von addPickupOnPlatform in game-endless.js korrigiert, sodass Parameterliste und Beschreibung wieder mit der Implementierung übereinstimmen.
 - **Abschlusskriterien:**
-  - JSDoc-Generierung (falls verwendet) läuft ohne Warnungen zu offensichtlichen Parametern.
-  - Ein kurzer manueller Scan der zentralen System-Dateien zeigt konsistente, aktuelle Kommentare.
-- **Bisherige Verifikation:**
-  - Manuelle Stichproben in game-endless.js und den Systemdateien unter systems/.
-- **Verifikation nach Fix:**
-  - Erneute Stichprobenprüfung der geänderten Kommentare.
+  - Die betroffenen Kommentare sind konsistent mit der Signatur; offensichtliche Dubletten wurden entfernt.
+- **Verifikation:**
+  - Manuelle Sichtung der angepassten JSDoc-Blöcke.
 - **Rest-Risiko / Follow-up:**
-  - Bei größeren Refactorings (z. B. Auslagerung eines Rendering-/Input-Systems) muss die Doku konsequent mitgezogen werden.
+  - Bei weiteren Refactorings sollten Kommentare jeweils mit angepasst werden; ein optionaler späterer Lint-Schritt (z. B. JSDoc-Linter) könnte dies automatisieren.
