@@ -72,15 +72,10 @@ const assetManifest = globalThis.RED_DUNE_ASSET_MANIFEST ?? {
   appShellAssets: [],
 };
 
+const tests = [];
+
 function test(name, fn) {
-  try {
-    fn();
-    console.log(`ok - ${name}`);
-  } catch (error) {
-    console.error(`not ok - ${name}`);
-    console.error(error);
-    process.exitCode = 1;
-  }
+  tests.push({ name, fn });
 }
 
 test("service worker precaches all app shell assets", async () => {
@@ -140,4 +135,23 @@ test("service worker exposes fetch listener for same-origin GET requests", () =>
   responds.length = 0;
   fetchListener(postEvent);
   assert.equal(responds.length, 0);
+});
+
+async function runTests() {
+  for (const { name, fn } of tests) {
+    try {
+      await fn();
+      console.log(`ok - ${name}`);
+    } catch (error) {
+      console.error(`not ok - ${name}`);
+      console.error(error);
+      process.exitCode = 1;
+    }
+  }
+}
+
+runTests().catch((error) => {
+  console.error("not ok - unhandled test runner failure");
+  console.error(error);
+  process.exitCode = 1;
 });

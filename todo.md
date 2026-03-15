@@ -10,6 +10,8 @@
 ## TODOs
 
 ### P0 - Service-Worker-Tests sind asynchron nicht verlässlich
+- Status
+  Erledigt am 2026-03-15.
 - Problem
   Die Test-Hilfsfunktion führt `async` Tests nicht korrekt aus, weil Promises nicht `await`-ed werden. Dadurch können Fehler in asynchronen Pfaden unentdeckt bleiben oder als unhandled rejection außerhalb der eigentlichen Testauswertung auftreten.
 - Warum wichtig
@@ -21,9 +23,11 @@
   - Ein absichtlich fehlschlagender async-Test führt reproduzierbar zu `process.exitCode = 1`.
   - Normaler Lauf bleibt grün.
 - Verifizierung durchgeführt
-  Fundstellen geprüft in `tests/service-worker.test.js` (`test(...)`-Runner und async-Testfall).
+  Promise-aware Runner in `tests/service-worker.test.js` umgesetzt und lokal geprüft:
+  - `node tests/service-worker.test.js` (beide SW-Smoke-Tests grün)
+  - `node tests/simulation-core.test.js` (15/15 grün)
 - Rest-Risiko / Follow-up
-  Nach Fix sollte ein kleiner Meta-Test ergänzt werden, der explizit ein Promise-Reject im Testpfad simuliert.
+  Ein dedizierter Meta-Test fuer absichtlich rejectende Async-Tests ist weiterhin optionaler Hardening-Schritt.
 - Relevante Stellen
   `tests/service-worker.test.js` Zeilen mit `function test(name, fn)`, `fn();` und async-Testdefinition.
 
