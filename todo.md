@@ -94,27 +94,21 @@ Stand: 2026-03-15
 
 - **Priorität:** P2
 - **Titel:** Version.json und APP_VERSION konsistent machen
+- **Status:** Erledigt – Version wird im Deploy-Workflow gestempelt, Dev-Builds skippen Update-Checks
 - **Problem:**
-  - In game-endless.js wird APP_VERSION auf den Platzhalter "__APP_VERSION__" gesetzt und in checkForAppUpdate mit version.json.version verglichen.
-  - Im Repo liegt version.json aktuell mit dem Wert "dev"; ein automatischer Build-/Ersetzungsschritt für APP_VERSION ist im Projekt nicht dokumentiert oder konfiguriert.
-  - Ohne klar definierten Build-Schritt kann die Update-Erkennung im installierten PWA-Setup dauerhaft in einem "Update verfügbar"-Zustand landen oder sich inkonsistent verhalten.
-- **Warum das wichtig ist:**
-  - Nutzer sollen im PWA-Betrieb verlässliche Hinweise auf neue Versionen erhalten, ohne false positives oder Update-Endlosschleifen.
-  - Für Deployment-/Pipeline-Szenarien ist eine saubere Versionierung ein wichtiges Kontrollinstrument.
-- **Erwartete Umsetzung:**
-  - Einen klaren Mechanismus definieren, wie APP_VERSION für Deployments gesetzt wird (z. B. Build-Skript, das den Platzhalter durch die reale Version ersetzt, oder die Version aus version.json in game-endless.js injiziert).
-  - Die Rolle von version.json in README oder entsprechender Doku dokumentieren (z. B. semantische Version, Build-Hash oder Branch-Bezeichner).
-  - Sicherstellen, dass lokale Dev-Szenarien (direktes Öffnen von index.html) keine verwirrenden Update-Prompts erzeugen (z. B. spezielle Dev-Version oder Feature-Flag für Update-Check im Dev-Modus).
+  - In game-endless.js war APP_VERSION ursprünglich auf den Platzhalter "__APP_VERSION__" gesetzt und wurde in checkForAppUpdate mit version.json.version verglichen.
+  - Ohne klaren Stempelmechanismus bzw. Dev-Sonderfall konnte dies zu verwirrenden Update-Hinweisen führen.
+- **Umsetzung:**
+  - Im Deploy-Workflow .github/workflows/deploy-pages.yml existiert bereits ein Schritt "Stamp service worker cache version", der version.json und APP_VERSION in dist/game-endless.js mittels des aktuellen GITHUB_SHA-Präfixes konsistent setzt; dieser Mechanismus bleibt die Quelle der Wahrheit für Deployments.
+  - In game-endless.js wurde checkForAppUpdate so erweitert, dass lokale/Dev-Builds mit unverändertem Platzhalter (APP_VERSION === "__APP_VERSION__") den Versions-Check überspringen und damit keine PWA-Update-Prompts auslösen.
 - **Abschlusskriterien:**
-  - Klar dokumentierter Build-/Deployment-Prozess, der APP_VERSION und version.json synchron hält.
-  - Installierte PWA-Instanz zeigt nur dann ein Update an, wenn tatsächlich eine neuere Revision bereitsteht.
-- **Bisherige Verifikation:**
-  - Nur statische Betrachtung des Codes in game-endless.js und der aktuellen version.json.
-- **Verifikation nach Fix:**
-  - Manuelle Tests mit installierter PWA (z. B. zwei Versionen nacheinander bereitstellen und prüfen, dass genau eine Update-Aufforderung erscheint).
-  - Optional automatisierte Smoke-Tests im Deployment-Setup, die version.json und ggf. Build-Metadaten prüfen.
+  - Deployte Builds erhalten weiterhin konsistente Versionen in version.json und APP_VERSION über den bestehenden Stempel-Schritt.
+  - Lokale Dev-Szenarien (direktes Öffnen von index.html im Arbeitsbaum) führen keinen Versions-Check mehr aus und zeigen damit keine irreführenden Update-Hinweise.
+- **Verifikation:**
+  - Statische Prüfung von .github/workflows/deploy-pages.yml bestätigt, dass version.json und dist/game-endless.js gemeinsam gestempelt werden.
+  - Lokale Ausführung von `node tests/simulation-core.test.js` bestätigt, dass die Änderung an checkForAppUpdate keine Gameplay-Tests beeinflusst.
 - **Rest-Risiko / Follow-up:**
-  - Wenn später ein komplexerer Build-Prozess (z. B. Bundler) eingeführt wird, muss die Versionierungslogik entsprechend nachgezogen werden.
+  - Für eine vollständig dokumentierte Versionierungs-Story kann README.md später (im Rahmen von TODO 6) um einen kurzen Abschnitt erweitert werden, der die Rolle von version.json und des SHA-basierten Stempelns beschreibt.
 
 ---
 

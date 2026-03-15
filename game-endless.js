@@ -106,6 +106,10 @@ function shouldShowUpdatePrompt() {
  * @returns {Promise<void>} Resolves when the version check finishes.
  */
 async function checkForAppUpdate() {
+  if (APP_VERSION === "__APP_VERSION__") {
+    return;
+  }
+
   try {
     const response = await fetch("./version.json", { cache: "no-store" });
     if (!response.ok) {
