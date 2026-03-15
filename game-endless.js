@@ -2644,24 +2644,28 @@ function handleMovement(delta) {
     rocketSpawnTimer = getNextRocketSpawnDelay();
   }
 
+  // Normalise all frame-rate-dependent physics to the 60 Hz reference so that
+  // the game plays identically on 90 Hz / 120 Hz / 144 Hz displays.
+  const physicsScale = Math.min(delta / FRAME_DURATION_MS, 2);
+
   if (keys.left) {
-    player.vx -= player.speed;
+    player.vx -= player.speed * physicsScale;
     player.direction = -1;
   }
   if (keys.right) {
-    player.vx += player.speed;
+    player.vx += player.speed * physicsScale;
     player.direction = 1;
   }
   if (!keys.left && !keys.right) {
-    player.vx *= 0.82;
+    player.vx *= Math.pow(0.82, physicsScale);
   }
 
   player.vx = Math.max(-player.maxSpeed, Math.min(player.maxSpeed, player.vx));
-  player.vy += world.gravity;
+  player.vy += world.gravity * physicsScale;
 
   const previousY = player.y;
-  player.x += player.vx;
-  player.y += player.vy;
+  player.x += player.vx * physicsScale;
+  player.y += player.vy * physicsScale;
   player.grounded = false;
 
   level.platforms.forEach((platform) => {
@@ -2739,8 +2743,8 @@ function handleMovement(delta) {
     }
 
     if (bug.falling) {
-      bug.vy = Math.min(4.75, bug.vy + world.gravity * 0.21);
-      bug.y += bug.vy;
+      bug.vy = Math.min(4.75, bug.vy + world.gravity * 0.21 * physicsScale);
+      bug.y += bug.vy * physicsScale;
 
       if (bug.y >= bug.targetGroundY) {
         bug.y = bug.targetGroundY;
@@ -2751,7 +2755,7 @@ function handleMovement(delta) {
         bug.vx = (Math.random() > 0.5 ? 1 : -1) * randomBetween(0.9, 1.6);
       }
     } else {
-      bug.x += bug.vx;
+      bug.x += bug.vx * physicsScale;
       if (bug.x <= bug.minX || bug.x + bug.w >= bug.maxX) {
         bug.vx *= -1;
         bug.x = clamp(bug.x, bug.minX, bug.maxX - bug.w);
@@ -2811,7 +2815,7 @@ function handleMovement(delta) {
       return;
     }
 
-    rocket.x += rocket.vx;
+    rocket.x += rocket.vx * physicsScale;
     if (overlaps(player, rocket)) {
       rocket.active = false;
       applyPickupEffect(PICKUP_TYPE.EXTRA_LIFE, rocket);
