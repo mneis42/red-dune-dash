@@ -55,6 +55,14 @@ This repository is also an experiment in AI-assisted software delivery. The goal
 
 ## Local Development
 
+Run the local repository setup once after cloning:
+
+```powershell
+npm run setup
+```
+
+This configures the repository-local Git hooks from `.githooks/`. The current setup blocks direct pushes from `main` and nudges contributors toward feature branches and pull requests. The hard enforcement still lives on GitHub via branch protection.
+
 You can open `index.html` directly, but a small local server is recommended for service-worker and PWA testing.
 
 ```powershell
@@ -91,6 +99,13 @@ npm run test:service-worker
 ```
 
 The GitHub Actions workflows also run the same syntax and test steps before deployment.
+
+## Branch Workflow
+
+- Do not push directly from `main`.
+- Create a feature branch for each change.
+- Push the feature branch and open a pull request against `main`.
+- Use `npm run setup` after cloning so the local Git hook guardrail is active.
 
 ## Automation Status
 

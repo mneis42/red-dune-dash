@@ -22,7 +22,16 @@ This project is intentionally used as an AI-agent delivery experiment. Contribut
 1. Read the relevant repository instructions first.
 2. Check whether an existing document in `docs/`, `instructions/`, or `AGENTS.md` already defines the expected behavior.
 3. Prefer updating the documented workflow instead of inventing a parallel one.
-4. Make the smallest change that solves the problem cleanly.
+4. Run `npm run setup` after cloning to enable the repository-local Git hooks.
+5. Make the smallest change that solves the problem cleanly.
+
+## Branch And PR Workflow
+
+- Treat `main` as a protected branch.
+- Do your work on a feature branch, not directly on `main`.
+- Open a pull request for every change that should land in `main`.
+- The local `.githooks/pre-push` hook blocks direct pushes from `main` after `npm run setup` has been executed.
+- GitHub branch protection remains the source of truth; the local hook is an additional guardrail.
 
 ## Implementation Expectations
 

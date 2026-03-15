@@ -20,5 +20,10 @@
   "chat.tools.terminal.blockDetectedFileWrites": "outsideWorkspace",
   "chat.tools.terminal.autoApprove": {
     "/.*/": true
-  }
+  },
+
+  // Warn in the VS Code Git UI when someone works against the protected main branch.
+  "git.branchProtection": [
+    "main"
+  ]
 }
