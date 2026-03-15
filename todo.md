@@ -98,6 +98,8 @@
   `docs/run-model.md`, `game-endless.js`.
 
 ### P3 - Drittanbieter-Actions sind nur auf Major-Tags gepinnt
+- Status
+  Erledigt am 2026-03-15.
 - Problem
   Workflows verwenden `@v3/@v4` statt Commit-SHA-Pinning.
 - Warum wichtig
@@ -108,7 +110,10 @@
   - Alle externen Actions in CI/Deploy auf SHA gepinnt.
   - Dokumentierter Prozess für regelmäßige Pin-Updates vorhanden.
 - Verifizierung durchgeführt
-  Workflow-Dateien geprüft (`actions/checkout`, `actions/setup-node`, `actions/upload-pages-artifact`, `actions/deploy-pages`).
+  Actions in beiden Workflows auf SHAs gepinnt (`checkout`, `setup-node`, `upload-pages-artifact`, `deploy-pages`) und Wartungsprozess in `README.md` dokumentiert.
+  Nachkontrolle:
+  - keine `uses: ...@v*`-Eintraege mehr in `.github/workflows/*.yml`
+  - lokale Testlaeufe weiterhin gruen (`simulation-core`, `service-worker`)
 - Rest-Risiko / Follow-up
   SHA-Pinning reduziert, aber eliminiert Supply-Chain-Risiken nicht vollständig.
 - Relevante Stellen

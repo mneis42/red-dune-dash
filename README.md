@@ -48,6 +48,22 @@ node tests/service-worker.test.js
 
 Die CI-Workflows in `.github/workflows/` führen mindestens die Gameplay-Tests automatisch aus.
 
+### CI Action Pinning pflegen
+
+Die Workflows pinnen externe GitHub Actions auf Commit-SHAs.
+
+Empfohlener Update-Ablauf (z. B. monatlich oder vor Releases):
+
+1. Fuer jede Action den SHA hinter dem gewuenschten Tag abrufen, z. B.:
+
+	```powershell
+	git ls-remote https://github.com/actions/checkout refs/tags/v4
+	```
+
+2. SHAs in `.github/workflows/ci.yml` und `.github/workflows/deploy-pages.yml` aktualisieren.
+3. Workflow-Checks laufen lassen (`simulation-core` + `service-worker` Tests).
+4. Commit-Message klar kennzeichnen, z. B. `Refresh pinned GitHub Action SHAs`.
+
 ### Debug-Mode
 
 Der Debug-Modus wird über Query-Parameter aktiviert und erlaubt gezielte Balancing- und Event-Tests.
