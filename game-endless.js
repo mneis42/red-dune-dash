@@ -22,6 +22,13 @@ let isRefreshingForUpdate = false;
 const CLOUD_PARALLAX = 0.18;
 const CLOUD_RESPAWN_MIN_GAP = 140;
 const CLOUD_RESPAWN_MAX_GAP = 260;
+const GEM_VALUE_CENTS = 10;
+const scoreConfig = {
+  gemPickup: 30,
+  bugDefeat: 120,
+  rocketPickup: 200,
+  distanceDivisor: 12,
+};
 const isStandalone =
   window.matchMedia("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
@@ -61,10 +68,12 @@ function syncCanvasOnlyMode() {
   const portraitMode = isPortraitMobileView();
   document.body.classList.add("canvas-only");
   document.body.classList.toggle("portrait-mode", portraitMode);
+  if (portraitMode && gameState === "playing") {
+    pauseGame("portrait");
+  }
   // Give players a short reaction window after rotating back into landscape mid-run.
-  if (wasPortraitMode && !portraitMode && gameState === "playing") {
-    resetDirectionalInputState();
-    resumeCountdownTimer = 3000;
+  if (wasPortraitMode && !portraitMode && gameState === "paused" && pauseReason === "portrait") {
+    resumeGame(true);
   }
   wasPortraitMode = portraitMode;
 }
@@ -292,11 +301,16 @@ const player = {
 let highScore = loadHighScore();
 let cameraX = 0;
 let gameState = "ready";
+let pauseReason = null;
 let lastTime = 0;
 let worldTimeMs = 0;
 let runFrameIndex = 0;
 let runFrameTimer = 0;
 let rocketSpawnTimer = 0;
+const runBugStats = {
+  spawned: 0,
+  defeated: 0,
+};
 const specialEventState = {
   type: null,
   phase: "idle",
@@ -767,12 +781,88 @@ window.addEventListener("resize", syncCanvasOnlyMode);
 window.addEventListener("orientationchange", syncCanvasOnlyMode);
 
 /**
- * Computes the displayed total score including distance bonus.
+ * Returns the current euro pickup rate normalized to one hour.
+ *
+ * @returns {number} Current euros per hour rounded to a whole number.
+ */
+function getEuroRatePerHourValue() {
+  if (worldTimeMs <= 0 || player.gems <= 0) {
+    return 0;
+  }
+
+  return Math.round((player.gems * 3_600_000) / worldTimeMs / 100);
+}
+
+/**
+ * Returns the quality multiplier for the current bug load.
+ *
+ * @returns {number} Bug-side score multiplier.
+ */
+function getBugBalanceMultiplier() {
+  const outstandingBugs = getOutstandingBugTotal();
+  if (outstandingBugs === 0) {
+    return 1.35;
+  }
+  if (outstandingBugs <= 2) {
+    return 1.15;
+  }
+  if (outstandingBugs <= 4) {
+    return 1;
+  }
+  if (outstandingBugs <= 6) {
+    return 0.8;
+  }
+  return 0.6;
+}
+
+/**
+ * Returns the quality multiplier for current business momentum.
+ *
+ * @returns {number} Income-side score multiplier.
+ */
+function getIncomeBalanceMultiplier() {
+  const euroRate = getEuroRatePerHourValue();
+  if (euroRate >= 90) {
+    return 1.25;
+  }
+  if (euroRate >= 60) {
+    return 1.1;
+  }
+  if (euroRate >= 30) {
+    return 1;
+  }
+  if (euroRate >= 15) {
+    return 0.9;
+  }
+  return 0.75;
+}
+
+/**
+ * Returns the current run balance multiplier from bug pressure and income momentum.
+ *
+ * @returns {number} Current balance multiplier.
+ */
+function getRunBalanceMultiplier() {
+  return (getBugBalanceMultiplier() + getIncomeBalanceMultiplier()) / 2;
+}
+
+/**
+ * Computes the distance score including the current balance multiplier.
+ *
+ * @returns {number} Current distance score.
+ */
+function getDistanceScore() {
+  const baseDistanceScore = Math.floor(Math.max(0, player.farthestX - level.spawn.x) / scoreConfig.distanceDivisor);
+  return Math.floor(baseDistanceScore * getRunBalanceMultiplier());
+}
+
+/**
+ * Computes the displayed total score including the balance-based distance bonus.
  *
  * @returns {number} Current total score.
  */
 function getTotalScore() {
-  return player.score + Math.floor(Math.max(0, player.farthestX - level.spawn.x) / 12);
+  return player.score + getDistanceScore();
 }
 
 /**
@@ -782,6 +872,58 @@ function syncHighScore() {
   const total = getTotalScore();
   if (total > highScore) {
     saveHighScore(total);
+  }
+}
+
+/**
+ * Pauses the current run and remembers why it was interrupted.
+ *
+ * @param {"manual"|"portrait"|"background"} reason - Cause for the pause.
+ */
+function pauseGame(reason) {
+  if (gameState !== "playing") {
+    return;
+  }
+
+  resetDirectionalInputState();
+  activeHudInfo = null;
+  gameState = "paused";
+  pauseReason = reason;
+  statusMessage = reason === "manual" ? "Pausiert" : "Lauf pausiert";
+}
+
+/**
+ * Resumes a paused run, optionally with the existing safety countdown.
+ *
+ * @param {boolean} [withCountdown=false] - Whether to add the short resume countdown.
+ */
+function resumeGame(withCountdown = false) {
+  if (gameState !== "paused") {
+    return;
+  }
+  if (isPortraitMobileView() || document.visibilityState === "hidden") {
+    return;
+  }
+
+  resetDirectionalInputState();
+  activeHudInfo = null;
+  gameState = "playing";
+  pauseReason = null;
+  resumeCountdownTimer = withCountdown ? 3000 : 0;
+  statusMessage = withCountdown ? "Zurück im Lauf" : "Pause beendet";
+}
+
+/**
+ * Toggles the manual desktop pause state.
+ */
+function toggleManualPause() {
+  if (gameState === "playing") {
+    pauseGame("manual");
+    return;
+  }
+
+  if (gameState === "paused" && (pauseReason === "manual" || pauseReason === "background")) {
+    resumeGame(false);
   }
 }
 
@@ -936,6 +1078,7 @@ function createPlatform(x, y, w, h, kind) {
  */
 function createBug(x, y, minX, maxX, speed, options = {}) {
   const { telegraph = false, markerX = x + 23, markerY = y + 19 } = options;
+  runBugStats.spawned += 1;
   return {
     x,
     y,
@@ -1044,20 +1187,118 @@ function createHitEffect(x, y, emoji, color = null) {
  *
  * @returns {Array<object>} HUD stat descriptors for rendering and interaction.
  */
+function formatRunDuration(timeMs) {
+  const totalSeconds = Math.max(0, Math.floor(timeMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+/**
+ * Formats cent-based currency as a euro string.
+ *
+ * @param {number} cents - Monetary amount in cents.
+ * @returns {string} Formatted euro amount.
+ */
+function formatEuroAmount(cents) {
+  return `${(cents / 100).toFixed(2).replace(".", ",")} €`;
+}
+
+/**
+ * Returns the amount of spawned bugs that have not been defeated in the current run.
+ *
+ * @returns {number} Count of bugs still left unbeaten.
+ */
+function getOutstandingBugTotal() {
+  return Math.max(0, runBugStats.spawned - runBugStats.defeated);
+}
+
+/**
+ * Returns the amount of outstanding bugs as a HUD-friendly string.
+ *
+ * @returns {string} Count of bugs still left unbeaten.
+ */
+function getOutstandingBugCount() {
+  return String(getOutstandingBugTotal());
+}
+
+/**
+ * Returns the spawn multiplier for money-making sources based on outstanding bugs.
+ *
+ * @returns {number} Chance multiplier in the range 0.18..1.
+ */
+function getIncomeSourceSpawnMultiplier() {
+  const outstandingBugs = getOutstandingBugTotal();
+  return clamp(1 - outstandingBugs * 0.08, 0.18, 1);
+}
+
+/**
+ * Returns whether a money-making source should appear.
+ *
+ * @param {number} [baseChance=1] - Baseline spawn chance before bug pressure is applied.
+ * @returns {boolean} True when the source should spawn.
+ */
+function shouldSpawnIncomeSource(baseChance = 1) {
+  return Math.random() < clamp(baseChance * getIncomeSourceSpawnMultiplier(), 0, 1);
+}
+
+/**
+ * Formats the current euro-per-hour value for the HUD.
+ *
+ * @returns {string} Current euros per hour rounded to a whole number.
+ */
+function formatEuroRatePerHour() {
+  return String(getEuroRatePerHourValue());
+}
+
+/**
+ * Returns the current HUD section definitions, including values, hit areas and tooltip content.
+ *
+ * @returns {Array<object>} HUD stat descriptors for rendering and interaction.
+ */
 function getHudStats() {
   // Keep HUD layout, values and tooltip metadata in one place.
   return [
     {
+      key: "bugsOpen",
+      emoji: "🐞",
+      label: "Offene Bugs",
+      value: getOutstandingBugCount(),
+      accent: "#ffc48c",
+      sectionX: 24,
+      valueX: 64,
+      hitArea: { x: 0, y: 0, w: 192, h: 44 },
+      target: { x: 52, y: 42 },
+      tooltip: ["Zeigt alle Bugs, die in diesem Sprint nicht gefixt wurden.", "Je mehr offene Bugs, desto seltener kommen Einnahmequellen um Moneten zu verdienen."],
+    },
+    {
       key: "gems",
       emoji: "€",
       label: "Moneten",
-      value: String(player.gems),
+      value: formatEuroAmount(player.gems),
       accent: "#ffe37a",
-      sectionX: 30,
-      valueX: 70,
-      hitArea: { x: 0, y: 0, w: 241, h: 44 },
-      target: { x: 58, y: 42 },
-      tooltip: ["Jedes Euro-Symbol erhöht Moneten um 1.", "Zeigt alle eingesammelten Euro-Symbole."],
+      sectionX: 216,
+      valueX: 256,
+      hitArea: { x: 192, y: 0, w: 192, h: 44 },
+      target: { x: 244, y: 42 },
+      tooltip: ["Jedes Euro-Symbol bringt 10 ct.", "Zeigt den aktuell gesammelten Geldbetrag."],
+    },
+    {
+      key: "euroRate",
+      emoji: "€/h",
+      label: "Euro pro Stunde",
+      value: formatEuroRatePerHour(),
+      accent: "#ffe8a3",
+      sectionX: 408,
+      valueX: 456,
+      hitArea: { x: 384, y: 0, w: 192, h: 44 },
+      target: { x: 436, y: 42 },
+      tooltip: [
+        "Zeigt dein aktuelles Sammeltempo hochgerechnet auf eine Stunde.",
+        "Basiert auf dem Geldbetrag und der bisherigen Laufzeit.",
+        `Spieldauer: ${formatRunDuration(worldTimeMs)}`,
+        `Balance-Faktor: x${getRunBalanceMultiplier().toFixed(2).replace(".", ",")}`,
+      ],
     },
     {
       key: "lives",
@@ -1065,10 +1306,10 @@ function getHudStats() {
       label: "Leben",
       value: String(player.lives),
       accent: "#ffd27d",
-      sectionX: 254,
-      valueX: 295,
-      hitArea: { x: 241, y: 0, w: 228, h: 44 },
-      target: { x: 282, y: 42 },
+      sectionX: 600,
+      valueX: 641,
+      hitArea: { x: 576, y: 0, w: 192, h: 44 },
+      target: { x: 628, y: 42 },
       tooltip: ["Treffer und Stürze kosten ein Leben.", "Raketen schenken dir ein Extraleben."],
     },
     {
@@ -1077,23 +1318,18 @@ function getHudStats() {
       label: "Punkte",
       value: String(getTotalScore()),
       accent: "#fff1b8",
-      sectionX: 478,
-      valueX: 518,
-      hitArea: { x: 469, y: 0, w: 224, h: 44 },
-      target: { x: 506, y: 42 },
-      tooltip: ["Euro-Symbol: 50", "Bug besiegen: 150", "Rakete einsammeln: 250", "Distanz: laufend"],
-    },
-    {
-      key: "highscore",
-      emoji: "🏆",
-      label: "Highscore",
-      value: String(highScore),
-      accent: "#ffbc7e",
-      sectionX: 702,
-      valueX: 742,
-      hitArea: { x: 693, y: 0, w: 267, h: 44 },
-      target: { x: 730, y: 42 },
-      tooltip: ["Dein bester Gesamtwert.", "Wird lokal im Browser gespeichert."],
+      sectionX: 792,
+      valueX: 832,
+      hitArea: { x: 768, y: 0, w: 192, h: 44 },
+      target: { x: 820, y: 42 },
+      tooltip: [
+        `Euro-Symbol: ${scoreConfig.gemPickup}`,
+        `Bug fixen: ${scoreConfig.bugDefeat}`,
+        `Rakete einsammeln: ${scoreConfig.rocketPickup}`,
+        `Distanz: ${getDistanceScore()} mit Balance-Faktor`,
+        `Balance lebt von Einnahmen und wenigen offenen Bugs`,
+        `Highscore: ${highScore}`,
+      ],
     },
   ];
 }
@@ -1481,6 +1717,10 @@ function addGemOnPlatform(platform, telegraph = false) {
     return;
   }
 
+  if (!shouldSpawnIncomeSource()) {
+    return;
+  }
+
   const gemX = getSafeGemX(platform);
   if (gemX === null) {
     return;
@@ -1677,6 +1917,8 @@ function resetPlayer(fullReset = false) {
 
   if (fullReset) {
     resetSpecialEventState();
+    runBugStats.spawned = 0;
+    runBugStats.defeated = 0;
     initLevel();
     player.lives = 3;
     player.gems = 0;
@@ -1685,6 +1927,7 @@ function resetPlayer(fullReset = false) {
     player.checkpointX = level.spawn.x;
     player.checkpointY = level.spawn.y;
     gameState = "playing";
+    pauseReason = null;
     activeHudInfo = null;
     cameraX = 0;
     worldTimeMs = 0;
@@ -2076,9 +2319,9 @@ function handleMovement() {
       const scoreEffect = createHitEffect(gem.x + 16, gem.y - 8, "⭐");
       spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gems");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-      player.gems += 1;
-      player.score += 50;
-      statusMessage = "Moneten geborgen";
+      player.gems += GEM_VALUE_CENTS;
+      player.score += scoreConfig.gemPickup;
+      statusMessage = "10 ct geborgen";
     }
   });
 
@@ -2129,9 +2372,10 @@ function handleMovement() {
     const stomped = player.vy > 1 && previousY + player.h <= bug.y + 14;
     if (stomped) {
       bug.alive = false;
+      runBugStats.defeated += 1;
       const scoreEffect = createHitEffect(bug.x + bug.w / 2, bug.y + 6, "⭐");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-      player.score += 150;
+      player.score += scoreConfig.bugDefeat;
       stompedAnyBug = true;
       return;
     }
@@ -2169,7 +2413,7 @@ function handleMovement() {
       spawnHudEmoji(lifeEffect.x, lifeEffect.y, lifeEffect.emoji, "lives");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
       player.lives += 1;
-      player.score += 250;
+      player.score += scoreConfig.rocketPickup;
       statusMessage = "Rakete erwischt. Extraleben erhalten";
     }
   });
@@ -2610,7 +2854,7 @@ function drawHud() {
     ctx.fillText(String(stat.value), stat.valueX, 23);
   });
 
-  [241, 469, 693].forEach((x) => {
+  [192, 384, 576, 768].forEach((x) => {
     ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -2822,6 +3066,19 @@ function drawOverlay() {
         ctx.textAlign = "center";
       }
     }
+  } else if (gameState === "paused") {
+    installButtonRect = null;
+    ctx.fillText("Pause", canvas.width / 2, 175);
+    ctx.font = "24px Trebuchet MS";
+    ctx.fillStyle = "#ffd1aa";
+    if (pauseReason === "manual" || pauseReason === "background") {
+      ctx.fillText("Druecke P zum Fortsetzen", canvas.width / 2, 220);
+    } else {
+      ctx.fillText("Das Spiel wird gleich fortgesetzt", canvas.width / 2, 220);
+    }
+    ctx.font = "20px Trebuchet MS";
+    ctx.fillText(`Punkte: ${getTotalScore()}`, canvas.width / 2, 258);
+    ctx.fillText(`Offene Bugs: ${getOutstandingBugCount()}`, canvas.width / 2, 286);
   } else if (gameState === "lost") {
     installButtonRect = null;
     ctx.fillText("Game over", canvas.width / 2, 175);
@@ -2931,7 +3188,7 @@ function drawSpecialEventAnnouncement() {
  * Draws a compact HUD badge for currently active special events.
  */
 function drawSpecialEventStatus() {
-  if (specialEventState.phase !== "active" || player.hurtTimer > 0 || resumeCountdownTimer > 0) {
+  if (specialEventState.phase !== "active" || gameState !== "playing" || player.hurtTimer > 0 || resumeCountdownTimer > 0) {
     return;
   }
 
@@ -3013,37 +3270,40 @@ function gameLoop(time) {
   lastTime = time;
 
   if (delta < 100) {
-    worldTimeMs += delta;
-    const gameplayPaused =
-      gameState !== "playing" ||
-      isPortraitMobileView() ||
-      player.hurtTimer > 0 ||
-      resumeCountdownTimer > 0;
+    const runActive = gameState === "playing" && !isPortraitMobileView();
+    const gameplayPaused = !runActive || player.hurtTimer > 0 || resumeCountdownTimer > 0;
 
-    jumpButtonGlow = Math.max(0, jumpButtonGlow - 1);
-    player.hurtTimer = Math.max(0, player.hurtTimer - delta);
-    resumeCountdownTimer = Math.max(0, resumeCountdownTimer - delta);
     if (gameState === "lost") {
       player.pendingRespawn = false;
     }
-    // Delayed respawn is applied only once the countdown has finished and the run is still active.
-    if (player.hurtTimer === 0 && player.pendingRespawn && gameState === "playing") {
-      player.pendingRespawn = false;
-      player.forceInjuredPose = false;
-      player.respawnVisual = "injured";
-      player.x = player.checkpointX;
-      player.y = player.checkpointY;
-      player.vx = 0;
-      player.vy = 0;
-      player.grounded = false;
+
+    if (runActive) {
+      if (!gameplayPaused) {
+        worldTimeMs += delta;
+      }
+
+      jumpButtonGlow = Math.max(0, jumpButtonGlow - 1);
+      player.hurtTimer = Math.max(0, player.hurtTimer - delta);
+      resumeCountdownTimer = Math.max(0, resumeCountdownTimer - delta);
+      // Delayed respawn is applied only once the countdown has finished and the run is still active.
+      if (player.hurtTimer === 0 && player.pendingRespawn && gameState === "playing") {
+        player.pendingRespawn = false;
+        player.forceInjuredPose = false;
+        player.respawnVisual = "injured";
+        player.x = player.checkpointX;
+        player.y = player.checkpointY;
+        player.vx = 0;
+        player.vy = 0;
+        player.grounded = false;
+      }
+      updateSpawnTelegraphs(delta);
+      if (!gameplayPaused) {
+        updateSpecialEvents(delta);
+      }
+      updateHudEffects(delta);
+      handleMovement();
+      updateAnimation(delta);
     }
-    updateSpawnTelegraphs(delta);
-    if (!gameplayPaused) {
-      updateSpecialEvents(delta);
-    }
-    updateHudEffects(delta);
-    handleMovement();
-    updateAnimation(delta);
   }
 
   render(time);
@@ -3081,6 +3341,11 @@ function tryJump() {
 
 window.addEventListener("keydown", (event) => {
   const code = event.code;
+  if (code === "KeyP") {
+    event.preventDefault();
+    toggleManualPause();
+    return;
+  }
   if (code === "KeyA" || code === "ArrowLeft") {
     setDirectionalInput("keyboard-left", "left");
   }
@@ -3113,6 +3378,7 @@ window.addEventListener("blur", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     resetDirectionalInputState();
+    pauseGame("background");
   }
 });
 
