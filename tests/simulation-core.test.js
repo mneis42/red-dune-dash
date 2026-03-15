@@ -608,6 +608,106 @@ test("respawn helpers snap hurt poses to supporting platforms or checkpoint", ()
   assert.equal(backToCheckpoint.y, player.checkpointY);
 });
 
+test("respawn helpers detect hazard center-band hits and correctly exclude inactive or non-overlapping hazards", () => {
+  const placementSystem = placement.createPlacementSystem();
+  const level = {
+    platforms: [{ x: 0, y: 440, w: 300, h: 20, kind: "ground" }],
+    hazards: [],
+    bugs: [],
+  };
+  // Player: 40x40 at (100, 400). Center x = 120. Center band = [105, 135].
+  const player = {
+    x: 100,
+    y: 400,
+    w: 40,
+    h: 40,
+    checkpointX: 0,
+    checkpointY: 400,
+  };
+
+  function makeActiveState(hazard) {
+    return {
+      exposure: 1,
+      active: true,
+      top: hazard.y,
+      baseY: hazard.y + hazard.h,
+      height: hazard.h,
+    };
+  }
+
+  function makeInactiveState(hazard) {
+    return {
+      exposure: 0,
+      active: false,
+      top: hazard.y + hazard.h,
+      baseY: hazard.y + hazard.h,
+      height: 0,
+    };
+  }
+
+  // Hazard directly under player center and vertically overlapping -> hit.
+  const hazardCenter = { x: 112, y: 418, w: 16, h: 22 };
+  const helpersHit = respawnHelpers.createRespawnHelpers({
+    level,
+    player,
+    placementSystem,
+    placementSafetyConfig: placementSystem.config,
+    getHazardState: () => makeActiveState(hazardCenter),
+  });
+  assert.equal(helpersHit.hitsHazardWithPlayerCenter(hazardCenter), true,
+    "center-overlapping active hazard should register a hit");
+
+  // Hazard is active but center band is entirely to the left of the hazard -> no hit.
+  // Player center = 120, center band = [105, 135]. Hazard at x=200 -> no overlap.
+  const hazardRight = { x: 200, y: 418, w: 16, h: 22 };
+  const helpersRight = respawnHelpers.createRespawnHelpers({
+    level,
+    player,
+    placementSystem,
+    placementSafetyConfig: placementSystem.config,
+    getHazardState: () => makeActiveState(hazardRight),
+  });
+  assert.equal(helpersRight.hitsHazardWithPlayerCenter(hazardRight), false,
+    "active hazard outside center band (right side) should not register a hit");
+
+  // Hazard is active but center band is entirely to the right of the hazard -> no hit.
+  const hazardLeft = { x: 0, y: 418, w: 16, h: 22 };
+  const helpersLeft = respawnHelpers.createRespawnHelpers({
+    level,
+    player,
+    placementSystem,
+    placementSafetyConfig: placementSystem.config,
+    getHazardState: () => makeActiveState(hazardLeft),
+  });
+  assert.equal(helpersLeft.hitsHazardWithPlayerCenter(hazardLeft), false,
+    "active hazard outside center band (left side) should not register a hit");
+
+  // Hazard overlaps center band horizontally but is inactive -> no hit.
+  const hazardInactive = { x: 112, y: 418, w: 16, h: 22 };
+  const helpersInactive = respawnHelpers.createRespawnHelpers({
+    level,
+    player,
+    placementSystem,
+    placementSafetyConfig: placementSystem.config,
+    getHazardState: () => makeInactiveState(hazardInactive),
+  });
+  assert.equal(helpersInactive.hitsHazardWithPlayerCenter(hazardInactive), false,
+    "inactive hazard (height=0) should not register a hit");
+
+  // Hazard is active and center-band-adjacent but no vertical overlap -> no hit.
+  // Player y range [400, 440]. Hazard at y=450 places top at 450, baseY at 472 -> below player.
+  const hazardBelow = { x: 112, y: 450, w: 16, h: 22 };
+  const helpersBelow = respawnHelpers.createRespawnHelpers({
+    level,
+    player,
+    placementSystem,
+    placementSafetyConfig: placementSystem.config,
+    getHazardState: () => makeActiveState(hazardBelow),
+  });
+  assert.equal(helpersBelow.hitsHazardWithPlayerCenter(hazardBelow), false,
+    "active hazard with no vertical overlap should not register a hit");
+});
+
 let failed = 0;
 
 tests.forEach(({ name, fn }) => {
