@@ -226,6 +226,17 @@ const hazardCycleConfig = {
   risingDuration: 650,
   activeExposureThreshold: 0.55,
 };
+const placementSafetyConfig = {
+  platformEdgePadding: 28,
+  gemMinimumZoneWidth: 36,
+  embeddedHazardLaneTolerance: 4,
+  groundHazardLaneTolerance: 36,
+  bugLaneTolerance: 24,
+  collectibleHazardPadding: 24,
+  checkpointHazardPadding: 24,
+  hurtHazardPadding: 24,
+  hurtBugPadding: 18,
+};
 
 const specialEventConfig = {
   minDelay: 120_000,
@@ -2167,50 +2178,214 @@ function getHazardState(hazard, timeMs = worldTimeMs) {
 }
 
 /**
+ * Returns whether two horizontal spans overlap.
+ *
+ * @param {number} startA - Start x-position of the first span.
+ * @param {number} endA - End x-position of the first span.
+ * @param {number} startB - Start x-position of the second span.
+ * @param {number} endB - End x-position of the second span.
+ * @returns {boolean} True when both spans overlap.
+ */
+function spansOverlap(startA, endA, startB, endB) {
+  return startA < endB && endA > startB;
+}
+
+/**
+ * Returns the horizontal placement range available on a platform after reserving edge padding.
+ *
+ * The returned range uses the moving object's left edge when `occupantWidth > 0`, and a point range
+ * when `occupantWidth` is zero.
+ *
+ * @param {{x:number, w:number}} platform - Platform to inspect.
+ * @param {number} [occupantWidth=0] - Width of the occupying object.
+ * @param {number} [edgePadding=placementSafetyConfig.platformEdgePadding] - Reserved padding near platform edges.
+ * @returns {{start:number, end:number}|null} Available horizontal range or null when the platform is too small.
+ */
+function getPlatformPlacementRange(
+  platform,
+  occupantWidth = 0,
+  edgePadding = placementSafetyConfig.platformEdgePadding,
+) {
+  const start = platform.x + edgePadding;
+  const end = platform.x + platform.w - occupantWidth - edgePadding;
+  if (end < start) {
+    return null;
+  }
+
+  return { start, end };
+}
+
+/**
+ * Cuts one blocked interval out of a list of safe horizontal zones.
+ *
+ * @param {Array<{start:number,end:number}>} zones - Current safe zones.
+ * @param {{start:number,end:number}} blockedInterval - Interval that should become unavailable.
+ * @returns {Array<{start:number,end:number}>} Remaining safe zones.
+ */
+function subtractBlockedInterval(zones, blockedInterval) {
+  const nextZones = [];
+
+  zones.forEach((zone) => {
+    if (!spansOverlap(zone.start, zone.end, blockedInterval.start, blockedInterval.end)) {
+      nextZones.push(zone);
+      return;
+    }
+
+    if (blockedInterval.start > zone.start) {
+      nextZones.push({ start: zone.start, end: blockedInterval.start });
+    }
+    if (blockedInterval.end < zone.end) {
+      nextZones.push({ start: blockedInterval.end, end: zone.end });
+    }
+  });
+
+  return nextZones;
+}
+
+/**
+ * Builds a blocked placement interval for an obstacle on a platform.
+ *
+ * @param {number} blockerX - Obstacle x-position.
+ * @param {number} blockerWidth - Obstacle width.
+ * @param {number} [occupantWidth=0] - Width of the moving/placed object.
+ * @param {number} [padding=0] - Extra safety padding around the blocker.
+ * @returns {{start:number,end:number}} Blocked interval in placement-space coordinates.
+ */
+function createBlockedPlacementInterval(blockerX, blockerWidth, occupantWidth = 0, padding = 0) {
+  return {
+    start: blockerX - occupantWidth - padding,
+    end: blockerX + blockerWidth + padding,
+  };
+}
+
+/**
+ * Returns whether a hazard is embedded into the same top lane as a platform pickup.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} hazard - Hazard descriptor.
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to inspect.
+ * @returns {boolean} True when the hazard blocks pickup placement on that platform lane.
+ */
+function isHazardOnPickupLane(hazard, platform) {
+  return (
+    Math.abs(hazard.y - platform.y) < placementSafetyConfig.embeddedHazardLaneTolerance &&
+    spansOverlap(hazard.x, hazard.x + hazard.w, platform.x, platform.x + platform.w)
+  );
+}
+
+/**
+ * Returns whether a floor hazard occupies the same running lane as a platform-safe player pose.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} hazard - Hazard descriptor.
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to inspect.
+ * @returns {boolean} True when the hazard should block checkpoint or hurt-pose placement.
+ */
+function isHazardOnPlayerLane(hazard, platform) {
+  return (
+    Math.abs(hazard.y + hazard.h - platform.y) < placementSafetyConfig.groundHazardLaneTolerance &&
+    spansOverlap(hazard.x, hazard.x + hazard.w, platform.x, platform.x + platform.w)
+  );
+}
+
+/**
+ * Returns whether a living bug occupies the same running lane as a platform-safe player pose.
+ *
+ * @param {{x:number, y:number, w:number, h:number, alive:boolean}} bug - Bug descriptor.
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to inspect.
+ * @returns {boolean} True when the bug should block safe player placement.
+ */
+function isBugOnPlayerLane(bug, platform) {
+  return (
+    bug.alive &&
+    Math.abs(bug.y + bug.h - platform.y) < placementSafetyConfig.bugLaneTolerance &&
+    spansOverlap(bug.x, bug.x + bug.w, platform.x, platform.x + platform.w)
+  );
+}
+
+/**
+ * Returns safe horizontal placement zones on a platform after subtracting known blockers.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to inspect.
+ * @param {object} [options={}] - Placement rule options.
+ * @param {number} [options.occupantWidth=0] - Width of the moving or placed object.
+ * @param {number} [options.edgePadding=placementSafetyConfig.platformEdgePadding] - Reserved padding near edges.
+ * @param {number} [options.minimumZoneWidth=0] - Minimum width a safe zone must keep.
+ * @param {Array<{start:number,end:number}>} [options.blockedIntervals=[]] - Precomputed blocked intervals.
+ * @returns {Array<{start:number,end:number}>} Safe zones ordered from left to right.
+ */
+function getPlatformSafeZones(platform, options = {}) {
+  const {
+    occupantWidth = 0,
+    edgePadding = placementSafetyConfig.platformEdgePadding,
+    minimumZoneWidth = 0,
+    blockedIntervals = [],
+  } = options;
+  const placementRange = getPlatformPlacementRange(platform, occupantWidth, edgePadding);
+  if (!placementRange) {
+    return [];
+  }
+
+  let safeZones = [placementRange];
+  blockedIntervals.forEach((blockedInterval) => {
+    safeZones = subtractBlockedInterval(safeZones, blockedInterval);
+  });
+
+  return safeZones
+    .map((zone) => ({
+      start: clamp(zone.start, placementRange.start, placementRange.end),
+      end: clamp(zone.end, placementRange.start, placementRange.end),
+    }))
+    .filter((zone) => zone.end >= zone.start && zone.end - zone.start >= minimumZoneWidth);
+}
+
+/**
+ * Picks the nearest valid x-position inside a list of safe zones.
+ *
+ * @param {Array<{start:number,end:number}>} safeZones - Candidate safe zones.
+ * @param {number} preferredX - Preferred x-position within placement-space coordinates.
+ * @returns {number|null} Best matching safe x-position or null when no safe zone exists.
+ */
+function pickNearestSafeZoneX(safeZones, preferredX) {
+  if (safeZones.length === 0) {
+    return null;
+  }
+
+  let bestCandidate = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  safeZones.forEach((zone) => {
+    const candidate = clamp(preferredX, zone.start, zone.end);
+    const distance = Math.abs(candidate - preferredX);
+    if (distance < bestDistance) {
+      bestCandidate = candidate;
+      bestDistance = distance;
+    }
+  });
+
+  return bestCandidate;
+}
+
+/**
  * Finds a safe x-position for a collectible on a platform.
  *
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
  * @returns {number|null} Safe x-position or null when none exists.
  */
 function getSafeGemX(platform) {
-  const edgePadding = 28;
-  const safeZones = [{ start: platform.x + edgePadding, end: platform.x + platform.w - edgePadding }];
-  const overlappingHazards = level.hazards.filter(
-    (hazard) => hazard.x < platform.x + platform.w && hazard.x + hazard.w > platform.x && Math.abs(hazard.y - platform.y) < 4
-  );
-
-  if (overlappingHazards.length > 0) {
-    return null;
-  }
-
-  overlappingHazards.forEach((hazard) => {
-    const nextZones = [];
-    safeZones.forEach((zone) => {
-      const blockedStart = hazard.x - 24;
-      const blockedEnd = hazard.x + hazard.w + 24;
-
-      if (blockedEnd <= zone.start || blockedStart >= zone.end) {
-        nextZones.push(zone);
-        return;
-      }
-      if (blockedStart > zone.start) {
-        nextZones.push({ start: zone.start, end: blockedStart });
-      }
-      if (blockedEnd < zone.end) {
-        nextZones.push({ start: blockedEnd, end: zone.end });
-      }
-    });
-    safeZones.splice(0, safeZones.length, ...nextZones);
+  const blockedIntervals = level.hazards
+    .filter((hazard) => isHazardOnPickupLane(hazard, platform))
+    .map((hazard) =>
+      createBlockedPlacementInterval(hazard.x, hazard.w, 0, placementSafetyConfig.collectibleHazardPadding)
+    );
+  const safeZones = getPlatformSafeZones(platform, {
+    minimumZoneWidth: placementSafetyConfig.gemMinimumZoneWidth,
+    blockedIntervals,
   });
-
-  const validZones = safeZones.filter((zone) => zone.end - zone.start >= 36);
-  if (validZones.length === 0) {
+  if (safeZones.length === 0) {
     return null;
   }
 
-  validZones.sort((a, b) => (b.end - b.start) - (a.end - a.start));
-  const bestZone = validZones[0];
-  return (bestZone.start + bestZone.end) / 2;
+  // Pickups prefer visually central positions, but still honor carved-out hazard safe zones.
+  return pickNearestSafeZoneX(safeZones, platform.x + platform.w / 2);
 }
 
 /**
@@ -2534,46 +2709,26 @@ function hitsHazardWithPlayerCenter(hazard) {
  */
 function getSafeCheckpointX(platform) {
   // Keep checkpoints away from platform edges and floor hazards to avoid death loops.
-  const edgeMargin = 28;
-  const respawnWidth = player.w;
-  const minX = platform.x + edgeMargin;
-  const maxX = platform.x + platform.w - respawnWidth - edgeMargin;
-  let safeX = clamp(player.x, minX, maxX);
-
-  const overlappingHazards = level.hazards.filter((hazard) => {
-    const sameLane = Math.abs(hazard.y + hazard.h - platform.y) < 36;
-    const overlapsPlatform = hazard.x < platform.x + platform.w && hazard.x + hazard.w > platform.x;
-    return sameLane && overlapsPlatform;
+  const safeZones = getPlatformSafeZones(platform, {
+    occupantWidth: player.w,
+    blockedIntervals: level.hazards
+      .filter((hazard) => isHazardOnPlayerLane(hazard, platform))
+      .map((hazard) =>
+        createBlockedPlacementInterval(
+          hazard.x,
+          hazard.w,
+          player.w,
+          placementSafetyConfig.checkpointHazardPadding
+        )
+      ),
   });
+  const safeX = pickNearestSafeZoneX(safeZones, player.x);
+  if (safeX === null) {
+    const placementRange = getPlatformPlacementRange(platform, player.w);
+    return placementRange ? placementRange.start : platform.x;
+  }
 
-  overlappingHazards.forEach((hazard) => {
-    const overlapsHazard =
-      safeX < hazard.x + hazard.w + 18 &&
-      safeX + respawnWidth > hazard.x - 18;
-
-    if (!overlapsHazard) {
-      return;
-    }
-
-    const leftOption = hazard.x - respawnWidth - 24;
-    const rightOption = hazard.x + hazard.w + 24;
-    const canUseLeft = leftOption >= minX;
-    const canUseRight = rightOption <= maxX;
-
-    if (canUseLeft && canUseRight) {
-      safeX = Math.abs(safeX - leftOption) < Math.abs(rightOption - safeX) ? leftOption : rightOption;
-      return;
-    }
-    if (canUseLeft) {
-      safeX = leftOption;
-      return;
-    }
-    if (canUseRight) {
-      safeX = rightOption;
-    }
-  });
-
-  return clamp(safeX, minX, maxX);
+  return safeX;
 }
 
 /**
@@ -2609,71 +2764,29 @@ function getSupportingPlatformAt(playerX, preferredY) {
  * @returns {number} Safe player x-position on the platform.
  */
 function getSafePlatformPoseX(platform, preferredX) {
-  const edgeMargin = 28;
-  const minX = platform.x + edgeMargin;
-  const maxX = platform.x + platform.w - player.w - edgeMargin;
-  let safeX = clamp(preferredX, minX, maxX);
-
-  const blockers = [
+  const blockedIntervals = [
     ...level.hazards
-      .filter((hazard) => Math.abs(hazard.y + hazard.h - platform.y) < 36)
-      .map((hazard) => ({ x: hazard.x, w: hazard.w, padding: 24 })),
+      .filter((hazard) => isHazardOnPlayerLane(hazard, platform))
+      .map((hazard) =>
+        createBlockedPlacementInterval(hazard.x, hazard.w, player.w, placementSafetyConfig.hurtHazardPadding)
+      ),
     ...level.bugs
-      .filter((bug) => bug.alive && Math.abs(bug.y + bug.h - platform.y) < 24)
-      .map((bug) => ({ x: bug.x, w: bug.w, padding: 18 })),
+      .filter((bug) => isBugOnPlayerLane(bug, platform))
+      .map((bug) =>
+        createBlockedPlacementInterval(bug.x, bug.w, player.w, placementSafetyConfig.hurtBugPadding)
+      ),
   ];
-
-  blockers.forEach((blocker) => {
-    const overlapsBlocker =
-      safeX < blocker.x + blocker.w + blocker.padding &&
-      safeX + player.w > blocker.x - blocker.padding;
-
-    if (!overlapsBlocker) {
-      return;
-    }
-
-    const leftOption = blocker.x - player.w - blocker.padding;
-    const rightOption = blocker.x + blocker.w + blocker.padding;
-    const canUseLeft = leftOption >= minX;
-    const canUseRight = rightOption <= maxX;
-
-    if (canUseLeft && canUseRight) {
-      safeX = Math.abs(safeX - leftOption) < Math.abs(rightOption - safeX) ? leftOption : rightOption;
-      return;
-    }
-    if (canUseLeft) {
-      safeX = leftOption;
-      return;
-    }
-    if (canUseRight) {
-      safeX = rightOption;
-    }
+  const safeZones = getPlatformSafeZones(platform, {
+    occupantWidth: player.w,
+    blockedIntervals,
   });
-
-  const stillBlocked = blockers.some((blocker) => {
-    return safeX < blocker.x + blocker.w + blocker.padding && safeX + player.w > blocker.x - blocker.padding;
-  });
-
-  if (stillBlocked) {
-    const leftEscape = blockers
-      .map((blocker) => blocker.x - player.w - blocker.padding)
-      .filter((candidate) => candidate >= minX)
-      .sort((a, b) => Math.abs(a - preferredX) - Math.abs(b - preferredX))[0];
-    const rightEscape = blockers
-      .map((blocker) => blocker.x + blocker.w + blocker.padding)
-      .filter((candidate) => candidate <= maxX)
-      .sort((a, b) => Math.abs(a - preferredX) - Math.abs(b - preferredX))[0];
-
-    if (leftEscape !== undefined && rightEscape !== undefined) {
-      safeX = Math.abs(leftEscape - preferredX) < Math.abs(rightEscape - preferredX) ? leftEscape : rightEscape;
-    } else if (leftEscape !== undefined) {
-      safeX = leftEscape;
-    } else if (rightEscape !== undefined) {
-      safeX = rightEscape;
-    }
+  const safeX = pickNearestSafeZoneX(safeZones, preferredX);
+  if (safeX === null) {
+    const placementRange = getPlatformPlacementRange(platform, player.w);
+    return placementRange ? placementRange.start : platform.x;
   }
 
-  return clamp(safeX, minX, maxX);
+  return safeX;
 }
 
 /**

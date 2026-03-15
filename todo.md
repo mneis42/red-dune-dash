@@ -36,7 +36,7 @@ Statusuebersicht. Die Detailbeschreibungen zu jedem Punkt folgen direkt darunter
 - [x] P1 - Score-, Ressourcen- und Fortschrittsmodell fachlich sauber definieren
 - [x] P1 - Bug-Lebenszyklus als eigenes Fachsystem modellieren
 - [x] P1 - Event-System von hart codierten Sonderfaellen zu einer erweiterbaren Struktur umbauen
-- [ ] P1 - Dead Code und unklare Regelpfade bei Platzierung und Kollision aufraeumen
+- [x] P1 - Dead Code und unklare Regelpfade bei Platzierung und Kollision aufraeumen
 - [ ] P1 - Offline-/PWA-Assets an die tatsaechlich verwendeten Inhalte angleichen
 - [ ] P2 - Den Monolithen in klar getrennte Spielsysteme zerlegen
 - [ ] P2 - Testbare Simulationskern-Logik einziehen
