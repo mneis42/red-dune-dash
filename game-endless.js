@@ -23,6 +23,9 @@ const CLOUD_PARALLAX = 0.18;
 const CLOUD_RESPAWN_MIN_GAP = 140;
 const CLOUD_RESPAWN_MAX_GAP = 260;
 const GEM_VALUE_CENTS = 10;
+const FRAME_DURATION_MS = 1000 / 60;
+const JUMP_BUTTON_GLOW_DURATION_MS = Math.round(8 * FRAME_DURATION_MS);
+const INVINCIBILITY_BLINK_INTERVAL_MS = Math.round(5 * FRAME_DURATION_MS);
 const scoreConfig = {
   gemPickup: 30,
   bugDefeat: 120,
@@ -373,6 +376,16 @@ function randomInt(min, max) {
 }
 
 /**
+ * Converts a legacy frame-based duration into milliseconds using the historical 60 FPS baseline.
+ *
+ * @param {number} frames - Duration measured in 60 FPS frames.
+ * @returns {number} Equivalent duration in milliseconds.
+ */
+function framesToMs(frames) {
+  return Math.round(frames * FRAME_DURATION_MS);
+}
+
+/**
  * Clamps a numeric value into a closed interval.
  *
  * @param {number} value - Value to clamp.
@@ -591,10 +604,10 @@ function getVisibleBugSpawnPlatform() {
 /**
  * Returns the current rocket spawn interval, with bug-wave countdowns and active bug-waves doubling the rate.
  *
- * @returns {number} Frames until the next rocket spawn.
+ * @returns {number} Milliseconds until the next rocket spawn.
  */
 function getNextRocketSpawnDelay() {
-  const baseDelay = randomInt(850, 1450);
+  const baseDelay = framesToMs(randomInt(850, 1450));
   const bugWaveIncoming =
     specialEventState.type === "bug-wave" &&
     (specialEventState.phase === "announce" || specialEventState.phase === "active");
@@ -603,7 +616,10 @@ function getNextRocketSpawnDelay() {
     return baseDelay;
   }
 
-  return Math.max(425, Math.round(baseDelay / specialEventConfig.bugWaveRocketSpawnMultiplier));
+  return Math.max(
+    framesToMs(425),
+    Math.round(baseDelay / specialEventConfig.bugWaveRocketSpawnMultiplier)
+  );
 }
 
 /**
@@ -2021,7 +2037,7 @@ function resetPlayer(fullReset = false) {
     activeHudInfo = null;
     cameraX = 0;
     worldTimeMs = 0;
-    rocketSpawnTimer = 700 + randomInt(0, 320);
+    rocketSpawnTimer = framesToMs(700 + randomInt(0, 320));
     resumeCountdownTimer = 0;
     statusMessage = "Endloslauf gestartet";
   }
@@ -2279,8 +2295,10 @@ function updateCheckpoint(platform) {
 
 /**
  * Advances the simulation for player movement, collisions, pickups, enemies and camera tracking.
+ *
+ * @param {number} delta - Frame delta in milliseconds.
  */
-function handleMovement() {
+function handleMovement(delta) {
   if (gameState !== "playing" || isPortraitMobileView() || player.hurtTimer > 0 || resumeCountdownTimer > 0) {
     return;
   }
@@ -2314,7 +2332,7 @@ function handleMovement() {
       }
     });
 
-  rocketSpawnTimer -= 1;
+  rocketSpawnTimer = Math.max(0, rocketSpawnTimer - delta);
   if (rocketSpawnTimer <= 0) {
     level.rockets.push(createRocket(Math.random() > 0.5));
     rocketSpawnTimer = getNextRocketSpawnDelay();
@@ -2380,9 +2398,7 @@ function handleMovement() {
     });
   }
 
-  if (player.invincible > 0) {
-    player.invincible -= 1;
-  }
+  player.invincible = Math.max(0, player.invincible - delta);
 
   level.hazards.forEach((hazard) => {
     if (player.invincible > 0) {
@@ -2560,7 +2576,7 @@ function loseLife(message, options = {}) {
       : { x: hitX, y: hitY };
 
   player.lives -= 1;
-  player.invincible = showInjured ? 135 : 75;
+  player.invincible = showInjured ? framesToMs(135) : framesToMs(75);
   player.hurtTimer = showInjured ? 3000 : 0;
   player.pendingRespawn = showInjured;
   player.forceInjuredPose = showInjured;
@@ -2858,7 +2874,9 @@ function drawTiger() {
   }
 
   const x = player.x - cameraX;
-  const blink = player.invincible > 0 && Math.floor(player.invincible / 5) % 2 === 0;
+  const blink =
+    player.invincible > 0 &&
+    Math.floor(player.invincible / INVINCIBILITY_BLINK_INTERVAL_MS) % 2 === 0;
 
   if (blink) {
     return;
@@ -3372,7 +3390,7 @@ function gameLoop(time) {
         worldTimeMs += delta;
       }
 
-      jumpButtonGlow = Math.max(0, jumpButtonGlow - 1);
+      jumpButtonGlow = Math.max(0, jumpButtonGlow - delta);
       player.hurtTimer = Math.max(0, player.hurtTimer - delta);
       resumeCountdownTimer = Math.max(0, resumeCountdownTimer - delta);
       // Delayed respawn is applied only once the countdown has finished and the run is still active.
@@ -3391,7 +3409,7 @@ function gameLoop(time) {
         updateSpecialEvents(delta);
       }
       updateHudEffects(delta);
-      handleMovement();
+      handleMovement(delta);
       updateAnimation(delta);
     }
   }
@@ -3534,13 +3552,13 @@ canvas.addEventListener("pointerdown", (event) => {
   }
 
   if (action === "jump") {
-    jumpButtonGlow = 8;
+    jumpButtonGlow = JUMP_BUTTON_GLOW_DURATION_MS;
     tryJump();
     return;
   }
 
   if (gameState === "ready" || gameState === "playing") {
-    jumpButtonGlow = 8;
+    jumpButtonGlow = JUMP_BUTTON_GLOW_DURATION_MS;
     tryJump();
   }
 });
