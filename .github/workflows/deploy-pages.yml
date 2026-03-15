@@ -29,17 +29,10 @@ jobs:
           node-version: 20
 
       - name: Verify JavaScript syntax
-        shell: bash
-        run: |
-          for file in app-assets.js service-worker.js systems/*.js game-endless.js; do
-            node --check "$file"
-          done
+        run: npm run check
 
-      - name: Run gameplay tests
-        run: node tests/simulation-core.test.js
-
-      - name: Run service worker smoke tests
-        run: node tests/service-worker.test.js
+      - name: Run test suite
+        run: npm test
 
   deploy:
     needs: test

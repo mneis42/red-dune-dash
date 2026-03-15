@@ -1,103 +1,138 @@
 # Curious Tiger: Red Dune Dash
 
-Kleines browserbasiertes Jump-and-Run auf dem Mars mit einem Tiger als Spielfigur. Das Spiel läuft komplett ohne Frameworks direkt im Browser und setzt auf HTML, CSS und Vanilla JavaScript.
+Red Dune Dash is a browser-first endless runner about a Mars tiger chasing bugs, collecting coins, surviving engineering-themed hazards, and grabbing rockets for extra lives. The game combines arcade platforming with light serious-gaming ideas that make software-development challenges feel playful and accessible.
 
-## Features
+This repository is also an experiment in AI-assisted software delivery. The goal is to learn how far current AI agents can take a game project with minimal human coding, where they already work well, where they struggle, and which instructions, workflows, and safeguards make them more reliable.
 
-- Endlos-Runner mit zufällig generierten Abschnitten
-- Gegner, Gefahren, Extraleben und Punkte-System
-- Highscore-Speicherung im Browser via `localStorage`
-- Tastatur- und Touch-Steuerung für Desktop und Mobile
+## Why This Repo Exists
 
-## Projektstruktur
+- Explore how much of day-to-day game development can already be delegated to AI agents.
+- Capture practical limits, failure modes, and mitigation patterns for agent-driven delivery.
+- Build a workflow where humans mainly steer, review, and refine instead of writing most code by hand.
+- Gradually move more of implementation, testing, review, deployment, and maintenance into automated agent-supported flows.
 
-- `index.html` - Einstiegspunkt und HUD
-- `styles.css` - Layout, Effekte und responsive UI
-- `game-endless.js` - aktuelle Spiel-Logik des Endless-Runs
-- `assets/` - Sprites und Grafiken
-- `systems/` - Kernsysteme für Simulation, Placement, Pickups, Events, Debug-Tools, Generator- und Respawn-Helfer
-- `app-assets.js` - zentrales Asset-Manifest für Spiel und Service Worker
-- `service-worker.js` - PWA-/Offline-Unterstützung
-- `tests/` - Node-basierte Gameplay-, System- und Service-Worker-Tests
+## Project Goals
 
-## Lokal starten
+- Keep the game playable in modern desktop and mobile browsers.
+- Support PWA installation and useful offline behavior.
+- Use GitHub Actions as the default safety net for verification and deployment.
+- Make the project easy to continue through clear instructions, tests, and repository-level conventions.
+- Preserve a high signal-to-noise workflow for both human contributors and coding agents.
 
-Einfach `index.html` im Browser öffnen.
+## Product Direction
 
-Empfohlen wird ein kleiner lokaler Server, zum Beispiel:
+- Genre: endless runner / jump-and-run
+- Theme: Mars tiger vs. bugs, coins, rockets, and software-inspired obstacles
+- Tone: accessible, playful, slightly educational
+- Primary audience: German-speaking developers and players
+- UI language: German
+- Preferred language for code, documentation, instruction files, and commit messages: English
+
+## Current Stack
+
+- HTML, CSS, and vanilla JavaScript
+- Canvas-based rendering
+- Browser `localStorage` for persistent highscores
+- Service worker and web manifest for PWA support
+- Node-based smoke and system tests
+- GitHub Actions for CI and GitHub Pages deployment
+
+## Repository Layout
+
+- `index.html` - app entry point and HUD shell
+- `styles.css` - layout, responsive UI, and visual presentation
+- `game-endless.js` - main endless-run gameplay loop and orchestration
+- `systems/` - modular gameplay and simulation subsystems
+- `assets/` - sprites and game graphics
+- `icons/` - PWA icons
+- `app-assets.js` - central asset manifest for runtime and caching
+- `service-worker.js` - offline and update behavior
+- `tests/` - Node-based tests for simulation logic and service worker behavior
+- `docs/` - focused technical documentation for core subsystems
+- `instructions/` - reusable instruction files for AI-agent workflows
+- `reviews/` - stored review outputs
+- `AGENTS.md` - repository-level instructions for coding agents
+
+## Local Development
+
+You can open `index.html` directly, but a small local server is recommended for service-worker and PWA testing.
 
 ```powershell
 python -m http.server 8000
 ```
 
-Dann `http://localhost:8000` im Browser öffnen.
+Then open `http://localhost:8000`.
 
-### Tests ausführen
+## Verification
 
-Gameplay- und System-Tests laufen direkt unter Node:
-
-```powershell
-node tests/simulation-core.test.js
-```
-
-Einfache Smoke-Tests für den Service Worker:
+Run the existing checks locally with npm:
 
 ```powershell
-node tests/service-worker.test.js
+npm test
 ```
 
-Die CI-Workflows in `.github/workflows/` führen mindestens die Gameplay-Tests automatisch aus.
+For syntax validation, use:
 
-### CI Action Pinning pflegen
+```powershell
+npm run check
+```
 
-Die Workflows pinnen externe GitHub Actions auf Commit-SHAs.
+To run the full local verification flow:
 
-Empfohlener Update-Ablauf (z. B. monatlich oder vor Releases):
+```powershell
+npm run verify
+```
 
-1. Fuer jede Action den SHA hinter dem gewuenschten Tag abrufen, z. B.:
+If you want to run the suites individually, you can also use:
 
-	```powershell
-	git ls-remote https://github.com/actions/checkout refs/tags/v4
-	```
+```powershell
+npm run test:simulation
+npm run test:service-worker
+```
 
-2. SHAs in `.github/workflows/ci.yml` und `.github/workflows/deploy-pages.yml` aktualisieren.
-3. Workflow-Checks laufen lassen (`simulation-core` + `service-worker` Tests).
-4. Commit-Message klar kennzeichnen, z. B. `Refresh pinned GitHub Action SHAs`.
+The GitHub Actions workflows also run the same syntax and test steps before deployment.
 
-### Debug-Mode
+## Automation Status
 
-Der Debug-Modus wird über Query-Parameter aktiviert und erlaubt gezielte Balancing- und Event-Tests.
+The repository already includes:
 
-Beispiele:
+- CI for JavaScript syntax checks
+- Automated gameplay and service-worker tests
+- GitHub Pages deployment from `main`
+- Version stamping during deployment for cache-safe releases
+- Pinned GitHub Action SHAs for more predictable workflow execution
 
-- Debug aktivieren und ein bestimmtes Event erzwingen:
+This is the baseline. Over time, more of the full development workflow should become agent-driven and automation-backed.
 
-	```text
-	?debug=1&debugEvent=big-order
-	```
+## Working Principles
 
-- Bestimmten Pickup-Typ und Backlog vorbefüllen:
+- Prefer small, verifiable increments over large speculative rewrites.
+- Keep tests, docs, and instructions in sync with behavior changes.
+- Treat instruction files as product infrastructure, not as optional notes.
+- Optimize for workflows where a human can guide and approve without needing to write much code.
+- Document friction honestly so the repo remains useful as an AI-agent benchmark and learning artifact.
 
-	```text
-	?debug=1&debugPickup=score-boost&debugBacklog=5
-	```
+## Debug And PWA Notes
 
-Verfügbare Parameter und Hotkeys sind in `docs/debug-tools.md` dokumentiert.
+The debug mode is activated with query parameters and is documented in `docs/debug-tools.md`.
 
-### PWA- und Offline-Betrieb
+Examples:
 
-Red Dune Dash unterstützt „Add to Home Screen“ und Offline-Spiel über einen Service Worker.
+- `?debug=1&debugEvent=big-order`
+- `?debug=1&debugPickup=score-boost&debugBacklog=5`
 
-- Für lokale Tests sollte das Spiel über einen HTTP-Server laufen (siehe oben), nicht direkt per `file://`.
-- Der Service Worker nutzt `app-assets.js` als zentrale Quelle für Offline-Assets und `network-first`-Routen.
-- Versions-Updates werden über `version.json` und eine gestempelte `APP_VERSION` erkannt; produktive Deployments werden im GitHub-Pages-Workflow automatisch mit einer Versions-ID versehen. Im Repository enthält `version.json` den Platzhalter `"dev"`; der Deploy-Workflow ersetzt ihn beim Veröffentlichen durch den aktuellen Commit-SHA.
+For offline testing, use a local HTTP server instead of `file://`. The service worker reads from `app-assets.js`, and production deployments replace the repository placeholder in `version.json` with a commit-based version during the GitHub Pages workflow.
 
-## Steuerung
+## Controls
 
-- `A` / `D` oder Pfeiltasten links/rechts: Laufen
-- `W`, `Leertaste` oder Pfeil hoch: Springen
-- `R`: Neustart
+- `A` / `D` or left/right arrow keys: move
+- `W`, `Space`, or up arrow: jump
+- `R`: restart
 
-## Tech-Stack
+## Contributing
 
-HTML, CSS und Vanilla JavaScript mit Rendering über das `canvas`-Element.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the expected workflow, language conventions, testing expectations, and collaboration model for both humans and AI agents.
+
+For repository-specific agent instructions, see [AGENTS.md](AGENTS.md).
+
+For full repository reviews, the canonical instructions live in [instructions/full-code-review.md](instructions/full-code-review.md).
