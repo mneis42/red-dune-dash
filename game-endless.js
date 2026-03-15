@@ -288,17 +288,21 @@ const player = {
   grounded: false,
   direction: 1,
   lives: 3,
-  gems: 0,
-  score: 0,
   invincible: 0,
   hurtTimer: 0,
   pendingRespawn: false,
   forceInjuredPose: false,
   respawnVisual: "injured",
-  farthestX: level.spawn.x,
   checkpointX: level.spawn.x,
   checkpointY: level.spawn.y,
   visible: true,
+};
+
+const runState = {
+  currencyCents: 0,
+  actionScore: 0,
+  progressScore: 0,
+  farthestX: level.spawn.x,
 };
 
 let highScore = loadHighScore();
@@ -802,11 +806,11 @@ window.addEventListener("orientationchange", syncCanvasOnlyMode);
  * @returns {number} Current euros per hour rounded to a whole number.
  */
 function getEuroRatePerHourValue() {
-  if (worldTimeMs <= 0 || player.gems <= 0) {
+  if (worldTimeMs <= 0 || runState.currencyCents <= 0) {
     return 0;
   }
 
-  return Math.round((player.gems * 3_600_000) / worldTimeMs / 100);
+  return Math.round((runState.currencyCents * 3_600_000) / worldTimeMs / 100);
 }
 
 /**
@@ -863,22 +867,55 @@ function getRunBalanceMultiplier() {
 }
 
 /**
- * Computes the distance score including the current balance multiplier.
+ * Computes the current progress-score target from distance and the live run balance.
  *
- * @returns {number} Current distance score.
+ * @returns {number} Current progress-score target.
  */
-function getDistanceScore() {
-  const baseDistanceScore = Math.floor(Math.max(0, player.farthestX - level.spawn.x) / scoreConfig.distanceDivisor);
+function getProgressScoreTarget() {
+  const baseDistanceScore = Math.floor(Math.max(0, runState.farthestX - level.spawn.x) / scoreConfig.distanceDivisor);
   return Math.floor(baseDistanceScore * getRunBalanceMultiplier());
 }
 
 /**
- * Computes the displayed total score including the balance-based distance bonus.
+ * Locks in monotonic progress score so forward movement never removes already-earned progress points.
+ *
+ * @returns {number} Current stored progress score.
+ */
+function syncProgressScore() {
+  runState.progressScore = Math.max(runState.progressScore, getProgressScoreTarget());
+  return runState.progressScore;
+}
+
+/**
+ * Returns the stored progress score for the current run.
+ *
+ * @returns {number} Current progress score.
+ */
+function getProgressScore() {
+  return runState.progressScore;
+}
+
+/**
+ * Returns the current score breakdown for the run.
+ *
+ * @returns {{action:number, progress:number, total:number}} Score breakdown.
+ */
+function getScoreBreakdown() {
+  const progress = getProgressScore();
+  return {
+    action: runState.actionScore,
+    progress,
+    total: runState.actionScore + progress,
+  };
+}
+
+/**
+ * Computes the displayed total score including the locked-in progress bonus.
  *
  * @returns {number} Current total score.
  */
 function getTotalScore() {
-  return player.score + getDistanceScore();
+  return getScoreBreakdown().total;
 }
 
 /**
@@ -1249,12 +1286,30 @@ function formatEuroAmount(cents) {
 }
 
 /**
- * Returns the amount of spawned bugs that have not been defeated in the current run.
+ * Returns the current bug ledger for the run.
  *
- * @returns {number} Count of bugs still left unbeaten.
+ * `openInRun` tracks unresolved bugs from this run. Backlog exists as an explicit future extension point
+ * but is not gameplay-active yet.
+ *
+ * @returns {{spawnedInRun:number, resolvedInRun:number, openInRun:number, backlog:number}} Bug ledger snapshot.
+ */
+function getBugLedger() {
+  const openInRun = Math.max(0, runBugStats.spawned - runBugStats.defeated);
+  return {
+    spawnedInRun: runBugStats.spawned,
+    resolvedInRun: runBugStats.defeated,
+    openInRun,
+    backlog: 0,
+  };
+}
+
+/**
+ * Returns the amount of unresolved bugs in the current run.
+ *
+ * @returns {number} Count of bugs still left unbeaten in this run.
  */
 function getOutstandingBugTotal() {
-  return Math.max(0, runBugStats.spawned - runBugStats.defeated);
+  return getBugLedger().openInRun;
 }
 
 /**
@@ -1296,42 +1351,70 @@ function formatEuroRatePerHour() {
 }
 
 /**
+ * Returns the current run model used by HUD, scoring and future resource-oriented systems.
+ *
+ * @returns {{resources:{currencyCents:number,lives:number,euroRatePerHour:number},bugs:{spawnedInRun:number,resolvedInRun:number,openInRun:number,backlog:number},score:{action:number,progress:number,total:number},balanceMultiplier:number}} Run snapshot.
+ */
+function getRunModel() {
+  return {
+    resources: {
+      currencyCents: runState.currencyCents,
+      lives: player.lives,
+      euroRatePerHour: getEuroRatePerHourValue(),
+    },
+    bugs: getBugLedger(),
+    score: getScoreBreakdown(),
+    balanceMultiplier: getRunBalanceMultiplier(),
+  };
+}
+
+/**
  * Returns the current HUD section definitions, including values, hit areas and tooltip content.
  *
  * @returns {Array<object>} HUD stat descriptors for rendering and interaction.
  */
 function getHudStats() {
   // Keep HUD layout, values and tooltip metadata in one place.
+  const runModel = getRunModel();
   return [
     {
       key: "bugsOpen",
       emoji: "🐞",
       label: "Offene Bugs",
-      value: getOutstandingBugCount(),
+      value: String(runModel.bugs.openInRun),
       accent: "#ffc48c",
       sectionX: 24,
       valueX: 64,
       hitArea: { x: 0, y: 0, w: 192, h: 44 },
       target: { x: 52, y: 42 },
-      tooltip: ["Zeigt alle Bugs, die in diesem Sprint nicht gefixt wurden.", "Je mehr offene Bugs, desto seltener kommen Einnahmequellen um Moneten zu verdienen."],
+      tooltip: [
+        "Zeigt offene Bugs im aktuellen Run.",
+        `Im Run gespawnt: ${runModel.bugs.spawnedInRun}`,
+        `Im Run geloest: ${runModel.bugs.resolvedInRun}`,
+        "Je mehr offene Bugs, desto seltener kommen Einnahmequellen um Moneten zu verdienen.",
+      ],
     },
     {
       key: "gems",
       emoji: "€",
       label: "Moneten",
-      value: formatEuroAmount(player.gems),
+      value: formatEuroAmount(runModel.resources.currencyCents),
       accent: "#ffe37a",
       sectionX: 216,
       valueX: 256,
       hitArea: { x: 192, y: 0, w: 192, h: 44 },
       target: { x: 244, y: 42 },
-      tooltip: ["Jedes Euro-Symbol bringt 10 ct.", "Zeigt den aktuell gesammelten Geldbetrag."],
+      tooltip: [
+        "Jedes Euro-Symbol bringt 10 ct.",
+        "Moneten sind die direkte Einkommens-Ressource dieses Runs.",
+        "Weitere Ressourcenarten koennen spaeter hinzukommen, ohne diese Anzeige umzudeuten.",
+      ],
     },
     {
       key: "euroRate",
       emoji: "€/h",
       label: "Euro pro Stunde",
-      value: formatEuroRatePerHour(),
+      value: String(runModel.resources.euroRatePerHour),
       accent: "#ffe8a3",
       sectionX: 408,
       valueX: 456,
@@ -1339,16 +1422,16 @@ function getHudStats() {
       target: { x: 436, y: 42 },
       tooltip: [
         "Zeigt dein aktuelles Sammeltempo hochgerechnet auf eine Stunde.",
-        "Basiert auf dem Geldbetrag und der bisherigen Laufzeit.",
+        "Basiert nur auf Moneten und der bisherigen Laufzeit dieses Runs.",
         `Spieldauer: ${formatRunDuration(worldTimeMs)}`,
-        `Balance-Faktor: x${getRunBalanceMultiplier().toFixed(2).replace(".", ",")}`,
+        `Balance-Faktor: x${runModel.balanceMultiplier.toFixed(2).replace(".", ",")}`,
       ],
     },
     {
       key: "lives",
       emoji: "🚀",
       label: "Leben",
-      value: String(player.lives),
+      value: String(runModel.resources.lives),
       accent: "#ffd27d",
       sectionX: 600,
       valueX: 641,
@@ -1360,7 +1443,7 @@ function getHudStats() {
       key: "score",
       emoji: "⭐",
       label: "Punkte",
-      value: String(getTotalScore()),
+      value: String(runModel.score.total),
       accent: "#fff1b8",
       sectionX: 792,
       valueX: 832,
@@ -1370,8 +1453,10 @@ function getHudStats() {
         `Euro-Symbol: ${scoreConfig.gemPickup}`,
         `Bug fixen: ${scoreConfig.bugDefeat}`,
         `Rakete einsammeln: ${scoreConfig.rocketPickup}`,
-        `Distanz: ${getDistanceScore()} mit Balance-Faktor`,
-        `Balance lebt von Einnahmen und wenigen offenen Bugs`,
+        `Aktionspunkte: ${runModel.score.action}`,
+        `Fortschrittspunkte: ${runModel.score.progress}`,
+        "Fortschrittspunkte sind monoton und gehen durch spaetere Balance-Schwankungen nicht verloren.",
+        "Balance lebt von Einnahmen und wenigen offenen Bugs.",
         `Highscore: ${highScore}`,
       ],
     },
@@ -2027,9 +2112,10 @@ function resetPlayer(fullReset = false) {
     runBugStats.defeated = 0;
     initLevel();
     player.lives = 3;
-    player.gems = 0;
-    player.score = 0;
-    player.farthestX = level.spawn.x;
+    runState.currencyCents = 0;
+    runState.actionScore = 0;
+    runState.progressScore = 0;
+    runState.farthestX = level.spawn.x;
     player.checkpointX = level.spawn.x;
     player.checkpointY = level.spawn.y;
     gameState = "playing";
@@ -2388,7 +2474,8 @@ function handleMovement(delta) {
   });
 
   player.x = Math.max(0, player.x);
-  player.farthestX = Math.max(player.farthestX, player.x);
+  runState.farthestX = Math.max(runState.farthestX, player.x);
+  syncProgressScore();
 
   if (player.y > canvas.height + 180) {
     loseLife("Der Tiger ist in einen Krater gestürzt", {
@@ -2425,8 +2512,8 @@ function handleMovement(delta) {
       const scoreEffect = createHitEffect(gem.x + 16, gem.y - 8, "⭐");
       spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gems");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-      player.gems += GEM_VALUE_CENTS;
-      player.score += scoreConfig.gemPickup;
+      runState.currencyCents += GEM_VALUE_CENTS;
+      runState.actionScore += scoreConfig.gemPickup;
       statusMessage = "10 ct geborgen";
     }
   });
@@ -2481,7 +2568,7 @@ function handleMovement(delta) {
       runBugStats.defeated += 1;
       const scoreEffect = createHitEffect(bug.x + bug.w / 2, bug.y + 6, "⭐");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-      player.score += scoreConfig.bugDefeat;
+      runState.actionScore += scoreConfig.bugDefeat;
       stompedAnyBug = true;
       return;
     }
@@ -2519,7 +2606,7 @@ function handleMovement(delta) {
       spawnHudEmoji(lifeEffect.x, lifeEffect.y, lifeEffect.emoji, "lives");
       spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
       player.lives += 1;
-      player.score += scoreConfig.rocketPickup;
+      runState.actionScore += scoreConfig.rocketPickup;
       statusMessage = "Rakete erwischt. Extraleben erhalten";
     }
   });
