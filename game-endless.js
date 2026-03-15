@@ -914,6 +914,34 @@ function resumeGame(withCountdown = false) {
 }
 
 /**
+ * Returns whether the current pause state can be resumed interactively by the player.
+ *
+ * @returns {boolean} True when a manual or background pause may be resumed.
+ */
+function canResumePausedRun() {
+  return gameState === "paused" && (pauseReason === "manual" || pauseReason === "background");
+}
+
+/**
+ * Returns whether resuming from the given pause reason should use the safety countdown.
+ *
+ * @param {"manual"|"portrait"|"background"|null} [reason=pauseReason] - Pause reason to inspect.
+ * @returns {boolean} True when a resume countdown should be shown.
+ */
+function shouldUseResumeCountdown(reason = pauseReason) {
+  return reason === "background";
+}
+
+/**
+ * Returns the localized pause overlay prompt for the current input mode.
+ *
+ * @returns {string} Resume prompt shown in the paused overlay.
+ */
+function getPauseResumePrompt() {
+  return isTouchDevice ? "Tippe zum Fortsetzen" : "Druecke P zum Fortsetzen";
+}
+
+/**
  * Toggles the manual desktop pause state.
  */
 function toggleManualPause() {
@@ -922,8 +950,8 @@ function toggleManualPause() {
     return;
   }
 
-  if (gameState === "paused" && (pauseReason === "manual" || pauseReason === "background")) {
-    resumeGame(false);
+  if (canResumePausedRun()) {
+    resumeGame(shouldUseResumeCountdown());
   }
 }
 
@@ -3133,8 +3161,8 @@ function drawOverlay() {
     ctx.fillText("Pause", canvas.width / 2, 175);
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
-    if (pauseReason === "manual" || pauseReason === "background") {
-      ctx.fillText("Druecke P zum Fortsetzen", canvas.width / 2, 220);
+    if (canResumePausedRun()) {
+      ctx.fillText(getPauseResumePrompt(), canvas.width / 2, 220);
     } else {
       ctx.fillText("Das Spiel wird gleich fortgesetzt", canvas.width / 2, 220);
     }
@@ -3446,7 +3474,6 @@ document.addEventListener("visibilitychange", () => {
 
 canvas.addEventListener("pointerdown", (event) => {
   const point = getCanvasPoint(event);
-  const infoHit = point ? getHudInfoHit(point) : null;
 
   if (point && updateButtonRect && pointInRect(point, updateButtonRect)) {
     event.preventDefault();
@@ -3467,6 +3494,16 @@ canvas.addEventListener("pointerdown", (event) => {
     }
     return;
   }
+
+  if (event.pointerType !== "mouse" && canResumePausedRun()) {
+    event.preventDefault();
+    activeHudInfo = null;
+    requestLandscapeLock();
+    resumeGame(shouldUseResumeCountdown());
+    return;
+  }
+
+  const infoHit = point && gameState !== "paused" ? getHudInfoHit(point) : null;
 
   if (infoHit) {
     event.preventDefault();

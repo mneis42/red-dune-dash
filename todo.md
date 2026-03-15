@@ -31,7 +31,7 @@ Statusuebersicht. Die Detailbeschreibungen zu jedem Punkt folgen direkt darunter
 
 - [x] P0 - Weltgenerator stabilisieren und fruehe `return`-Pfadfehler beseitigen
 - [x] P0 - Weltbereinigung korrigieren, damit eingesammelte oder tote Entities wirklich verschwinden
-- [ ] P0 - Mobile Resume-Pfad fuer Hintergrund-/App-Wechsel loesen
+- [x] P0 - Mobile Resume-Pfad fuer Hintergrund-/App-Wechsel loesen
 - [ ] P0 - Alle gameplay-relevanten Timer und Counter auf echte Zeitbasis umstellen
 - [ ] P1 - Score-, Ressourcen- und Fortschrittsmodell fachlich sauber definieren
 - [ ] P1 - Bug-Lebenszyklus als eigenes Fachsystem modellieren
