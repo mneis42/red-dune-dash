@@ -16,7 +16,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify JavaScript syntax
+        shell: bash
+        run: |
+          for file in app-assets.js service-worker.js systems/*.js game-endless.js; do
+            node --check "$file"
+          done
+
+      - name: Run gameplay tests
+        run: node tests/simulation-core.test.js
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -1,0 +1,31 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify JavaScript syntax
+        shell: bash
+        run: |
+          for file in app-assets.js service-worker.js systems/*.js game-endless.js; do
+            node --check "$file"
+          done
+
+      - name: Run gameplay tests
+        run: node tests/simulation-core.test.js
