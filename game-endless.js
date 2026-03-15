@@ -1471,6 +1471,50 @@ function removeHazardsUnderSpan(startX, endX) {
 }
 
 /**
+ * Captures the mutable generation state that optional chunk features may change.
+ *
+ * @returns {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugSpawned:number}} Snapshot.
+ */
+function createChunkFeatureSnapshot() {
+  return {
+    platformCount: level.platforms.length,
+    hazards: [...level.hazards],
+    gemCount: level.gems.length,
+    bugCount: level.bugs.length,
+    bugSpawned: runBugStats.spawned,
+  };
+}
+
+/**
+ * Restores the mutable generation state after a failed optional chunk feature attempt.
+ *
+ * @param {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugSpawned:number}} snapshot - State to restore.
+ */
+function restoreChunkFeatureSnapshot(snapshot) {
+  level.platforms.length = snapshot.platformCount;
+  level.hazards = snapshot.hazards;
+  level.gems.length = snapshot.gemCount;
+  level.bugs.length = snapshot.bugCount;
+  runBugStats.spawned = snapshot.bugSpawned;
+}
+
+/**
+ * Runs an optional chunk feature and rolls back all intermediate generation side effects when it fails.
+ *
+ * @param {() => boolean} attemptFeature - Returns true when the optional feature should be kept.
+ * @returns {boolean} True when the feature was committed.
+ */
+function commitChunkFeatureAttempt(attemptFeature) {
+  const snapshot = createChunkFeatureSnapshot();
+  if (attemptFeature()) {
+    return true;
+  }
+
+  restoreChunkFeatureSnapshot(snapshot);
+  return false;
+}
+
+/**
  * Adds an intermediate helper platform when a generated platform would otherwise be too high.
  *
  * @param {{x:number, y:number, w:number, h:number, kind:string}} targetPlatform - Platform that needs support.
@@ -1803,35 +1847,40 @@ function generateChunk() {
   }
 
   if (Math.random() < 0.58) {
-    const plateWidth = randomInt(96, 170);
-    const plateX = x + randomInt(10, Math.max(12, width - plateWidth - 12));
-    const plateY = groundY - randomInt(82, 156);
-    const plate = createPlatform(plateX, plateY, plateWidth, 18, "plate");
-    if (!platformCollides(plate, 10) && !isTooCloseToGround(plate, groundY)) {
+    commitChunkFeatureAttempt(() => {
+      const plateWidth = randomInt(96, 170);
+      const plateX = x + randomInt(10, Math.max(12, width - plateWidth - 12));
+      const plateY = groundY - randomInt(82, 156);
+      const plate = createPlatform(plateX, plateY, plateWidth, 18, "plate");
+      let chunkGroundHasHazard = groundHasHazard;
+
+      if (platformCollides(plate, 10) || isTooCloseToGround(plate, groundY)) {
+        return false;
+      }
+
       const tooHighFromGround = groundY - plateY > 124;
       let shouldPlacePlate = true;
       if (tooHighFromGround) {
         const hasStep = ensureStepPlatform(plate, groundY);
-        if (!hasStep && groundHasHazard) {
+        if (!hasStep && chunkGroundHasHazard) {
           removeHazardsUnderSpan(plate.x - 18, plate.x + plate.w + 18);
-          groundHasHazard = false;
+          chunkGroundHasHazard = false;
         }
         shouldPlacePlate = hasStep;
-      } else if (groundHasHazard) {
+      } else if (chunkGroundHasHazard) {
         const overlapsHazardLane = level.hazards.some(
           (hazard) => hazard.x < plate.x + plate.w && hazard.x + hazard.w > plate.x
         );
         if (overlapsHazardLane && plateY < groundY - 90) {
           removeHazardsUnderSpan(plate.x - 18, plate.x + plate.w + 18);
-          groundHasHazard = false;
+          chunkGroundHasHazard = false;
         }
       }
       if (shouldPlacePlate && !hasReachableApproach(plate, ground)) {
         shouldPlacePlate = false;
       }
-
       if (!shouldPlacePlate) {
-        return;
+        return false;
       }
 
       level.platforms.push(plate);
@@ -1845,15 +1894,22 @@ function generateChunk() {
       if (Math.random() < (bigOrderActive ? bigOrderConfig.plateBugChance : 0.3)) {
         addBugOnPlatform(plate);
       }
-    }
+
+      return true;
+    });
   }
 
   if (Math.random() < (bigOrderActive ? bigOrderConfig.bonusPlatformChance : 0.22)) {
-    const bonusWidth = randomInt(82, 130);
-    const bonusX = x + width + randomInt(26, 80);
-    const bonusY = clamp(groundY - randomInt(96, 152), 240, 390);
-    const bonus = createPlatform(bonusX, bonusY, bonusWidth, 18, "plate");
-    if (!platformCollides(bonus, 10) && !isTooCloseToGround(bonus, groundY)) {
+    commitChunkFeatureAttempt(() => {
+      const bonusWidth = randomInt(82, 130);
+      const bonusX = x + width + randomInt(26, 80);
+      const bonusY = clamp(groundY - randomInt(96, 152), 240, 390);
+      const bonus = createPlatform(bonusX, bonusY, bonusWidth, 18, "plate");
+
+      if (platformCollides(bonus, 10) || isTooCloseToGround(bonus, groundY)) {
+        return false;
+      }
+
       const tooHighFromGround = groundY - bonusY > 124;
       let shouldPlaceBonus = true;
       if (tooHighFromGround) {
@@ -1867,8 +1923,9 @@ function generateChunk() {
         shouldPlaceBonus = false;
       }
       if (!shouldPlaceBonus) {
-        return;
+        return false;
       }
+
       level.platforms.push(bonus);
       addGemOnPlatform(bonus);
       if (bigOrderActive && Math.random() < bigOrderConfig.bonusExtraGemChance) {
@@ -1877,7 +1934,9 @@ function generateChunk() {
       if (bigOrderActive && Math.random() < bigOrderConfig.bonusBugChance) {
         addBugOnPlatform(bonus);
       }
-    }
+
+      return true;
+    });
   }
 
   level.nextChunkX = x + width;
@@ -2698,7 +2757,7 @@ function drawBug(bug, time) {
     const preview = getSpawnPreviewState(bug.spawnTimer, bug.spawnDuration, time);
     const x = (bug.spawnMarkerX ?? bug.x + bug.w / 2) - cameraX;
     const y = bug.spawnMarkerY ?? bug.y + bug.h / 2;
-    const facing = bug.vx < 0 ? -1 : 1;
+    const facing = bug.vx < 0 ? 1 : -1;
 
     ctx.save();
     ctx.globalAlpha = preview.alpha;
@@ -2719,7 +2778,7 @@ function drawBug(bug, time) {
 
   const x = bug.x - cameraX;
   const y = bug.falling ? bug.y : bug.y + Math.sin(time / 170 + bug.x * 0.03) * 1.5;
-  const facing = bug.vx < 0 ? -1 : 1;
+  const facing = bug.vx < 0 ? 1 : -1;
 
   ctx.save();
   ctx.translate(x + bug.w / 2, y + bug.h);
