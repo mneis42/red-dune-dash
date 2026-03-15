@@ -19,6 +19,9 @@ let updateButtonRect = null;
 let directionalInputSequence = 0;
 let updateReady = false;
 let isRefreshingForUpdate = false;
+const CLOUD_PARALLAX = 0.18;
+const CLOUD_RESPAWN_MIN_GAP = 140;
+const CLOUD_RESPAWN_MAX_GAP = 260;
 const isStandalone =
   window.matchMedia("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
@@ -1003,9 +1006,24 @@ function createCloud(x) {
     y: randomInt(50, 190),
     w: randomInt(90, 170),
     h: randomInt(28, 52),
-    vx: randomBetween(0.12, 0.32),
+    vx: -randomBetween(0.12, 0.32),
     puff: randomBetween(0.85, 1.2),
   };
+}
+
+/**
+ * Reuses an existing cloud with fresh randomized visuals at a specific parallax-layer x-position.
+ *
+ * @param {{x:number, y:number, w:number, h:number, vx:number, puff:number}} cloud - Cloud to randomize.
+ * @param {number} x - New x-position in the background parallax layer.
+ */
+function resetCloud(cloud, x) {
+  cloud.x = x;
+  cloud.y = randomInt(50, 190);
+  cloud.w = randomInt(90, 170);
+  cloud.h = randomInt(28, 52);
+  cloud.vx = -randomBetween(0.12, 0.32);
+  cloud.puff = randomBetween(0.85, 1.2);
 }
 
 /**
@@ -1938,19 +1956,30 @@ function handleMovement() {
   generateUntil(cameraX + canvas.width * 3);
 
   level.clouds.forEach((cloud) => {
+    if (cloud.vx > 0) {
+      cloud.vx = -cloud.vx;
+    }
     cloud.x += cloud.vx;
   });
-  const cloudResetX = cameraX - 260;
-  level.clouds.forEach((cloud) => {
-    if (cloud.x - cameraX > canvas.width + 180) {
-      cloud.x = cloudResetX;
-      cloud.y = randomInt(50, 190);
-      cloud.w = randomInt(90, 170);
-      cloud.h = randomInt(28, 52);
-      cloud.vx = randomBetween(0.12, 0.32);
-      cloud.puff = randomBetween(0.85, 1.2);
-    }
-  });
+  const cloudViewportLeft = cameraX * CLOUD_PARALLAX;
+  const cloudViewportRight = cloudViewportLeft + canvas.width;
+  const minRespawnX = cloudViewportRight - canvas.width * 0.35;
+  let rightmostCloudEdge = level.clouds.reduce(
+    (maxEdge, cloud) => Math.max(maxEdge, cloud.x + cloud.w),
+    minRespawnX,
+  );
+  [...level.clouds]
+    .sort((a, b) => a.x - b.x)
+    .forEach((cloud) => {
+      if (cloud.x + cloud.w < cloudViewportLeft - 40) {
+        const spawnX = Math.max(
+          minRespawnX,
+          rightmostCloudEdge + randomInt(CLOUD_RESPAWN_MIN_GAP, CLOUD_RESPAWN_MAX_GAP),
+        );
+        resetCloud(cloud, spawnX);
+        rightmostCloudEdge = cloud.x + cloud.w;
+      }
+    });
 
   rocketSpawnTimer -= 1;
   if (rocketSpawnTimer <= 0) {
@@ -2259,7 +2288,7 @@ function drawBackground() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.save();
-  ctx.translate(-cameraX * 0.18, 0);
+  ctx.translate(-cameraX * CLOUD_PARALLAX, 0);
   ctx.fillStyle = "rgba(255, 220, 170, 0.18)";
   ctx.beginPath();
   ctx.arc(740, 112, 68, 0, Math.PI * 2);
@@ -2285,7 +2314,7 @@ function drawBackground() {
   }
 
   level.clouds.forEach((cloud) => {
-    const x = cloud.x - cameraX * 0.18;
+    const x = cloud.x;
     const y = cloud.y;
     ctx.fillStyle = "rgba(255, 244, 234, 0.11)";
     ctx.beginPath();
