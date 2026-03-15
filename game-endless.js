@@ -2935,18 +2935,27 @@ function drawBackground() {
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.save();
-  ctx.translate(-cameraX * CLOUD_PARALLAX, 0);
+  // Sun glow is a fixed atmospheric overlay drawn in canvas space so it is
+  // always visible regardless of how far the player has run.
   ctx.fillStyle = "rgba(255, 220, 170, 0.18)";
   ctx.beginPath();
   ctx.arc(740, 112, 68, 0, Math.PI * 2);
   ctx.fill();
 
+  ctx.save();
+  ctx.translate(-cameraX * CLOUD_PARALLAX, 0);
+
+  // Tiling sand ridges – the pattern repeats every `ridgeSpacing` pixels so
+  // ridges are always present no matter how far the player has run.
+  const parallaxLeft = Math.floor(cameraX * CLOUD_PARALLAX);
+  const ridgeSpacing = 300;
+  const firstRidgeIndex = Math.floor(parallaxLeft / ridgeSpacing) - 1;
+  const numRidgesVisible = Math.ceil(canvas.width / ridgeSpacing) + 3;
   ctx.fillStyle = "rgba(255, 168, 106, 0.15)";
-  for (let i = 0; i < 14; i += 1) {
-    const ridgeX = i * 300;
-    const ridgeY = 405 + (i % 3) * 18;
-    const ridgeW = 220 + (i % 4) * 30;
+  for (let j = firstRidgeIndex; j < firstRidgeIndex + numRidgesVisible; j += 1) {
+    const ridgeX = j * ridgeSpacing;
+    const ridgeY = 405 + (((j % 3) + 3) % 3) * 18;
+    const ridgeW = 220 + (((j % 4) + 4) % 4) * 30;
     ctx.beginPath();
     ctx.moveTo(ridgeX, canvas.height);
     ctx.quadraticCurveTo(ridgeX + ridgeW * 0.45, ridgeY, ridgeX + ridgeW, canvas.height);
@@ -2954,10 +2963,16 @@ function drawBackground() {
     ctx.fill();
   }
 
-  for (let i = 0; i < 40; i += 1) {
-    const starX = 120 + i * 130;
-    const starY = 70 + (i % 4) * 30;
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
+  // Tiling stars – computed relative to the current parallax viewport so they
+  // tile infinitely and never disappear on long runs.
+  const starSpacing = 130;
+  const starBaseX = 120;
+  const firstStarIndex = Math.floor((parallaxLeft - starBaseX) / starSpacing) - 1;
+  const numStarsVisible = Math.ceil(canvas.width / starSpacing) + 3;
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  for (let j = firstStarIndex; j < firstStarIndex + numStarsVisible; j += 1) {
+    const starX = starBaseX + j * starSpacing;
+    const starY = 70 + (((j % 4) + 4) % 4) * 30;
     ctx.fillRect(starX, starY, 2, 2);
   }
 
