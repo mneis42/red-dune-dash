@@ -3454,10 +3454,39 @@ const releaseTouchControl = (event) => {
   event.preventDefault();
   activeTouchControls.delete(event.pointerId);
   clearDirectionalInput(event.pointerId);
+  canvas.releasePointerCapture?.(event.pointerId);
+};
+
+const updateTouchControl = (event) => {
+  if (!activeTouchControls.has(event.pointerId) || event.pointerType === "mouse") {
+    return;
+  }
+
+  const point = getCanvasPoint(event);
+  const previousAction = activeTouchControls.get(event.pointerId);
+  const nextAction = getTouchAction(point);
+
+  if (previousAction === nextAction) {
+    return;
+  }
+
+  if (previousAction === "left" || previousAction === "right") {
+    clearDirectionalInput(event.pointerId);
+  }
+
+  if (nextAction === "left" || nextAction === "right") {
+    activeTouchControls.set(event.pointerId, nextAction);
+    setDirectionalInput(event.pointerId, nextAction);
+    return;
+  }
+
+  activeTouchControls.delete(event.pointerId);
 };
 
 canvas.addEventListener("pointerup", releaseTouchControl);
 canvas.addEventListener("pointercancel", releaseTouchControl);
+canvas.addEventListener("pointermove", updateTouchControl);
+canvas.addEventListener("lostpointercapture", releaseTouchControl);
 canvas.addEventListener("pointerleave", (event) => {
   if (event.pointerType === "mouse") {
     return;
