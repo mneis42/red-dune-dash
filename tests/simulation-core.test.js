@@ -7,6 +7,7 @@ require("../systems/pickup-system.js");
 require("../systems/simulation-core.js");
 require("../systems/special-event-system.js");
 require("../systems/generator-helpers.js");
+require("../systems/respawn-helpers.js");
 
 const simulationCore = globalThis.RedDuneSimulationCore;
 const bugLifecycle = globalThis.RedDuneBugLifecycle;
@@ -15,6 +16,7 @@ const placement = globalThis.RedDunePlacement;
 const pickups = globalThis.RedDunePickups;
 const specialEvents = globalThis.RedDuneSpecialEvents;
 const generatorHelpers = globalThis.RedDuneGeneratorHelpers;
+const respawnHelpers = globalThis.RedDuneRespawnHelpers;
 
 const tests = [];
 
@@ -507,6 +509,103 @@ test("generator helpers expose basic hazard and clearance helpers for fairness c
 
   assert.equal(helpers.isTooCloseToGround({ y: 412, h: 20 }, 440), true);
   assert.equal(helpers.isTooCloseToGround({ y: 360, h: 20 }, 440), false);
+});
+
+test("respawn helpers choose safe checkpoint positions away from hazards", () => {
+  const placementSystem = placement.createPlacementSystem();
+  const level = {
+    platforms: [{ x: 0, y: 440, w: 260, h: 20, kind: "ground" }],
+    hazards: [
+      { x: 40, y: 422, w: 40, h: 18 },
+      { x: 180, y: 422, w: 40, h: 18 },
+    ],
+    bugs: [],
+  };
+  const player = {
+    x: 120,
+    y: 400,
+    w: 40,
+    h: 40,
+    checkpointX: 0,
+    checkpointY: 400,
+  };
+
+  const helpers = respawnHelpers.createRespawnHelpers({
+    level,
+    player,
+    placementSystem,
+    placementSafetyConfig: placementSystem.config,
+    getHazardState(hazard) {
+      // For checkpoint-Berechnung reicht eine statische Geometrie ohne Zyklus.
+      return {
+        exposure: 1,
+        active: true,
+        top: hazard.y,
+        baseY: hazard.y + hazard.h,
+        height: hazard.h,
+      };
+    },
+  });
+
+  const ground = level.platforms[0];
+  const checkpointX = helpers.getSafeCheckpointX(ground);
+  // Checkpoint sollte innerhalb der Plattform, aber ausserhalb der unmittelbaren Hazard-Spans liegen.
+  assert.ok(checkpointX > ground.x + placementSystem.config.platformEdgePadding);
+  assert.ok(checkpointX + player.w < ground.x + ground.w - placementSystem.config.platformEdgePadding);
+  // Der konkrete Wert haengt von der inneren Safe-Zonen-Berechnung ab; hier reicht ein
+  // stabiler Bereichscheck rund um die Plattformmitte.
+  assert.ok(checkpointX > 80);
+  assert.ok(checkpointX < 180);
+});
+
+test("respawn helpers snap hurt poses to supporting platforms or checkpoint", () => {
+  const placementSystem = placement.createPlacementSystem();
+  const level = {
+    platforms: [
+      { x: 0, y: 440, w: 260, h: 20, kind: "ground" },
+      { x: 320, y: 360, w: 120, h: 20, kind: "ground" },
+    ],
+    hazards: [],
+    bugs: [],
+  };
+  const player = {
+    x: 100,
+    y: 400,
+    w: 40,
+    h: 40,
+    checkpointX: 40,
+    checkpointY: 400,
+  };
+
+  const helpers = respawnHelpers.createRespawnHelpers({
+    level,
+    player,
+    placementSystem,
+    placementSafetyConfig: placementSystem.config,
+    getHazardState(hazard) {
+      return {
+        exposure: 1,
+        active: true,
+        top: hazard.y,
+        baseY: hazard.y + hazard.h,
+        height: hazard.h,
+      };
+    },
+  });
+
+  // Fall auf eine existierende Plattform.
+  const safeOnGround = helpers.moveToSafeInjuredPose(120, 420);
+  assert.equal(safeOnGround.y, level.platforms[0].y - player.h);
+
+  // Verletzungsposition ueber einer Luecke vor der zweiten Plattform -> sollte auf diese Plattform schnappen.
+  const safeOnSecond = helpers.moveToSafeInjuredPose(340, 380);
+  assert.equal(safeOnSecond.y, level.platforms[1].y - player.h);
+
+  // Komplett ohne tragende Plattform unter dem Spieler -> Rueckfall auf Checkpoint.
+  level.platforms.length = 0;
+  const backToCheckpoint = helpers.moveToSafeInjuredPose(200, 600);
+  assert.equal(backToCheckpoint.x, player.checkpointX);
+  assert.equal(backToCheckpoint.y, player.checkpointY);
 });
 
 let failed = 0;

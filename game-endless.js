@@ -282,6 +282,14 @@ const { BUG_STATUS } = globalThis.RedDuneBugLifecycle;
 const bugLifecycleSystem = globalThis.RedDuneBugLifecycle.createBugLifecycleSystem();
 const bugLifecycle = bugLifecycleSystem.state;
 
+const respawnHelpers = globalThis.RedDuneRespawnHelpers.createRespawnHelpers({
+  level,
+  player,
+  placementSystem,
+  placementSafetyConfig,
+  getHazardState,
+});
+
 let highScore = loadHighScore();
 let cameraX = 0;
 let gameState = "ready";
@@ -2525,17 +2533,7 @@ function circleRectCollision(circle, rect) {
  * @returns {boolean} True when the player's center band touches the hazard span.
  */
 function hitsHazardWithPlayerCenter(hazard) {
-  const hazardState = getHazardState(hazard);
-  if (!hazardState.active || hazardState.height <= 0) {
-    return false;
-  }
-
-  const centerBandRadius = 15;
-  const playerCenterX = player.x + player.w / 2;
-  const centerBandLeft = playerCenterX - centerBandRadius;
-  const centerBandRight = playerCenterX + centerBandRadius;
-  const overlapsVertically = player.y < hazardState.baseY && player.y + player.h > hazardState.top;
-  return overlapsVertically && centerBandRight >= hazard.x && centerBandLeft <= hazard.x + hazard.w;
+  return respawnHelpers.hitsHazardWithPlayerCenter(hazard);
 }
 
 /**
@@ -2545,27 +2543,7 @@ function hitsHazardWithPlayerCenter(hazard) {
  * @returns {number} Safe checkpoint x-position.
  */
 function getSafeCheckpointX(platform) {
-  // Keep checkpoints away from platform edges and floor hazards to avoid death loops.
-  const safeZones = getPlatformSafeZones(platform, {
-    occupantWidth: player.w,
-    blockedIntervals: level.hazards
-      .filter((hazard) => isHazardOnPlayerLane(hazard, platform))
-      .map((hazard) =>
-        createBlockedPlacementInterval(
-          hazard.x,
-          hazard.w,
-          player.w,
-          placementSafetyConfig.checkpointHazardPadding
-        )
-      ),
-  });
-  const safeX = pickNearestSafeZoneX(safeZones, player.x);
-  if (safeX === null) {
-    const placementRange = getPlatformPlacementRange(platform, player.w);
-    return placementRange ? placementRange.start : platform.x;
-  }
-
-  return safeX;
+  return respawnHelpers.getSafeCheckpointX(platform);
 }
 
 /**
@@ -2576,21 +2554,7 @@ function getSafeCheckpointX(platform) {
  * @returns {{x:number, y:number, w:number, h:number, kind:string}|null} Supporting platform or null when unsupported.
  */
 function getSupportingPlatformAt(playerX, preferredY) {
-  // Hurt poses should snap to solid platforms instead of hovering above gaps or enemies.
-  const supportingPlatforms = level.platforms.filter((platform) => {
-    const overlapsX = playerX + player.w > platform.x && playerX < platform.x + platform.w;
-    return overlapsX;
-  });
-
-  if (supportingPlatforms.length === 0) {
-    return null;
-  }
-
-  const playerFeetY = preferredY + player.h;
-  const platformsBelow = supportingPlatforms.filter((platform) => platform.y >= playerFeetY - 8);
-  const candidatePlatforms = platformsBelow.length > 0 ? platformsBelow : supportingPlatforms;
-  candidatePlatforms.sort((a, b) => a.y - b.y);
-  return candidatePlatforms[0];
+  return respawnHelpers.getSupportingPlatformAt(playerX, preferredY);
 }
 
 /**
@@ -2601,29 +2565,7 @@ function getSupportingPlatformAt(playerX, preferredY) {
  * @returns {number} Safe player x-position on the platform.
  */
 function getSafePlatformPoseX(platform, preferredX) {
-  const blockedIntervals = [
-    ...level.hazards
-      .filter((hazard) => isHazardOnPlayerLane(hazard, platform))
-      .map((hazard) =>
-        createBlockedPlacementInterval(hazard.x, hazard.w, player.w, placementSafetyConfig.hurtHazardPadding)
-      ),
-    ...level.bugs
-      .filter((bug) => isBugOnPlayerLane(bug, platform))
-      .map((bug) =>
-        createBlockedPlacementInterval(bug.x, bug.w, player.w, placementSafetyConfig.hurtBugPadding)
-      ),
-  ];
-  const safeZones = getPlatformSafeZones(platform, {
-    occupantWidth: player.w,
-    blockedIntervals,
-  });
-  const safeX = pickNearestSafeZoneX(safeZones, preferredX);
-  if (safeX === null) {
-    const placementRange = getPlatformPlacementRange(platform, player.w);
-    return placementRange ? placementRange.start : platform.x;
-  }
-
-  return safeX;
+  return respawnHelpers.getSafePlatformPoseX(platform, preferredX);
 }
 
 /**
@@ -2634,19 +2576,7 @@ function getSafePlatformPoseX(platform, preferredX) {
  * @returns {{x:number, y:number}} Safe pose position.
  */
 function moveToSafeInjuredPose(preferredX, preferredY) {
-  const clampedX = Math.max(0, preferredX);
-  const platform = getSupportingPlatformAt(clampedX, preferredY);
-  if (platform === null) {
-    return {
-      x: player.checkpointX,
-      y: player.checkpointY,
-    };
-  }
-
-  return {
-    x: getSafePlatformPoseX(platform, clampedX),
-    y: platform.y - player.h,
-  };
+  return respawnHelpers.moveToSafeInjuredPose(preferredX, preferredY);
 }
 
 /**

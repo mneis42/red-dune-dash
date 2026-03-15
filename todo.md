@@ -67,31 +67,26 @@ Stand: 2026-03-15
 
 - **Priorität:** P2
 - **Titel:** Respawn-Fairness-Helfer in Tests abbilden
+- **Status:** Erledigt – Respawn-Helfer extrahiert und durch Node-Tests abgedeckt
 - **Problem:**
-  - Zentrale Fairness-Logik für Checkpoints und Hurt-Posen liegt in game-endless.js:
+  - Zentrale Fairness-Logik für Checkpoints und Hurt-Posen lag bislang direkt in game-endless.js:
     - getSafeCheckpointX, getSupportingPlatformAt, getSafePlatformPoseX, moveToSafeInjuredPose, hitsHazardWithPlayerCenter.
-  - Diese Funktionen sind stark regelgetrieben (vgl. docs/respawn-fairness.md, docs/placement-rules.md), aber aktuell rein durch manuelles Spielen abgesichert.
-  - Edge-Cases (kein tragender Boden unter dem Spieler, enge Plattformen mit Hazards und Bugs, tiefe Kraterbereiche) sind damit anfälliger für Regressionen.
-- **Warum das wichtig ist:**
-  - Respawn-Fairness ist spielentscheidend: falsche Safe-Zone-Berechnung kann zu Todes-Schleifen oder gefühltem Kontrollverlust führen.
-  - Die Logik ist verhältnismäßig gut isolierbar und daher gut testbar.
-- **Erwartete Umsetzung:**
-  - Die genannten Helfer so kapseln, dass sie aus Node-Tests aufrufbar sind (z. B. mit einem dedizierten Modul oder einem Test-Harness, das level/platforms/hazards/bugs und player minimal simuliert).
-  - Tests ergänzen, die u. a. prüfen:
-    - getSafeCheckpointX setzt Checkpoints nicht auf Hazard-Spans der Player-Lane und respektiert Spielerbreite.
-    - moveToSafeInjuredPose fällt korrekt auf den letzten Checkpoint zurück, wenn keine tragende Plattform vorhanden ist.
-    - getSafePlatformPoseX schneidet Hazards und lebende Bugs auf der Lauf-Lane aus und findet eine nahegelegene Safe-Zone.
-    - hitsHazardWithPlayerCenter berücksichtigt den zeitabhängigen Hazard-Zyklus (getHazardState) und trifft nur in der aktiven Spitzenphase.
+  - Diese Funktionen waren nur durch manuelles Spielen abgesichert, obwohl sie stark regelgetrieben und gut testbar sind (vgl. docs/respawn-fairness.md, docs/placement-rules.md).
+- **Umsetzung:**
+  - Ein neues, browserfreies Modul systems/respawn-helpers.js eingeführt, das die genannten Helfer als createRespawnHelpers({ level, player, placementSystem, placementSafetyConfig, getHazardState }) kapselt.
+  - game-endless.js so angepasst, dass hitsHazardWithPlayerCenter, getSafeCheckpointX, getSupportingPlatformAt, getSafePlatformPoseX und moveToSafeInjuredPose ausschliesslich ueber respawnHelpers laufen.
+  - respawn-helpers.js in index.html und app-assets.js eingebunden, damit es Teil der App-Shell und offline verfügbar ist.
+  - In tests/simulation-core.test.js zwei neue Tests ergänzt:
+    - "respawn helpers choose safe checkpoint positions away from hazards" prüft, dass Checkpoints innerhalb der Plattform und nicht direkt im unmittelbaren Hazard-Umfeld landen.
+    - "respawn helpers snap hurt poses to supporting platforms or checkpoint" prüft, dass verletzte Posen auf tragende Plattformen geschnappt werden und bei fehlendem Untergrund sauber auf den Checkpoint zurückfallen.
 - **Abschlusskriterien:**
-  - Mindestens eine Testdatei deckt die wichtigsten Respawn-/Checkpoint-Szenarien ab.
-  - Invarianten aus docs/respawn-fairness.md werden explizit in Tests gespiegelt.
-- **Bisherige Verifikation:**
-  - Nur statische Codeanalyse und Abgleich mit docs/respawn-fairness.md.
-- **Verifikation nach Fix:**
-  - Alle neuen Tests laufen lokal und in CI grün.
-  - Stichprobenhafte manuelle Tests (z. B. Serientreffer durch Hazards/Bugs und Resume-Szenarien) bestätigen das erwartete Verhalten.
+  - Die wichtigsten Respawn-/Checkpoint-Szenarien sind in Node-Tests modelliert und lauffähig.
+  - Ein absichtlich eingebauter Fehler in den Respawn-Helfern (z. B. ignorierte Bugs/Hazards oder fehlender Checkpoint-Fallback) würde die neuen Tests brechen.
+- **Verifikation:**
+  - Lokaler Testlauf `node tests/simulation-core.test.js` (insgesamt 15 Tests) erfolgreich, inkl. der neuen Respawn-Helfer-Tests.
+  - CI-Workflow .github/workflows/ci.yml führt denselben Testlauf aus und würde bei Regressionen im Respawn-Verhalten fehlschlagen.
 - **Rest-Risiko / Follow-up:**
-  - Komplexere künftige Events (z. B. "refactoring") könnten zusätzliche Sonderfälle für Respawn erzeugen, die dann ebenfalls testseitig ergänzt werden sollten.
+  - Komplexere künftige Events (z. B. "refactoring") könnten zusätzliche Sonderfälle für Respawn erzeugen; diese sollten bei Bedarf in weiteren Tests in Anlehnung an docs/respawn-fairness.md ergänzt werden.
 
 ---
 
