@@ -2,14 +2,14 @@
   /**
    * Creates the mutable world state for one endless run.
    *
-   * @returns {{spawn:{x:number,y:number},platforms:Array<object>,hazards:Array<object>,gems:Array<object>,bugs:Array<object>,rockets:Array<object>,clouds:Array<object>,nextChunkX:number,lastGroundY:number}} Fresh level state.
+   * @returns {{spawn:{x:number,y:number},platforms:Array<object>,hazards:Array<object>,pickups:Array<object>,bugs:Array<object>,rockets:Array<object>,clouds:Array<object>,nextChunkX:number,lastGroundY:number}} Fresh level state.
    */
   function createLevelState() {
     return {
       spawn: { x: 120, y: 340 },
       platforms: [],
       hazards: [],
-      gems: [],
+      pickups: [],
       bugs: [],
       rockets: [],
       clouds: [],

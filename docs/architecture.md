@@ -56,7 +56,24 @@ Zustaendig fuer Safe-Zones und Platzierungsregeln:
 
 Nutzen:
 
-- Platzierungslogik fuer Gems, Checkpoints und Hurt-Posen lebt nicht mehr als verteilte Mathematik im Hauptfile
+- Platzierungslogik fuer Pickups, Checkpoints und Hurt-Posen lebt nicht mehr als verteilte Mathematik im Hauptfile
+
+### `systems/pickup-system.js`
+
+Zustaendig fuer typisierte Pickups und ihre fachlichen Regeln:
+
+- Pickup-Typen
+- Pickup-Definitionen
+- Plattform-Spawnregeln
+- Telegraphing-Dauern
+- Render-Metadaten
+- Pickup-Effekte
+
+Nutzen:
+
+- Pickups sind nicht mehr implizit "Euro-Symbole"
+- neue Pickup-Arten koennen ueber Definitionen und Effekthooks hinzukommen
+- Kollisionscode im Hauptfile muss den fachlichen Effekt nicht selbst kennen
 
 ### `systems/simulation-core.js`
 
@@ -109,7 +126,6 @@ Wichtig ist aber:
 
 Die naechsten groesseren Kandidaten fuer weitere Schnitte sind:
 
-- Pickup-/Item-System
 - Rendering-/HUD-System
 - Input-System
 - PWA-/Install-/Update-System

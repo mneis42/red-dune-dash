@@ -2,12 +2,14 @@ const assert = require("node:assert/strict");
 
 require("../systems/bug-lifecycle-system.js");
 require("../systems/placement-system.js");
+require("../systems/pickup-system.js");
 require("../systems/simulation-core.js");
 require("../systems/special-event-system.js");
 
 const simulationCore = globalThis.RedDuneSimulationCore;
 const bugLifecycle = globalThis.RedDuneBugLifecycle;
 const placement = globalThis.RedDunePlacement;
+const pickups = globalThis.RedDunePickups;
 const specialEvents = globalThis.RedDuneSpecialEvents;
 
 const tests = [];
@@ -113,6 +115,98 @@ test("placement system computes stable safe zones and nearest safe positions", (
   assert.equal(placementSystem.pickNearestSafeZoneX(safeZones, 240), 196);
 });
 
+test("pickup system exposes typed spawn rules and preserves pickup metadata", () => {
+  const pickupSystem = pickups.createPickupSystem(
+    pickups.createPickupDefinitions({
+      gemValueCents: 15,
+      scoreConfig: {
+        gemPickup: 30,
+        rocketPickup: 200,
+      },
+      spawnTelegraphDuration: 1000,
+    })
+  );
+
+  const pickup = pickupSystem.createPickup(pickups.PICKUP_TYPE.CURRENCY, 240, 180, {
+    telegraph: true,
+    sourceEvent: "big-order",
+  });
+
+  assert.equal(pickup.spawnTimer, 1000);
+  assert.equal(pickup.spawnDuration, 1000);
+  assert.equal(pickup.sourceEvent, "big-order");
+  assert.equal(pickupSystem.canSpawnOnPlatform(pickups.PICKUP_TYPE.CURRENCY, { w: 100 }), true);
+  assert.equal(pickupSystem.canSpawnOnPlatform(pickups.PICKUP_TYPE.EXTRA_LIFE, { w: 240 }), false);
+  assert.equal(pickupSystem.getDefinition(pickups.PICKUP_TYPE.BACKLOG_REVIVAL).label, "Backlog-Impuls");
+});
+
+test("pickup system applies typed currency and extra-life effects through callbacks", () => {
+  const pickupSystem = pickups.createPickupSystem(
+    pickups.createPickupDefinitions({
+      gemValueCents: 15,
+      scoreConfig: {
+        gemPickup: 30,
+        rocketPickup: 200,
+      },
+      spawnTelegraphDuration: 1000,
+    })
+  );
+  const player = {
+    lives: 3,
+    invincible: 0,
+  };
+  const runState = {
+    currencyCents: 0,
+    actionScore: 0,
+  };
+  const hudEffects = [];
+  const hitEffects = [];
+  let statusMessage = "";
+
+  const context = {
+    player,
+    runState,
+    createHitEffect(x, y, emoji, color = null) {
+      const effect = { x, y, emoji, color };
+      hitEffects.push(effect);
+      return effect;
+    },
+    spawnHudEmoji(worldX, worldY, emoji, statKey) {
+      hudEffects.push({ worldX, worldY, emoji, statKey });
+    },
+    setStatusMessage(message) {
+      statusMessage = message;
+    },
+  };
+
+  assert.equal(
+    pickupSystem.applyEffect(pickups.PICKUP_TYPE.CURRENCY, {
+      ...context,
+      pickup: { x: 120, y: 210, r: 14 },
+    }),
+    true
+  );
+  assert.equal(runState.currencyCents, 15);
+  assert.equal(runState.actionScore, 30);
+  assert.equal(statusMessage, "15 ct geborgen");
+  assert.deepEqual(
+    hudEffects.map((effect) => effect.statKey),
+    ["gems", "score"]
+  );
+
+  assert.equal(
+    pickupSystem.applyEffect(pickups.PICKUP_TYPE.EXTRA_LIFE, {
+      ...context,
+      pickup: { x: 300, y: 180, w: 52, h: 20 },
+    }),
+    true
+  );
+  assert.equal(player.lives, 4);
+  assert.equal(runState.actionScore, 230);
+  assert.equal(statusMessage, "Rakete erwischt. Extraleben erhalten");
+  assert.equal(hitEffects.length, 4);
+});
+
 test("special event system can be driven deterministically through time and injected random hooks", () => {
   const randomChance = simulationCore.createSequenceRandom([0.2, 0.95], 0.99);
   const counters = {
@@ -215,5 +309,5 @@ tests.forEach(({ name, fn }) => {
 if (failed > 0) {
   process.exitCode = 1;
 } else {
-  console.log(`All ${tests.length} simulation-core tests passed.`);
+  console.log(`All ${tests.length} gameplay system tests passed.`);
 }

@@ -40,7 +40,7 @@ Statusuebersicht. Die Detailbeschreibungen zu jedem Punkt folgen direkt darunter
 - [x] P1 - Offline-/PWA-Assets an die tatsaechlich verwendeten Inhalte angleichen
 - [x] P2 - Den Monolithen in klar getrennte Spielsysteme zerlegen
 - [x] P2 - Testbare Simulationskern-Logik einziehen
-- [ ] P2 - Item-/Pickup-System verallgemeinern statt nur "Gem = Geld" zu kennen
+- [x] P2 - Item-/Pickup-System verallgemeinern statt nur "Gem = Geld" zu kennen
 - [ ] P3 - Debug-, Balancing- und Content-Werkzeuge ausbauen
 - [ ] P3 - Architektur- und Regelentscheidungen kurz dokumentieren
 

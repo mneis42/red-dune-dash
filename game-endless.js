@@ -258,6 +258,13 @@ const debugSpecialEventType = null; // Set to an event type id to force a specif
 const placementSystem = globalThis.RedDunePlacement.createPlacementSystem();
 const placementSafetyConfig = placementSystem.config;
 const simulationCore = globalThis.RedDuneSimulationCore;
+const { PICKUP_TYPE } = globalThis.RedDunePickups;
+const pickupDefinitions = globalThis.RedDunePickups.createPickupDefinitions({
+  gemValueCents: GEM_VALUE_CENTS,
+  scoreConfig,
+  spawnTelegraphDuration: specialEventConfig.spawnTelegraphDuration,
+});
+const pickupSystem = globalThis.RedDunePickups.createPickupSystem(pickupDefinitions);
 
 const keys = {
   left: false,
@@ -1183,6 +1190,41 @@ function createHitEffect(x, y, emoji, color = null) {
 }
 
 /**
+ * Applies one pickup effect through the typed pickup system.
+ *
+ * @param {string} type - Pickup type id.
+ * @param {object} pickup - Pickup-shaped source entity.
+ * @returns {boolean} True when the effect was applied.
+ */
+function applyPickupEffect(type, pickup) {
+  return pickupSystem.applyEffect(type, {
+    pickup,
+    player,
+    runState,
+    scoreConfig,
+    createHitEffect,
+    spawnHudEmoji,
+    setStatusMessage(message) {
+      statusMessage = message;
+    },
+  });
+}
+
+/**
+ * Collects a platform pickup and applies its typed gameplay effect.
+ *
+ * @param {{type:string, collected:boolean}} pickup - Pickup entity.
+ */
+function collectPickup(pickup) {
+  if (pickup.collected) {
+    return;
+  }
+
+  pickup.collected = true;
+  applyPickupEffect(pickup.type, pickup);
+}
+
+/**
  * Returns the current HUD section definitions, including values, hit areas and tooltip content.
  *
  * @returns {Array<object>} HUD stat descriptors for rendering and interaction.
@@ -1531,13 +1573,13 @@ function removeHazardsUnderSpan(startX, endX) {
 /**
  * Captures the mutable generation state that optional chunk features may change.
  *
- * @returns {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugLifecycleNextId:number}} Snapshot.
+ * @returns {{platformCount:number, hazards:Array<object>, pickupCount:number, bugCount:number, bugLifecycleNextId:number}} Snapshot.
  */
 function createChunkFeatureSnapshot() {
   return {
     platformCount: level.platforms.length,
     hazards: [...level.hazards],
-    gemCount: level.gems.length,
+    pickupCount: level.pickups.length,
     bugCount: level.bugs.length,
     bugLifecycleNextId: bugLifecycle.nextId,
   };
@@ -1546,12 +1588,12 @@ function createChunkFeatureSnapshot() {
 /**
  * Restores the mutable generation state after a failed optional chunk feature attempt.
  *
- * @param {{platformCount:number, hazards:Array<object>, gemCount:number, bugCount:number, bugLifecycleNextId:number}} snapshot - State to restore.
+ * @param {{platformCount:number, hazards:Array<object>, pickupCount:number, bugCount:number, bugLifecycleNextId:number}} snapshot - State to restore.
  */
 function restoreChunkFeatureSnapshot(snapshot) {
   level.platforms.length = snapshot.platformCount;
   level.hazards = snapshot.hazards;
-  level.gems.length = snapshot.gemCount;
+  level.pickups.length = snapshot.pickupCount;
   level.bugs.length = snapshot.bugCount;
   bugLifecycle.records.forEach((record, bugId) => {
     if (bugId >= snapshot.bugLifecycleNextId) {
@@ -1675,7 +1717,7 @@ function isTooCloseToGround(platform, groundY) {
 function initLevel() {
   level.platforms = [];
   level.hazards = [];
-  level.gems = [];
+  level.pickups = [];
   level.bugs = [];
   level.rockets = [];
   level.clouds = [];
@@ -1689,7 +1731,7 @@ function initLevel() {
   level.platforms.push(createPlatform(0, 470, 360, 70, "ground"));
   level.platforms.push(createPlatform(360, 456, 260, 84, "ground"));
   level.platforms.push(createPlatform(660, 440, 260, 100, "ground"));
-  level.gems.push({ x: 780, y: 394, r: 14, collected: false });
+  level.pickups.push(createPickup(PICKUP_TYPE.CURRENCY, 780, 394));
   level.bugs.push(createBug(450, 418, 390, 560, 1.15));
 
   level.nextChunkX = 960;
@@ -1882,19 +1924,56 @@ function pickNearestSafeZoneX(safeZones, preferredX) {
 }
 
 /**
- * Finds a safe x-position for a collectible on a platform.
+ * Looks up a pickup definition by type.
  *
+ * @param {string} type - Pickup type id.
+ * @returns {object|null} Pickup definition or null when unknown.
+ */
+function getPickupDefinition(type) {
+  return pickupSystem.getDefinition(type);
+}
+
+/**
+ * Creates one collectible pickup entity.
+ *
+ * @param {string} type - Pickup type id.
+ * @param {number} x - World x-position.
+ * @param {number} y - World y-position.
+ * @param {boolean|object} [options=false] - Telegraph flag or extended pickup creation options.
+ * @returns {{type:string, x:number, y:number, r:number, collected:boolean, spawnTimer:number, spawnDuration:number}|null} Pickup entity or null when the type is unknown.
+ */
+function createPickup(type, x, y, options = false) {
+  const normalizedOptions =
+    typeof options === "boolean"
+      ? { telegraph: options }
+      : { ...(options ?? {}) };
+
+  return pickupSystem.createPickup(type, x, y, {
+    spawnDuration: specialEventConfig.spawnTelegraphDuration,
+    ...normalizedOptions,
+  });
+}
+
+/**
+ * Finds a safe x-position for a collectible pickup on a platform.
+ *
+ * @param {string} type - Pickup type id.
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
  * @returns {number|null} Safe x-position or null when none exists.
  */
-function getSafeGemX(platform) {
+function getSafePickupX(type, platform) {
+  const definition = getPickupDefinition(type);
+  if (!definition) {
+    return null;
+  }
+
   const blockedIntervals = level.hazards
     .filter((hazard) => isHazardOnPickupLane(hazard, platform))
     .map((hazard) =>
       createBlockedPlacementInterval(hazard.x, hazard.w, 0, placementSafetyConfig.collectibleHazardPadding)
     );
   const safeZones = getPlatformSafeZones(platform, {
-    minimumZoneWidth: placementSafetyConfig.gemMinimumZoneWidth,
+    minimumZoneWidth: definition.minimumSafeZoneWidth ?? placementSafetyConfig.gemMinimumZoneWidth,
     blockedIntervals,
   });
   if (safeZones.length === 0) {
@@ -1906,46 +1985,52 @@ function getSafeGemX(platform) {
 }
 
 /**
- * Places a collectible on a platform when a safe location exists.
+ * Places a typed pickup on a platform when a safe location exists.
  *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
+ * @param {string} [type=PICKUP_TYPE.CURRENCY] - Pickup type id.
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
  * @param {boolean} [telegraph=false] - Whether the item should fade and scale in before becoming active.
  */
-function addGemOnPlatform(platform, telegraph = false) {
-  if (platform.w < 90) {
+function addPickupOnPlatform(platform, type = PICKUP_TYPE.CURRENCY, telegraph = false) {
+  if (!pickupSystem.canSpawnOnPlatform(type, platform)) {
     return;
   }
 
-  if (!shouldSpawnIncomeSource()) {
+  if (!pickupSystem.shouldSpawnOnPlatform(type, { shouldSpawnIncomeSource })) {
     return;
   }
 
-  const gemX = getSafeGemX(platform);
-  if (gemX === null) {
+  const pickupX = getSafePickupX(type, platform);
+  if (pickupX === null) {
     return;
   }
 
-  level.gems.push({
-    x: gemX,
-    y: platform.y - 32,
-    r: 14,
-    collected: false,
-    spawnTimer: telegraph ? specialEventConfig.spawnTelegraphDuration : 0,
-    spawnDuration: specialEventConfig.spawnTelegraphDuration,
-  });
+  const pickup = createPickup(type, pickupX, platform.y - 32, telegraph);
+  if (!pickup) {
+    return;
+  }
+
+  level.pickups.push(pickup);
 }
 
 /**
- * Advances pending spawn telegraphs for gems and bugs.
+ * Places a currency pickup on a platform.
+ *
+ * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
+ * @param {boolean} [telegraph=false] - Whether the pickup should fade and scale in before becoming active.
+ */
+function addGemOnPlatform(platform, telegraph = false) {
+  addPickupOnPlatform(platform, PICKUP_TYPE.CURRENCY, telegraph);
+}
+
+/**
+ * Advances pending spawn telegraphs for pickups and bugs.
  *
  * @param {number} delta - Frame delta in milliseconds.
  */
 function updateSpawnTelegraphs(delta) {
-  level.gems.forEach((gem) => {
-    if (gem.spawnTimer > 0) {
-      gem.spawnTimer = Math.max(0, gem.spawnTimer - delta);
-    }
-  });
+  pickupSystem.updateSpawnTimers(level.pickups, delta);
 
   level.bugs.forEach((bug) => {
     if (bug.spawnTimer > 0) {
@@ -2116,7 +2201,7 @@ function cleanupWorld() {
   level.platforms = level.platforms.filter((platform) => platform.x + platform.w > cutoffX);
   level.hazards = level.hazards.filter((hazard) => hazard.x + hazard.w > cutoffX);
   // Collected pickups and defeated bugs should leave the active world immediately; historical run state lives elsewhere.
-  level.gems = level.gems.filter((gem) => !gem.collected && gem.x + gem.r > cutoffX);
+  level.pickups = level.pickups.filter((pickup) => !pickup.collected && pickup.x + pickup.r > cutoffX);
   level.bugs.forEach((bug) => {
     if (bug.alive && bug.x + bug.w <= cutoffX) {
       markBugMissed(bug);
@@ -2469,19 +2554,12 @@ function handleMovement(delta) {
     }
   });
 
-  level.gems.forEach((gem) => {
-    if (gem.collected || gem.spawnTimer > 0) {
+  level.pickups.forEach((pickup) => {
+    if (pickup.collected || pickup.spawnTimer > 0) {
       return;
     }
-    if (circleRectCollision(gem, player)) {
-      gem.collected = true;
-      const moneyEffect = createHitEffect(gem.x, gem.y, "€", "#ffe37a");
-      const scoreEffect = createHitEffect(gem.x + 16, gem.y - 8, "⭐");
-      spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gems");
-      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-      runState.currencyCents += GEM_VALUE_CENTS;
-      runState.actionScore += scoreConfig.gemPickup;
-      statusMessage = "10 ct geborgen";
+    if (circleRectCollision(pickup, player)) {
+      collectPickup(pickup);
     }
   });
 
@@ -2568,13 +2646,7 @@ function handleMovement(delta) {
     rocket.x += rocket.vx;
     if (overlaps(player, rocket)) {
       rocket.active = false;
-      const lifeEffect = createHitEffect(rocket.x + rocket.w / 2 - 12, rocket.y + rocket.h / 2, "🚀");
-      const scoreEffect = createHitEffect(rocket.x + rocket.w / 2 + 16, rocket.y + rocket.h / 2 - 10, "⭐");
-      spawnHudEmoji(lifeEffect.x, lifeEffect.y, lifeEffect.emoji, "lives");
-      spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-      player.lives += 1;
-      runState.actionScore += scoreConfig.rocketPickup;
-      statusMessage = "Rakete erwischt. Extraleben erhalten";
+      applyPickupEffect(PICKUP_TYPE.EXTRA_LIFE, rocket);
     }
   });
   level.rockets = level.rockets.filter((rocket) => rocket.active);
@@ -2795,52 +2867,65 @@ function getSpawnPreviewState(timer, duration, time) {
   };
 }
 
+function drawPickupGlyph(renderModel, x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = renderModel.fillStyle ?? "#ffe37a";
+  ctx.strokeStyle = renderModel.strokeStyle ?? "#9a6a00";
+  ctx.lineWidth = renderModel.lineWidth ?? 2.5;
+  ctx.font = renderModel.font ?? "700 42px Trebuchet MS";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (renderModel.strokeStyle) {
+    ctx.strokeText(renderModel.glyph, 0, 0);
+  }
+  ctx.fillText(renderModel.glyph, 0, 0);
+  ctx.restore();
+}
+
 /**
- * Draws a collectible currency symbol with a small hover animation.
+ * Draws one typed pickup using its definition-driven render model.
  *
- * @param {{x:number, y:number, r:number, collected:boolean}} gem - Collectible to render.
+ * @param {{type:string, x:number, y:number, r:number, collected:boolean, spawnTimer:number, spawnDuration:number}} pickup - Pickup to render.
  * @param {number} time - Current animation timestamp.
  */
-function drawGem(gem, time) {
-  if (gem.collected) {
+function drawPickup(pickup, time) {
+  if (pickup.collected) {
     return;
   }
 
-  if (gem.spawnTimer > 0) {
-    const preview = getSpawnPreviewState(gem.spawnTimer, gem.spawnDuration, time);
-    const x = gem.x - cameraX;
+  const definition = getPickupDefinition(pickup.type);
+  if (!definition) {
+    return;
+  }
 
+  const renderModel = {
+    glyph: definition.render?.glyph ?? definition.emoji ?? "?",
+    fillStyle: definition.render?.fillStyle,
+    strokeStyle: definition.render?.strokeStyle,
+    lineWidth: definition.render?.lineWidth,
+    font: definition.render?.font,
+  };
+  const x = pickup.x - cameraX;
+
+  if (pickup.spawnTimer > 0) {
+    const preview = getSpawnPreviewState(pickup.spawnTimer, pickup.spawnDuration, time);
     ctx.save();
-    ctx.translate(x, gem.y);
-    ctx.scale(preview.scale, preview.scale);
     ctx.globalAlpha = preview.alpha;
-    ctx.fillStyle = "#ffe37a";
-    ctx.strokeStyle = "#9a6a00";
-    ctx.lineWidth = 2.5;
-    ctx.font = "700 42px Trebuchet MS";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.strokeText("€", 0, 0);
-    ctx.fillText("€", 0, 0);
+    ctx.translate(x, pickup.y);
+    ctx.scale(preview.scale, preview.scale);
+    drawPickupGlyph(renderModel, 0, 0);
     ctx.restore();
     return;
   }
 
-  const bob = Math.sin(time / 180 + gem.x * 0.01) * 4;
-  const x = gem.x - cameraX;
-  const y = gem.y + bob;
+  const bobAmplitude = definition.render?.bobAmplitude ?? 4;
+  const bobTimeDivisor = definition.render?.bobTimeDivisor ?? 180;
+  const worldPhaseScale = definition.render?.worldPhaseScale ?? 0.01;
+  const bob = Math.sin(time / bobTimeDivisor + pickup.x * worldPhaseScale) * bobAmplitude;
+  const y = pickup.y + bob;
 
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = "#ffe37a";
-  ctx.strokeStyle = "#9a6a00";
-  ctx.lineWidth = 2.5;
-  ctx.font = "700 42px Trebuchet MS";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.strokeText("€", 0, 0);
-  ctx.fillText("€", 0, 0);
-  ctx.restore();
+  drawPickupGlyph(renderModel, x, y);
 }
 
 /**
@@ -3404,7 +3489,7 @@ function render(time) {
   drawBackground();
   level.platforms.forEach(drawPlatform);
   level.hazards.forEach(drawHazard);
-  level.gems.forEach((gem) => drawGem(gem, time));
+  level.pickups.forEach((pickup) => drawPickup(pickup, time));
   level.bugs.forEach((bug) => {
     if (bug.spawnTimer <= 0) {
       drawBug(bug, time);
