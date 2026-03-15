@@ -6,6 +6,7 @@ require("../systems/placement-system.js");
 require("../systems/pickup-system.js");
 require("../systems/simulation-core.js");
 require("../systems/special-event-system.js");
+require("../systems/generator-helpers.js");
 
 const simulationCore = globalThis.RedDuneSimulationCore;
 const bugLifecycle = globalThis.RedDuneBugLifecycle;
@@ -13,6 +14,7 @@ const debugTools = globalThis.RedDuneDebugTools;
 const placement = globalThis.RedDunePlacement;
 const pickups = globalThis.RedDunePickups;
 const specialEvents = globalThis.RedDuneSpecialEvents;
+const generatorHelpers = globalThis.RedDuneGeneratorHelpers;
 
 const tests = [];
 
@@ -312,6 +314,199 @@ test("special event system can be driven deterministically through time and inje
   eventSystem.update(500);
   assert.equal(eventSystem.state.phase, specialEvents.SPECIAL_EVENT_PHASE.IDLE);
   assert.equal(statusMessages.at(-1), "Großauftrag abgeschlossen");
+});
+
+test("generator helpers roll back failed optional chunk features without leaving partial state", () => {
+  const bugSystem = bugLifecycle.createBugLifecycleSystem();
+  const initialBugA = bugSystem.register(bugLifecycle.BUG_STATUS.ACTIVE_WORLD);
+  const initialBugB = bugSystem.register(bugLifecycle.BUG_STATUS.ACTIVE_WORLD);
+
+  const level = {
+    platforms: [{ x: 0, y: 400, w: 300, h: 40, kind: "ground" }],
+    hazards: [{ x: 40, y: 380, w: 40, h: 20 }],
+    pickups: [{ type: "dummy", x: 180, y: 360 }],
+    bugs: [],
+    nextChunkX: 300,
+  };
+  const player = { h: 40 };
+
+  const helpers = generatorHelpers.createGeneratorHelpers({
+    level,
+    bugLifecycleSystem: bugSystem,
+    player,
+    randomInt: (min, max) => min,
+    randomBetween: (min, max) => min,
+    clamp: simulationCore.clamp,
+    createPlatform(x, y, w, h, kind) {
+      return { x, y, w, h, kind };
+    },
+    addGemOnPlatform() {},
+    addBugOnPlatform() {},
+  });
+
+  const baselinePlatformCount = level.platforms.length;
+  const baselineHazardCount = level.hazards.length;
+  const baselinePickupCount = level.pickups.length;
+  const baselineBugCount = level.bugs.length;
+
+  const failed = helpers.commitChunkFeatureAttempt(() => {
+    const bugId = bugSystem.register(bugLifecycle.BUG_STATUS.ACTIVE_WORLD);
+    level.platforms.push({ x: 320, y: 360, w: 120, h: 20, kind: "plate" });
+    level.hazards.push({ x: 340, y: 380, w: 40, h: 20 });
+    level.pickups.push({ type: "extra", x: 340, y: 340 });
+    level.bugs.push({ id: bugId, x: 340, y: 360, w: 32, h: 24 });
+    return false;
+  });
+  assert.equal(failed, false);
+
+  assert.equal(level.platforms.length, baselinePlatformCount);
+  assert.equal(level.hazards.length, baselineHazardCount);
+  assert.equal(level.pickups.length, baselinePickupCount);
+  assert.equal(level.bugs.length, baselineBugCount);
+
+  const counts = bugSystem.getCounts();
+  assert.equal(counts.totalKnown, 2);
+  assert.ok(bugSystem.state.records.has(initialBugA));
+  assert.ok(bugSystem.state.records.has(initialBugB));
+});
+
+test("generator helpers commit successful optional features and keep new entities", () => {
+  const bugSystem = bugLifecycle.createBugLifecycleSystem();
+  const level = {
+    platforms: [{ x: 0, y: 400, w: 300, h: 40, kind: "ground" }],
+    hazards: [],
+    pickups: [],
+    bugs: [],
+    nextChunkX: 300,
+  };
+  const player = { h: 40 };
+
+  const helpers = generatorHelpers.createGeneratorHelpers({
+    level,
+    bugLifecycleSystem: bugSystem,
+    player,
+    randomInt: (min, max) => min,
+    randomBetween: (min, max) => min,
+    clamp: simulationCore.clamp,
+    createPlatform(x, y, w, h, kind) {
+      return { x, y, w, h, kind };
+    },
+    addGemOnPlatform() {},
+    addBugOnPlatform() {},
+  });
+
+  const committed = helpers.commitChunkFeatureAttempt(() => {
+    const bugId = bugSystem.register(bugLifecycle.BUG_STATUS.ACTIVE_WORLD);
+    level.platforms.push({ x: 320, y: 360, w: 120, h: 20, kind: "plate" });
+    level.hazards.push({ x: 340, y: 380, w: 40, h: 20 });
+    level.pickups.push({ type: "extra", x: 340, y: 340 });
+    level.bugs.push({ id: bugId, x: 340, y: 360, w: 32, h: 24 });
+    return true;
+  });
+
+  assert.equal(committed, true);
+  assert.equal(level.platforms.length, 2);
+  assert.equal(level.hazards.length, 1);
+  assert.equal(level.pickups.length, 1);
+  assert.equal(level.bugs.length, 1);
+});
+
+test("ensureStepPlatform creates a helper step for too-high platforms and keeps approach reachable", () => {
+  const bugSystem = bugLifecycle.createBugLifecycleSystem();
+  const level = {
+    platforms: [],
+    hazards: [],
+    pickups: [],
+    bugs: [],
+    nextChunkX: 0,
+  };
+  const player = { h: 40 };
+  const groundY = 460;
+
+  const ground = { x: 0, y: groundY, w: 360, h: 40, kind: "ground" };
+  const target = { x: 260, y: 280, w: 120, h: 20, kind: "plate" };
+  level.platforms.push(ground, target);
+
+  let decoratedGems = 0;
+  let decoratedBugs = 0;
+
+  const helpers = generatorHelpers.createGeneratorHelpers({
+    level,
+    bugLifecycleSystem: bugSystem,
+    player,
+    randomInt: (min, max) => min,
+    randomBetween: (min, max) => min,
+    clamp: simulationCore.clamp,
+    createPlatform(x, y, w, h, kind) {
+      return { x, y, w, h, kind };
+    },
+    addGemOnPlatform() {
+      decoratedGems += 1;
+    },
+    addBugOnPlatform() {
+      decoratedBugs += 1;
+    },
+  });
+
+  const ok = helpers.ensureStepPlatform(target, groundY);
+  assert.equal(ok, true);
+  assert.equal(level.platforms.length, 3);
+
+  const step = level.platforms.find((p) => p.kind === "plate" && p !== target);
+  assert.ok(step);
+  assert.ok(step.y > target.y);
+  assert.ok(step.y < groundY);
+
+  assert.equal(decoratedGems, 1);
+  assert.equal(decoratedBugs, 1);
+  assert.equal(helpers.hasReachableApproach(target, ground), true);
+});
+
+test("generator helpers expose basic hazard and clearance helpers for fairness corrections", () => {
+  const bugSystem = bugLifecycle.createBugLifecycleSystem();
+  const level = {
+    platforms: [
+      { x: 0, y: 440, w: 200, h: 20, kind: "ground" },
+      { x: 260, y: 380, w: 120, h: 20, kind: "plate" },
+    ],
+    hazards: [
+      { x: 40, y: 420, w: 40, h: 20 },
+      { x: 280, y: 420, w: 40, h: 20 },
+    ],
+    pickups: [],
+    bugs: [],
+    nextChunkX: 0,
+  };
+  const player = { h: 40 };
+
+  const helpers = generatorHelpers.createGeneratorHelpers({
+    level,
+    bugLifecycleSystem: bugSystem,
+    player,
+    randomInt: (min, max) => min,
+    randomBetween: (min, max) => min,
+    clamp: simulationCore.clamp,
+    createPlatform(x, y, w, h, kind) {
+      return { x, y, w, h, kind };
+    },
+    addGemOnPlatform() {},
+    addBugOnPlatform() {},
+  });
+
+  assert.equal(
+    helpers.platformCollides(
+      { x: 250, y: 380, w: 80, h: 20 },
+      18,
+    ),
+    true
+  );
+
+  helpers.removeHazardsUnderSpan(250, 360);
+  assert.equal(level.hazards.length, 1);
+  assert.deepEqual(level.hazards[0], { x: 40, y: 420, w: 40, h: 20 });
+
+  assert.equal(helpers.isTooCloseToGround({ y: 412, h: 20 }, 440), true);
+  assert.equal(helpers.isTooCloseToGround({ y: 360, h: 20 }, 440), false);
 });
 
 let failed = 0;

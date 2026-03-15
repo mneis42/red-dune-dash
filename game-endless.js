@@ -381,6 +381,18 @@ function lerp(start, end, alpha) {
   return start + (end - start) * alpha;
 }
 
+const generatorHelpers = globalThis.RedDuneGeneratorHelpers.createGeneratorHelpers({
+  level,
+  bugLifecycleSystem,
+  player,
+  randomInt,
+  randomBetween,
+  clamp,
+  createPlatform,
+  addGemOnPlatform,
+  addBugOnPlatform,
+});
+
 /**
  * Returns whether the current run is allowed to persist competitive progress.
  *
@@ -1809,7 +1821,7 @@ function wrapTextLines(text, maxWidth) {
  * @param {number} endX - End of the span.
  */
 function removeHazardsUnderSpan(startX, endX) {
-  level.hazards = level.hazards.filter((hazard) => hazard.x + hazard.w <= startX || hazard.x >= endX);
+  generatorHelpers.removeHazardsUnderSpan(startX, endX);
 }
 
 /**
@@ -1818,13 +1830,7 @@ function removeHazardsUnderSpan(startX, endX) {
  * @returns {{platformCount:number, hazards:Array<object>, pickupCount:number, bugCount:number, bugLifecycleNextId:number}} Snapshot.
  */
 function createChunkFeatureSnapshot() {
-  return {
-    platformCount: level.platforms.length,
-    hazards: [...level.hazards],
-    pickupCount: level.pickups.length,
-    bugCount: level.bugs.length,
-    bugLifecycleNextId: bugLifecycle.nextId,
-  };
+  return generatorHelpers.createChunkFeatureSnapshot();
 }
 
 /**
@@ -1833,16 +1839,7 @@ function createChunkFeatureSnapshot() {
  * @param {{platformCount:number, hazards:Array<object>, pickupCount:number, bugCount:number, bugLifecycleNextId:number}} snapshot - State to restore.
  */
 function restoreChunkFeatureSnapshot(snapshot) {
-  level.platforms.length = snapshot.platformCount;
-  level.hazards = snapshot.hazards;
-  level.pickups.length = snapshot.pickupCount;
-  level.bugs.length = snapshot.bugCount;
-  bugLifecycle.records.forEach((record, bugId) => {
-    if (bugId >= snapshot.bugLifecycleNextId) {
-      bugLifecycle.records.delete(bugId);
-    }
-  });
-  bugLifecycle.nextId = snapshot.bugLifecycleNextId;
+  generatorHelpers.restoreChunkFeatureSnapshot(snapshot);
 }
 
 /**
@@ -1852,13 +1849,7 @@ function restoreChunkFeatureSnapshot(snapshot) {
  * @returns {boolean} True when the feature was committed.
  */
 function commitChunkFeatureAttempt(attemptFeature) {
-  const snapshot = createChunkFeatureSnapshot();
-  if (attemptFeature()) {
-    return true;
-  }
-
-  restoreChunkFeatureSnapshot(snapshot);
-  return false;
+  return generatorHelpers.commitChunkFeatureAttempt(attemptFeature);
 }
 
 /**
@@ -1869,31 +1860,7 @@ function commitChunkFeatureAttempt(attemptFeature) {
  * @returns {boolean} True when a reachable setup exists after processing.
  */
 function ensureStepPlatform(targetPlatform, groundY) {
-  // Insert an intermediate platform whenever procedural generation creates a jump that is too tall.
-  const heightDelta = groundY - targetPlatform.y;
-  if (heightDelta <= 124) {
-    return true;
-  }
-
-  const stepWidth = clamp(Math.floor(targetPlatform.w * 0.7), 88, 130);
-  const stepHeight = 18;
-  const stepY = clamp(targetPlatform.y + 58, groundY - 112, groundY - 72);
-  const desiredX = targetPlatform.x - randomInt(74, 120);
-  const stepX = Math.max(level.nextChunkX + 10, desiredX);
-  const step = createPlatform(stepX, stepY, stepWidth, stepHeight, "plate");
-
-  if (platformCollides(step, 8)) {
-    return false;
-  }
-
-  level.platforms.push(step);
-  if (Math.random() < 0.55) {
-    addGemOnPlatform(step);
-  }
-  if (Math.random() < 0.18) {
-    addBugOnPlatform(step);
-  }
-  return true;
+  return generatorHelpers.ensureStepPlatform(targetPlatform, groundY);
 }
 
 /**
@@ -1904,23 +1871,7 @@ function ensureStepPlatform(targetPlatform, groundY) {
  * @returns {boolean} True when the platform can be approached.
  */
 function hasReachableApproach(targetPlatform, ground) {
-  // Reject bonus platforms that look valid geometrically but cannot be reached by the player.
-  const supports = level.platforms.filter((platform) => {
-    if (platform.x + platform.w < targetPlatform.x - 150) {
-      return false;
-    }
-    if (platform.x > targetPlatform.x + targetPlatform.w + 40) {
-      return false;
-    }
-    return platform.y > targetPlatform.y;
-  });
-
-  const supportPool = [...supports, ground];
-  return supportPool.some((platform) => {
-    const verticalGain = platform.y - targetPlatform.y;
-    const horizontalGap = targetPlatform.x - (platform.x + platform.w);
-    return verticalGain <= 126 && horizontalGap <= 138;
-  });
+  return generatorHelpers.hasReachableApproach(targetPlatform, ground);
 }
 
 /**
@@ -1931,14 +1882,7 @@ function hasReachableApproach(targetPlatform, ground) {
  * @returns {boolean} True when a collision is detected.
  */
 function platformCollides(candidate, padding = 18) {
-  return level.platforms.some((platform) => {
-    return !(
-      candidate.x + candidate.w + padding <= platform.x ||
-      candidate.x >= platform.x + platform.w + padding ||
-      candidate.y + candidate.h + padding <= platform.y ||
-      candidate.y >= platform.y + platform.h + padding
-    );
-  });
+  return generatorHelpers.platformCollides(candidate, padding);
 }
 
 /**
@@ -1949,8 +1893,7 @@ function platformCollides(candidate, padding = 18) {
  * @returns {boolean} True when the underpass would be too tight for the player.
  */
 function isTooCloseToGround(platform, groundY) {
-  const clearance = groundY - (platform.y + platform.h);
-  return clearance < player.h + 10;
+  return generatorHelpers.isTooCloseToGround(platform, groundY);
 }
 
 /**

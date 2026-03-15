@@ -38,30 +38,28 @@ Stand: 2026-03-15
 
 - **Priorität:** P1
 - **Titel:** Tests für Generator-Fairness und Chunk-Rollback ergänzen
+- **Status:** Erledigt – Generator-Helfer extrahiert und durch Node-Tests abgesichert
 - **Problem:**
   - Der Weltgenerator in game-endless.js (generateChunk, generateUntil, ensureStepPlatform, hasReachableApproach, commitChunkFeatureAttempt, restoreChunkFeatureSnapshot) implementiert wichtige Fairness-Regeln und ein Rollback-Modell für optionale Chunk-Features.
-  - Diese Logik ist aktuell nicht durch dedizierte Tests abgesichert; nur die darunterliegenden Systeme (Placement, Simulation Core, Special Events, Pickups) sind getestet.
-  - Fehler in der Snapshot-/Rollback-Logik könnten zu halbfertigen Plattform-/Hazard-Zuständen, unfairen Layouts oder inkonsistenten Bug-Lifecycle-States führen.
-- **Warum das wichtig ist:**
-  - Der Generator bestimmt Spielbarkeit und Fairness des Endlos-Runs.
-  - Besonders Rollback (createChunkFeatureSnapshot/restoreChunkFeatureSnapshot/commitChunkFeatureAttempt) ist anfällig für stille Fehler.
-- **Erwartete Umsetzung:**
-  - Einen Node-kompatiblen Test-Einstieg für die Generatorfunktionen schaffen (z. B. separater Modul-Export oder kleines Harness, das level, player und abhängige Systeme initialisiert, ohne Canvas zu benötigen).
-  - Tests schreiben, die u. a. folgende Fälle abdecken:
-    - ensureStepPlatform fügt nur dann Hilfsplattformen hinzu, wenn nötig und möglich; scheitert ansonsten mit sauberem Rollback.
-    - hasReachableApproach erkennt unerreichbare Bonus-/Plate-Plattformen und verwirft sie.
-    - commitChunkFeatureAttempt stellt nach einem gescheiterten Feature-Versuch level.platforms, level.hazards, level.pickups, level.bugs und bugLifecycle.state konsistent wieder her.
-    - generateChunk respektiert die dokumentierten Invarianten aus docs/generator-rules.md (einmalige Fortschreibung von level.nextChunkX/lastGroundY, optionale Inhalte dürfen fehlschlagen ohne die Welt zu „brechen“).
+  - Diese Logik war zunächst nicht durch dedizierte Tests abgesichert; nur die darunterliegenden Systeme (Placement, Simulation Core, Special Events, Pickups) waren getestet.
+- **Umsetzung:**
+  - Ein neues, browserfreies Hilfsmodul systems/generator-helpers.js eingeführt, das zentrale Generator-Helfer (removeHazardsUnderSpan, createChunkFeatureSnapshot, restoreChunkFeatureSnapshot, commitChunkFeatureAttempt, ensureStepPlatform, hasReachableApproach, platformCollides, isTooCloseToGround) kapselt.
+  - game-endless.js so angepasst, dass die bisherigen lokalen Helferfunktionen diese gemeinsame Implementierung verwenden, statt eigene Logik zu duplizieren.
+  - Die neue Hilfs-Implementierung in index.html und app-assets.js eingebunden, sodass sie sowohl im Spiel als auch im Service Worker/App-Shell-Manifest konsistent verfügbar ist.
+  - In tests/simulation-core.test.js neue Tests ergänzt, die u. a. folgende Fälle abdecken:
+    - commitChunkFeatureAttempt rollt Änderungen an level.platforms, level.hazards, level.pickups, level.bugs und bugLifecycle.state bei fehlgeschlagenen Features sauber zurück.
+    - Erfolgreiche Feature-Versuche werden committed und behalten ihre Änderungen.
+    - ensureStepPlatform fügt bei zu hohen Plattformen eine Hilfsplattform ein, dekoriert sie mit Pickups/Bugs über injizierte Callbacks und erlaubt einen plausiblen Zugang (hasReachableApproach).
+    - platformCollides, removeHazardsUnderSpan und isTooCloseToGround verhalten sich konsistent mit den beschriebenen Fairness-Regeln (docs/generator-rules.md).
 - **Abschlusskriterien:**
-  - Mindestens ein Test-Suite-Bereich deckt Generator-/Rollback-Fälle ab und läuft unter Node ohne Browser.
-  - Ein absichtlich eingebauter Fehler in der Snapshot-/Rollback-Logik wird von den neuen Tests zuverlässig erkannt.
-- **Bisherige Verifikation:**
-  - Nur manuelle Code-Inspektion und dokumentbasierte Prüfung (docs/generator-rules.md, docs/placement-rules.md).
-- **Verifikation nach Fix:**
-  - Neuer Testlauf (lokal und in CI) inkludiert Generator-Tests und bleibt grün.
-  - Manuelles Spielen einzelner Runs zur Stichprobenkontrolle (keine offensichtlich unfairen Chunks, keine halbfertigen Features).
+  - Generator-Helfer sind in einem separaten Modul gekapselt und werden in game-endless.js ausschließlich über generatorHelpers genutzt.
+  - tests/simulation-core.test.js enthält mehrere Szenarien für Rollback, Hilfsplattformen und Hazard-/Clearance-Helfer.
+  - Ein absichtlich eingebauter Fehler in createChunkFeatureSnapshot/restoreChunkFeatureSnapshot/commitChunkFeatureAttempt oder den Clearance-Helfern würde die neuen Tests brechen.
+- **Verifikation:**
+  - Lokaler Testlauf `node tests/simulation-core.test.js` mit nun 13 Tests erfolgreich (inklusive der neuen Generator-Tests).
+  - CI-Workflow .github/workflows/ci.yml führt denselben Testlauf aus und würde bei Regressionsfehlern im Generator fehlschlagen.
 - **Rest-Risiko / Follow-up:**
-  - Einige visuelle Layout-Probleme lassen sich nur im echten Canvas-Betrieb entdecken; mittelfristig könnten einfache visuelle Snapshot-/Replay-Tools ergänzt werden.
+  - generateChunk/generateUntil selbst sind weiterhin nur indirekt abgesichert; für künftige Arbeiten könnten zusätzliche, höherstufige Generator-Szenarien (z. B. Sequenzen von Chunks mit verschiedenen Events/Debug-Konfigurationen) in eigenen Tests modelliert werden.
 
 ---
 
