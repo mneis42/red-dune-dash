@@ -9,3 +9,5 @@ Execute as many steps as possible in one uninterrupted run.
 Do not send intermediate progress updates unless the user explicitly asks for them.
 Only interrupt when blocked by missing permissions, conflicting instructions, missing critical information, or hard platform or runtime limits.
 If interrupted by a platform limit, resume from the next unfinished step on the user's next message without asking whether to continue.
+
+For full-code-review runs, enforce the mandatory stop-prevention checklist in [../instructions/full-code-review.md](../instructions/full-code-review.md) before ending any response.
