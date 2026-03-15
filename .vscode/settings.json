@@ -1,0 +1,25 @@
+{
+  // Makes the Autopilot permission level available in chat.
+  // You still need to select it in the chat session when you want maximum autonomy.
+  "chat.autopilot.enabled": true,
+
+  // The default limit is 25 requests. A higher limit helps with longer multi-step tasks.
+  "chat.agent.maxRequests": 1000,
+
+  // Show file change summaries after chat requests so longer sessions stay easier to review.
+  "chat.checkpoints.showFileChanges": true,
+
+  // Auto-approve common read-only inspection commands in this trusted workspace.
+  // Destructive commands and likely script execution stay blocked.
+  "chat.tools.terminal.autoApprove": {
+    "/^(Get-ChildItem|Get-Content|Get-Location|Select-String|rg|dir|ls|pwd|cat|git status|git diff\\b.*|git log\\b.*|git show\\b.*)$/i": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^(Remove-Item|del|rmdir|rm)\\b/i": false,
+    "/\\.(ps1|bat|cmd)\\b/i": {
+      "approve": false,
+      "matchCommandLine": true
+    }
+  }
+}
