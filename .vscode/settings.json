@@ -20,6 +20,18 @@
     "/\\.(ps1|bat|cmd)\\b/i": {
       "approve": false,
       "matchCommandLine": true
+    },
+    "/^node tests/service-worker\\.test\\.js$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^node tests/service-core-orchestration\\.js$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^powershell -NoLogo -Command \"\\$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'; Rename-Item -Path 'todo\\.md' -NewName \\(\\$stamp \\+ '-complete\\.md'\\); Move-Item -Path \\(\\$stamp \\+ '-complete\\.md'\\) -Destination 'reviews'\"$/": {
+      "approve": true,
+      "matchCommandLine": true
     }
   }
 }
