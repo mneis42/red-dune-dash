@@ -123,12 +123,16 @@ Der aktuelle Run fuehrt ein Bug-Ledger mit folgenden Bedeutungen:
 - `spawnedInRun`
 - `resolvedInRun`
 - `openInRun`
+- `activeInWorld`
+- `missedInRun`
 - `backlog`
+- `reactivatedInRun`
 
 Derzeit gilt:
 
-- `openInRun = spawnedInRun - resolvedInRun`
-- `backlog = 0`
+- `openInRun = activeInWorld + missedInRun + backlog + reactivatedInRun`
+- `backlog` ist im regulären Spiel normalerweise `0`, kann im Debug-Modus aber vorbefuellt oder per Hotkey erhoeht werden
+- `reactivatedInRun` bleibt im Normalfall `0`, kann aber durch vorbereitete Debug-/Pickup-Pfade steigen
 
 Wichtige semantische Entscheidung:
 

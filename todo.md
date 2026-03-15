@@ -78,6 +78,8 @@
   `.github/workflows/deploy-pages.yml`, `service-worker.js`, `app-assets.js`.
 
 ### P2 - Dokumentationsdrift im Run-Modell (Backlog-Formel)
+- Status
+  Erledigt am 2026-03-15.
 - Problem
   `docs/run-model.md` beschreibt `openInRun = spawnedInRun - resolvedInRun` und `backlog = 0`. Die Implementierung zählt aber explizit `backlog` und `reactivated` in offene Bugs mit hinein, und Debug kann Backlog direkt vorbefüllen.
 - Warum wichtig
@@ -88,7 +90,8 @@
   - `docs/run-model.md` stimmt mit `getBugLedger()` und Debug-Pfaden überein.
   - Begriffe „openInRun“, „backlog“, „reactivated“ sind konsistent über Doku-Dateien.
 - Verifizierung durchgeführt
-  `docs/run-model.md` gegen `game-endless.js` verglichen.
+  `docs/run-model.md` aktualisiert auf die implementierte Ledger-Semantik (`activeInWorld`, `missedInRun`, `reactivatedInRun`).
+  Nachkontrolle per Textsuche auf alte und neue Formel erfolgt.
 - Rest-Risiko / Follow-up
   Optional Cross-Links zwischen `run-model.md`, `bug-lifecycle.md` und `debug-tools.md` schärfen.
 - Relevante Stellen
