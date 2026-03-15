@@ -90,7 +90,7 @@ Red Dune Dash unterstützt „Add to Home Screen“ und Offline-Spiel über eine
 
 - Für lokale Tests sollte das Spiel über einen HTTP-Server laufen (siehe oben), nicht direkt per `file://`.
 - Der Service Worker nutzt `app-assets.js` als zentrale Quelle für Offline-Assets und `network-first`-Routen.
-- Versions-Updates werden über `version.json` und eine gestempelte `APP_VERSION` erkannt; produktive Deployments werden im GitHub-Pages-Workflow automatisch mit einer Versions-ID versehen.
+- Versions-Updates werden über `version.json` und eine gestempelte `APP_VERSION` erkannt; produktive Deployments werden im GitHub-Pages-Workflow automatisch mit einer Versions-ID versehen. Im Repository enthält `version.json` den Platzhalter `"dev"`; der Deploy-Workflow ersetzt ihn beim Veröffentlichen durch den aktuellen Commit-SHA.
 
 ## Steuerung
 
