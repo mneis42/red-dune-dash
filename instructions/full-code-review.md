@@ -188,3 +188,9 @@ If a TODO cannot be safely completed or verified, document the blocker clearly i
 - Keep `todo.md` readable for humans who will continue the work later.
 - Treat architecture, docs, pipelines, tests, and game consistency as first-class review targets, not side notes.
 - Ignore `reviews/` during the review itself even if previous review files exist there.
+- During the full-code-review workflow, do not stop after the review, after creating `todo.md`, after individual TODOs, or after intermediate commits just to ask for confirmation.
+- Continue until the workflow is fully complete or a real blocker is hit.
+- Do not send intermediate progress updates unless the user explicitly asks for them.
+- Only interrupt when blocked by missing permissions, conflicting instructions, missing critical information, or hard platform or runtime limits.
+- If interrupted by a platform limit, resume from the next unfinished step on the user's next message without asking whether to continue.
+- Prefer one final summary over step-by-step narration.

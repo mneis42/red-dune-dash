@@ -9,29 +9,16 @@
   // Show file change summaries after chat requests so longer sessions stay easier to review.
   "chat.checkpoints.showFileChanges": true,
 
-  // Auto-approve common read-only inspection commands in this trusted workspace.
-  // Destructive commands and likely script execution stay blocked.
+  // Auto-accept file edits anywhere inside this repository.
+  "chat.tools.edits.autoApprove": {
+    "**/*": true
+  },
+
+  // In this workspace we want the agent to move freely inside the repo.
+  // Keep approvals for writes outside the workspace via blockDetectedFileWrites.
+  "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+  "chat.tools.terminal.blockDetectedFileWrites": "outsideWorkspace",
   "chat.tools.terminal.autoApprove": {
-    "/^(Get-ChildItem|Get-Content|Get-Location|Select-String|rg|dir|ls|pwd|cat|git status|git diff\\b.*|git log\\b.*|git show\\b.*)$/i": {
-      "approve": true,
-      "matchCommandLine": true
-    },
-    "/^(Remove-Item|del|rmdir|rm)\\b/i": false,
-    "/\\.(ps1|bat|cmd)\\b/i": {
-      "approve": false,
-      "matchCommandLine": true
-    },
-    "/^node tests/service-worker\\.test\\.js$/": {
-      "approve": true,
-      "matchCommandLine": true
-    },
-    "/^node tests/service-core-orchestration\\.js$/": {
-      "approve": true,
-      "matchCommandLine": true
-    },
-    "/^powershell -NoLogo -Command \"\\$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'; Rename-Item -Path 'todo\\.md' -NewName \\(\\$stamp \\+ '-complete\\.md'\\); Move-Item -Path \\(\\$stamp \\+ '-complete\\.md'\\) -Destination 'reviews'\"$/": {
-      "approve": true,
-      "matchCommandLine": true
-    }
+    "/.*/": true
   }
 }
