@@ -188,14 +188,17 @@ test("pickup system exposes typed spawn rules and preserves pickup metadata", ()
   const pickup = pickupSystem.createPickup(pickups.PICKUP_TYPE.CURRENCY, 240, 180, {
     telegraph: true,
     sourceEvent: "big-order",
+    renderScale: 2,
   });
 
   assert.equal(pickup.spawnTimer, 1000);
   assert.equal(pickup.spawnDuration, 1000);
   assert.equal(pickup.sourceEvent, "big-order");
+  assert.equal(pickup.r, 28);
   assert.equal(pickupSystem.canSpawnOnPlatform(pickups.PICKUP_TYPE.CURRENCY, { w: 100 }), true);
   assert.equal(pickupSystem.canSpawnOnPlatform(pickups.PICKUP_TYPE.EXTRA_LIFE, { w: 240 }), false);
   assert.equal(pickupSystem.getDefinition(pickups.PICKUP_TYPE.BACKLOG_REVIVAL).label, "Backlog-Impuls");
+  assert.equal(pickupSystem.getRenderModel(pickups.PICKUP_TYPE.CURRENCY, pickup).scale, 2);
 });
 
 test("pickup system applies typed currency and extra-life effects through callbacks", () => {
@@ -219,6 +222,7 @@ test("pickup system applies typed currency and extra-life effects through callba
   };
   const hudEffects = [];
   const hitEffects = [];
+  const currencyEvents = [];
   let statusMessage = "";
 
   const context = {
@@ -235,6 +239,9 @@ test("pickup system applies typed currency and extra-life effects through callba
     setStatusMessage(message) {
       statusMessage = message;
     },
+    onCurrencyCollected(payload) {
+      currencyEvents.push(payload);
+    },
   };
 
   assert.equal(
@@ -247,6 +254,8 @@ test("pickup system applies typed currency and extra-life effects through callba
   assert.equal(runState.currencyCents, 15);
   assert.equal(runState.actionScore, 30);
   assert.equal(statusMessage, "15 ct geborgen");
+  assert.equal(currencyEvents.length, 1);
+  assert.equal(currencyEvents[0].currencyCents, 15);
   assert.deepEqual(
     hudEffects.map((effect) => effect.statKey),
     ["gems", "score"]
@@ -263,6 +272,56 @@ test("pickup system applies typed currency and extra-life effects through callba
   assert.equal(runState.actionScore, 230);
   assert.equal(statusMessage, "Rakete erwischt. Extraleben erhalten");
   assert.equal(hitEffects.length, 4);
+});
+
+test("pickup system applies currency overrides and forwards bonus bug metadata", () => {
+  const pickupSystem = pickups.createPickupSystem(
+    pickups.createPickupDefinitions({
+      gemValueCents: 10,
+      scoreConfig: {
+        gemPickup: 30,
+        rocketPickup: 200,
+      },
+      spawnTelegraphDuration: 1000,
+    })
+  );
+  const runState = {
+    currencyCents: 0,
+    actionScore: 0,
+  };
+  const currencyEvents = [];
+  let statusMessage = "";
+
+  assert.equal(
+    pickupSystem.applyEffect(pickups.PICKUP_TYPE.CURRENCY, {
+      pickup: {
+        x: 120,
+        y: 210,
+        r: 28,
+        currencyCents: 100,
+        spawnBugOnCollect: { chance: 0.5, telegraph: true },
+      },
+      player: { lives: 3, invincible: 0 },
+      runState,
+      createHitEffect(x, y, emoji, color = null) {
+        return { x, y, emoji, color };
+      },
+      spawnHudEmoji() {},
+      setStatusMessage(message) {
+        statusMessage = message;
+      },
+      onCurrencyCollected(payload) {
+        currencyEvents.push(payload);
+      },
+    }),
+    true
+  );
+
+  assert.equal(runState.currencyCents, 100);
+  assert.equal(runState.actionScore, 30);
+  assert.equal(statusMessage, "1 EUR geborgen");
+  assert.equal(currencyEvents.length, 1);
+  assert.deepEqual(currencyEvents[0].spawnBugOnCollect, { chance: 0.5, telegraph: true });
 });
 
 test("special event system can be driven deterministically through time and injected random hooks", () => {
@@ -416,6 +475,48 @@ test("special event system supports weighted backlog-aware event selection", () 
   eventSystem.update(1000);
   assert.equal(eventSystem.state.phase, specialEvents.SPECIAL_EVENT_PHASE.ANNOUNCE);
   assert.equal(eventSystem.state.type, "bug-wave");
+});
+
+test("special event helpers can deterministically choose grossauftrag bonus euros", () => {
+  assert.deepEqual(
+    specialEvents.pickBigOrderCurrencyVariant(
+      {
+        baseCurrencyCents: 10,
+        bonusEuroChance: 0.3,
+        bonusCurrencyCents: 100,
+        bonusRenderScale: 2,
+        bonusBugSpawnChance: 0.5,
+      },
+      0.2
+    ),
+    {
+      variant: "bonus-euro",
+      isBonus: true,
+      currencyCents: 100,
+      renderScale: 2,
+      spawnBugOnCollect: { chance: 0.5, telegraph: true },
+    }
+  );
+
+  assert.deepEqual(
+    specialEvents.pickBigOrderCurrencyVariant(
+      {
+        baseCurrencyCents: 10,
+        bonusEuroChance: 0.3,
+        bonusCurrencyCents: 100,
+        bonusRenderScale: 2,
+        bonusBugSpawnChance: 0.5,
+      },
+      0.8
+    ),
+    {
+      variant: "standard-euro",
+      isBonus: false,
+      currencyCents: 10,
+      renderScale: 1,
+      spawnBugOnCollect: null,
+    }
+  );
 });
 
 test("generator helpers roll back failed optional chunk features without leaving partial state", () => {

@@ -255,6 +255,11 @@ const specialEventConfig = {
     visibleExtraBugChance: 0.2,
     visibleBugSpawnIntervalMin: 1100,
     visibleBugSpawnIntervalMax: 1800,
+    baseCurrencyCents: GEM_VALUE_CENTS,
+    bonusEuroChance: 0.3,
+    bonusCurrencyCents: 100,
+    bonusRenderScale: 2,
+    bonusBugSpawnChance: 0.5,
   },
 };
 
@@ -404,7 +409,7 @@ function canPersistHighScore() {
   return !debugConfig.enabled;
 }
 
-const { SPECIAL_EVENT_PHASE } = globalThis.RedDuneSpecialEvents;
+const { SPECIAL_EVENT_PHASE, pickBigOrderCurrencyVariant } = globalThis.RedDuneSpecialEvents;
 
 function pickWeightedSpecialEventType(eventTypes) {
   const openBugCount = getOutstandingBugTotal();
@@ -892,7 +897,17 @@ function spawnBigOrderGem() {
       return;
     }
 
-    addGemOnPlatform(platform, true);
+    const variant = pickBigOrderCurrencyVariant(specialEventConfig.bigOrder, Math.random());
+    addPickupOnPlatform(platform, PICKUP_TYPE.CURRENCY, {
+      telegraph: true,
+      bypassSpawnGate: true,
+      randomizeX: true,
+      sourceEvent: "big-order",
+      pickupVariant: variant.variant,
+      currencyCents: variant.currencyCents,
+      renderScale: variant.renderScale,
+      spawnBugOnCollect: variant.spawnBugOnCollect,
+    });
   }
 }
 
@@ -932,6 +947,61 @@ function spawnVisiblePlatformBug(options = {}) {
  */
 function spawnBigOrderBug() {
   spawnVisiblePlatformBug();
+}
+
+/**
+ * Finds the most plausible supporting platform for a platform pickup.
+ *
+ * @param {{x:number, y:number, r:number}} pickup - Collected pickup.
+ * @returns {{x:number, y:number, w:number, h:number, kind:string}|null} Supporting platform or null when none fits.
+ */
+function getPickupSupportPlatform(pickup) {
+  const expectedPlatformY = pickup.y + 32;
+  const candidates = level.platforms.filter((platform) => {
+    if (pickup.x + pickup.r < platform.x || pickup.x - pickup.r > platform.x + platform.w) {
+      return false;
+    }
+
+    return Math.abs(platform.y - expectedPlatformY) <= 36;
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((left, right) => Math.abs(left.y - expectedPlatformY) - Math.abs(right.y - expectedPlatformY));
+  return candidates[0];
+}
+
+/**
+ * Spawns a telegraphed walking bug from the position of a collected pickup.
+ *
+ * @param {{x:number, y:number, r:number}} pickup - Collected pickup.
+ * @returns {boolean} True when the bug spawn was added.
+ */
+function spawnTelegraphedBugFromPickup(pickup) {
+  const platform = getPickupSupportPlatform(pickup);
+  if (!platform) {
+    return false;
+  }
+
+  const patrolMargin = 18;
+  const minX = platform.x + patrolMargin;
+  const maxX = platform.x + platform.w - 46 - patrolMargin;
+  if (maxX <= minX) {
+    return false;
+  }
+
+  const bugX = clamp(pickup.x - 23, minX, maxX);
+  const speed = (Math.random() > 0.5 ? 1 : -1) * randomBetween(0.8, 1.5);
+  level.bugs.push(
+    createBug(bugX, platform.y - 38, minX, maxX, speed, {
+      telegraph: true,
+      markerX: pickup.x,
+      markerY: pickup.y,
+    })
+  );
+  return true;
 }
 
 /**
@@ -1517,6 +1587,14 @@ function applyPickupEffect(type, pickup) {
         const bugEffect = createHitEffect(pickup.x, pickup.y - 10, "🐞");
         spawnHudEmoji(bugEffect.x, bugEffect.y, bugEffect.emoji, "bugsOpen");
       }
+    },
+    onCurrencyCollected({ spawnBugOnCollect }) {
+      const spawnChance = Number(spawnBugOnCollect?.chance);
+      if (!Number.isFinite(spawnChance) || Math.random() >= spawnChance) {
+        return;
+      }
+
+      spawnTelegraphedBugFromPickup(pickup);
     },
     triggerEvent(typeId) {
       triggerDebugEvent(typeId ?? null);
@@ -2206,11 +2284,15 @@ function createPickup(type, x, y, options = false) {
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
  * @returns {number|null} Safe x-position or null when none exists.
  */
-function getSafePickupX(type, platform) {
+function getSafePickupX(type, platform, options = {}) {
   const definition = getPickupDefinition(type);
   if (!definition) {
     return null;
   }
+  const {
+    preferredX = platform.x + platform.w / 2,
+    randomize = false,
+  } = options;
 
   const blockedIntervals = level.hazards
     .filter((hazard) => isHazardOnPickupLane(hazard, platform))
@@ -2225,8 +2307,13 @@ function getSafePickupX(type, platform) {
     return null;
   }
 
+  if (randomize) {
+    const zone = safeZones[randomInt(0, safeZones.length - 1)];
+    return randomBetween(zone.start, zone.end);
+  }
+
   // Pickups prefer visually central positions, but still honor carved-out hazard safe zones.
-  return pickNearestSafeZoneX(safeZones, platform.x + platform.w / 2);
+  return pickNearestSafeZoneX(safeZones, preferredX);
 }
 
 /**
@@ -2236,26 +2323,45 @@ function getSafePickupX(type, platform) {
  * @param {string} [type=PICKUP_TYPE.CURRENCY] - Pickup type id.
  * @param {boolean} [telegraph=false] - Whether the item should fade and scale in before becoming active.
  */
-function addPickupOnPlatform(platform, type = PICKUP_TYPE.CURRENCY, telegraph = false) {
+function addPickupOnPlatform(platform, type = PICKUP_TYPE.CURRENCY, options = false) {
+  const normalizedOptions =
+    typeof options === "boolean"
+      ? { telegraph: options }
+      : { ...(options ?? {}) };
+  const {
+    telegraph = false,
+    bypassSpawnGate = false,
+    randomizeX = false,
+    preferredX = platform.x + platform.w / 2,
+    ...pickupMetadata
+  } = normalizedOptions;
+
   if (!pickupSystem.canSpawnOnPlatform(type, platform)) {
-    return;
+    return false;
   }
 
-  if (!pickupSystem.shouldSpawnOnPlatform(type, { shouldSpawnIncomeSource })) {
-    return;
+  if (!bypassSpawnGate && !pickupSystem.shouldSpawnOnPlatform(type, { shouldSpawnIncomeSource })) {
+    return false;
   }
 
-  const pickupX = getSafePickupX(type, platform);
+  const pickupX = getSafePickupX(type, platform, {
+    preferredX,
+    randomize: randomizeX,
+  });
   if (pickupX === null) {
-    return;
+    return false;
   }
 
-  const pickup = createPickup(type, pickupX, platform.y - 32, telegraph);
+  const pickup = createPickup(type, pickupX, platform.y - 32, {
+    telegraph,
+    ...pickupMetadata,
+  });
   if (!pickup) {
-    return;
+    return false;
   }
 
   level.pickups.push(pickup);
+  return true;
 }
 
 /**
@@ -2264,9 +2370,16 @@ function addPickupOnPlatform(platform, type = PICKUP_TYPE.CURRENCY, telegraph = 
  * @param {{x:number, y:number, w:number, h:number}} platform - Platform to decorate.
  * @param {boolean} [telegraph=false] - Whether the pickup should fade and scale in before becoming active.
  */
-function addGemOnPlatform(platform, telegraph = false) {
+function addGemOnPlatform(platform, options = false) {
+  const normalizedOptions =
+    typeof options === "boolean"
+      ? { telegraph: options }
+      : { ...(options ?? {}) };
   const pickupType = resolvePlatformPickupType(PICKUP_TYPE.CURRENCY, platform);
-  addPickupOnPlatform(platform, pickupType, telegraph);
+  addPickupOnPlatform(platform, pickupType, {
+    randomizeX: specialEventSystem.isActive("big-order"),
+    ...normalizedOptions,
+  });
 }
 
 /**
@@ -3134,21 +3247,23 @@ function drawPickup(pickup, time) {
     return;
   }
 
-  const renderModel = {
+  const renderModel = pickupSystem.getRenderModel(pickup.type, pickup) ?? {
     glyph: definition.render?.glyph ?? definition.emoji ?? "?",
     fillStyle: definition.render?.fillStyle,
     strokeStyle: definition.render?.strokeStyle,
     lineWidth: definition.render?.lineWidth,
     font: definition.render?.font,
+    scale: 1,
   };
   const x = pickup.x - cameraX;
+  const renderScale = renderModel.scale ?? 1;
 
   if (pickup.spawnTimer > 0) {
     const preview = getSpawnPreviewState(pickup.spawnTimer, pickup.spawnDuration, time);
     ctx.save();
     ctx.globalAlpha = preview.alpha;
     ctx.translate(x, pickup.y);
-    ctx.scale(preview.scale, preview.scale);
+    ctx.scale(preview.scale * renderScale, preview.scale * renderScale);
     drawPickupGlyph(renderModel, 0, 0);
     ctx.restore();
     return;
@@ -3160,7 +3275,11 @@ function drawPickup(pickup, time) {
   const bob = Math.sin(time / bobTimeDivisor + pickup.x * worldPhaseScale) * bobAmplitude;
   const y = pickup.y + bob;
 
-  drawPickupGlyph(renderModel, x, y);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(renderScale, renderScale);
+  drawPickupGlyph(renderModel, 0, 0);
+  ctx.restore();
 }
 
 /**

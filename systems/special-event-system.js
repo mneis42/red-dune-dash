@@ -15,6 +15,36 @@
     bonusBugChance: 0,
   });
 
+  function clampChance(value, fallback = 0) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return fallback;
+    }
+
+    return Math.max(0, Math.min(1, numericValue));
+  }
+
+  function pickBigOrderCurrencyVariant(config, randomValue = Math.random()) {
+    const bonusEuroChance = clampChance(config?.bonusEuroChance, 0);
+    const baseCurrencyCents = Number.isFinite(config?.baseCurrencyCents) ? config.baseCurrencyCents : 10;
+    const bonusCurrencyCents = Number.isFinite(config?.bonusCurrencyCents) ? config.bonusCurrencyCents : 100;
+    const bonusRenderScale =
+      Number.isFinite(config?.bonusRenderScale) && config.bonusRenderScale > 0
+        ? config.bonusRenderScale
+        : 2;
+    const bugSpawnChance = clampChance(config?.bonusBugSpawnChance, 0.5);
+    const normalizedRandomValue = Math.max(0, Math.min(0.999999999, Number(randomValue) || 0));
+    const isBonus = normalizedRandomValue < bonusEuroChance;
+
+    return {
+      variant: isBonus ? "bonus-euro" : "standard-euro",
+      isBonus,
+      currencyCents: isBonus ? bonusCurrencyCents : baseCurrencyCents,
+      renderScale: isBonus ? bonusRenderScale : 1,
+      spawnBugOnCollect: isBonus ? { chance: bugSpawnChance, telegraph: true } : null,
+    };
+  }
+
   function pickWeightedEventType(eventTypes, getWeight, randomValue = Math.random()) {
     if (!Array.isArray(eventTypes) || eventTypes.length === 0) {
       return null;
@@ -400,6 +430,7 @@
   globalScope.RedDuneSpecialEvents = Object.freeze({
     SPECIAL_EVENT_PHASE,
     baseChunkGenerationConfig,
+    pickBigOrderCurrencyVariant,
     pickWeightedEventType,
     createSpecialEventDefinitions,
     createSpecialEventSystem,
