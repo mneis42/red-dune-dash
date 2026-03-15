@@ -137,6 +137,26 @@ Wichtig ist aber:
 - zentrale Fachlogik liegt nicht mehr nur dort
 - neue Features koennen gezielt in benennbaren Systemen landen
 
+## Zentrale Referenzdokumente
+
+Die wichtigsten fachlichen und architektonischen Entscheidungen sind aktuell in folgenden Dokumenten festgehalten:
+
+- `docs/run-model.md`
+- `docs/bug-lifecycle.md`
+- `docs/event-model.md`
+- `docs/pickup-model.md`
+- `docs/placement-rules.md`
+- `docs/generator-rules.md`
+- `docs/respawn-fairness.md`
+- `docs/simulation-core.md`
+- `docs/debug-tools.md`
+- `docs/asset-manifest.md`
+
+Damit gilt:
+
+- `architecture.md` beschreibt vor allem den Systemschnitt
+- die einzelnen Fachdokumente beschreiben Regeln, Invarianten und Erweiterungspunkte pro Themenbereich
+
 ## Systemgrenzen fuer kommende Arbeiten
 
 Die naechsten groesseren Kandidaten fuer weitere Schnitte sind:

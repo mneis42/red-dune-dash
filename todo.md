@@ -42,7 +42,7 @@ Statusuebersicht. Die Detailbeschreibungen zu jedem Punkt folgen direkt darunter
 - [x] P2 - Testbare Simulationskern-Logik einziehen
 - [x] P2 - Item-/Pickup-System verallgemeinern statt nur "Gem = Geld" zu kennen
 - [x] P3 - Debug-, Balancing- und Content-Werkzeuge ausbauen
-- [ ] P3 - Architektur- und Regelentscheidungen kurz dokumentieren
+- [x] P3 - Architektur- und Regelentscheidungen kurz dokumentieren
 
 ### P0 - Weltgenerator stabilisieren und fruehe `return`-Pfadfehler beseitigen
 
