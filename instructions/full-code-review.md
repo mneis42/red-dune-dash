@@ -55,6 +55,7 @@ This file must be understandable on its own and must serve as the actionable bac
 
 ### Requirements for `todo.md`
 
+- Record planning model metadata for the review backlog. If the runtime exposes the exact model name, write that exact name. If not, record a clear fallback such as `unknown-model` or `model-name-not-exposed-by-runtime`.
 - Use clear TODO items with explicit priorities.
 - Explain each issue well enough that it is still understandable later.
 - Make the backlog incremental so items can be solved one by one.
@@ -75,6 +76,7 @@ Use these priorities consistently:
 
 Each TODO should contain:
 
+- execution model metadata for the agent or model that completed the TODO. If the exact model name is unavailable, record a clear fallback instead of guessing.
 - priority
 - concise title
 - problem description
@@ -123,6 +125,7 @@ Decision rule:
 - Evaluate the project against the full review scope listed above.
 - Produce a fresh root-level `todo.md` containing the complete prioritized result.
 - Record the current baseline status of relevant checks in `todo.md`, such as tests, build, linting, type checks, and pipeline health, including what passes, what fails, what is missing, and what could not be run.
+- Record which model produced the initial review backlog. If the exact model name is not exposed by the runtime, record an explicit fallback rather than inventing a more specific name.
 
 ### 2. Create a local commit for the review backlog
 
@@ -146,6 +149,7 @@ Rules:
 - Implement the fix completely enough that the item can genuinely be considered done.
 - Verify the change with appropriate checks before committing.
 - Update `todo.md` so the current status remains accurate and understandable.
+- Record which model executed each completed TODO. If the runtime does not expose the exact model name, use the same explicit fallback convention as for the planning metadata.
 - If new problems are discovered while implementing a TODO, add them to `todo.md` with the correct priority instead of silently folding them into an unrelated item.
 - Reprioritize the remaining TODOs when newly discovered issues are more urgent than the current backlog order.
 - Create a new local git commit after finishing each TODO.
@@ -213,6 +217,7 @@ If a TODO cannot be safely completed or verified, document the blocker clearly i
 - Be skeptical of hidden regressions.
 - Prefer root-cause fixes over cosmetic patches.
 - Keep `todo.md` readable for humans who will continue the work later.
+- Record model identity honestly. Never invent or guess a more specific model name than the runtime actually exposes.
 - Treat architecture, docs, pipelines, tests, and game consistency as first-class review targets, not side notes.
 - Ignore `reviews/` during the review itself even if previous review files exist there.
 - During the full-code-review workflow, do not stop after the review, after creating `todo.md`, after individual TODOs, or after intermediate commits just to ask for confirmation.
