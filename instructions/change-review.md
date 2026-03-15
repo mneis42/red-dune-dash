@@ -1,0 +1,112 @@
+# Change Review Instructions
+
+This file is the canonical instruction set for lightweight, change-scoped code reviews in this repository.
+It is intentionally tool-agnostic and applies equally to Codex, Copilot, and comparable coding agents.
+
+Use these instructions when reviewing uncommitted changes, staged changes, a commit range, a small feature branch, or a pull request.
+Do not use this file for a complete review of the whole repository. For that, use `instructions/full-code-review.md`.
+If the user gives more specific instructions for the current task, follow the user's instructions first and apply this file only where it does not conflict.
+
+## Goal
+
+Review the proposed change set and its immediate impact with a high signal-to-noise ratio.
+
+The purpose is to catch bugs, regressions, unsafe assumptions, missing verification, and change-specific maintainability issues without turning the task into a full repository audit.
+
+## Required Review Scope
+
+Review the changed files first, then expand only as far as needed to understand behavior, contracts, side effects, and regression risk.
+
+The review should usually cover:
+
+1. Correctness of the changed behavior
+2. Regression risk in adjacent code paths
+3. Test coverage and test relevance for the change
+4. Documentation accuracy when behavior or workflow changed
+5. Build, CI, deployment, or runtime safety when touched by the change
+6. Game consistency, UX, and balancing only if the change affects them
+
+## What To Inspect
+
+- the diff itself
+- nearby code needed to understand the diff correctly
+- tests that should validate the change
+- docs or instruction files that the change makes outdated
+- workflow files when automation or release behavior is affected
+
+## What Not To Do
+
+- Do not turn a small review into a full-project audit unless the change clearly has repository-wide blast radius.
+- Do not create `todo.md`.
+- Do not make review-backlog commits.
+- Do not stop on style-only nits unless they create a real maintenance or correctness risk.
+- Do not flood the output with low-value comments.
+
+## Output Expectations
+
+Default to a review-only response unless the user explicitly asks for fixes.
+
+The review output should:
+
+- present findings first, ordered by severity
+- prioritize bugs, regressions, unsafe edge cases, broken assumptions, and missing tests
+- include file references when helpful
+- explain why each finding matters
+- suggest the expected direction of the fix when useful
+- clearly distinguish confirmed issues from open questions or suspicions
+
+If no meaningful findings are discovered, say so explicitly and mention any residual risk or testing gap.
+
+## Recommended Severity Model
+
+Use a lightweight severity model:
+
+- `High`: likely bug, regression, broken contract, unsafe deployment/runtime behavior, or missing critical verification
+- `Medium`: important maintainability, extensibility, or test gap that could plausibly cause defects soon
+- `Low`: clarity, documentation, or minor robustness issue worth addressing but not urgent
+
+## Review Workflow
+
+### 1. Identify the change boundary
+
+Understand what is being reviewed:
+
+- uncommitted changes
+- staged changes
+- a commit or commit range
+- a pull request
+- a user-specified subset of files
+
+### 2. Read the diff and gather the minimum surrounding context
+
+Inspect the changed lines first.
+Open additional files only when needed to confirm behavior, contracts, or side effects.
+
+### 3. Check impact areas
+
+Look for:
+
+- behavior changes without matching test updates
+- changed contracts without caller or consumer updates
+- stale docs or instructions
+- CI, deployment, or versioning changes that are incomplete
+- gameplay or UX regressions in the touched area
+
+### 4. Deliver concise findings
+
+Prefer a short list of high-signal findings over exhaustive commentary.
+If many issues exist, lead with the most severe ones and compress the rest.
+
+### 5. Only switch to implementation if requested
+
+If the user asks for a review, stay in review mode.
+Only edit code or files when the user explicitly asks for fixes or for the review to be applied.
+
+## Behavior Expectations For Agents
+
+- Be skeptical of regressions hidden behind small diffs.
+- Prefer root-cause observations over style commentary.
+- Keep the review concise, direct, and actionable.
+- Expand the scope only when the changed code makes that necessary.
+- Treat missing tests as a first-class finding when the change meaningfully alters behavior.
+- Respect the repository language conventions: German for player-facing UI, English for code and technical documentation.
