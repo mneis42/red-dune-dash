@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 
 require("../systems/bug-lifecycle-system.js");
+require("../systems/debug-tools.js");
 require("../systems/placement-system.js");
 require("../systems/pickup-system.js");
 require("../systems/simulation-core.js");
@@ -8,6 +9,7 @@ require("../systems/special-event-system.js");
 
 const simulationCore = globalThis.RedDuneSimulationCore;
 const bugLifecycle = globalThis.RedDuneBugLifecycle;
+const debugTools = globalThis.RedDuneDebugTools;
 const placement = globalThis.RedDunePlacement;
 const pickups = globalThis.RedDunePickups;
 const specialEvents = globalThis.RedDuneSpecialEvents;
@@ -113,6 +115,25 @@ test("placement system computes stable safe zones and nearest safe positions", (
   assert.deepEqual(safeZones[0], { start: 128, end: 196 });
   assert.deepEqual(safeZones[1], { start: 284, end: 372 });
   assert.equal(placementSystem.pickNearestSafeZoneX(safeZones, 240), 196);
+});
+
+test("debug tools parse query overrides and scale balancing helpers deterministically", () => {
+  const config = debugTools.createDebugConfig(
+    "?debugEvent=big-order&debugPickup=score-boost&debugPickupSpawnMultiplier=2.5&debugIncomeSpawnMultiplier=0.4&debugBacklog=7&debugLives=5"
+  );
+
+  assert.equal(config.enabled, true);
+  assert.equal(config.showPanel, true);
+  assert.equal(config.specialEvent.forceType, "big-order");
+  assert.equal(config.pickups.forcedType, "score-boost");
+  assert.equal(config.pickups.spawnMultiplier, 2.5);
+  assert.equal(config.spawns.incomeMultiplier, 0.4);
+  assert.equal(config.initialRun.backlog, 7);
+  assert.equal(config.initialRun.lives, 5);
+  assert.equal(debugTools.scaleChance(0.25, 2), 0.4375);
+  assert.equal(debugTools.scaleDelay(1200, 2, 300), 600);
+  assert.equal(debugTools.getSpawnIterations(2.4, 0.2), 3);
+  assert.equal(debugTools.getSpawnIterations(0.4, 0.8), 0);
 });
 
 test("pickup system exposes typed spawn rules and preserves pickup metadata", () => {

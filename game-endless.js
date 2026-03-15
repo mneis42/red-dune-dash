@@ -19,6 +19,7 @@ let updateButtonRect = null;
 let directionalInputSequence = 0;
 let updateReady = false;
 let isRefreshingForUpdate = false;
+let debugPanelVisible = false;
 const CLOUD_PARALLAX = 0.18;
 const CLOUD_RESPAWN_MIN_GAP = 140;
 const CLOUD_RESPAWN_MAX_GAP = 260;
@@ -253,11 +254,13 @@ const specialEventConfig = {
   },
 };
 
-const debugSpecialEventDelayMs = null; // Set to a number to force a specific delay for testing, or null for random scheduling.
-const debugSpecialEventType = null; // Set to an event type id to force a specific event for testing, or null for random selection.
 const placementSystem = globalThis.RedDunePlacement.createPlacementSystem();
 const placementSafetyConfig = placementSystem.config;
 const simulationCore = globalThis.RedDuneSimulationCore;
+const debugTools = globalThis.RedDuneDebugTools;
+const debugConfig = debugTools.createDebugConfig(window.location.search);
+const debugSpecialEventDelayMs = debugConfig.specialEvent.delayMs;
+const debugSpecialEventType = debugConfig.specialEvent.forceType;
 const { PICKUP_TYPE } = globalThis.RedDunePickups;
 const pickupDefinitions = globalThis.RedDunePickups.createPickupDefinitions({
   gemValueCents: GEM_VALUE_CENTS,
@@ -265,6 +268,7 @@ const pickupDefinitions = globalThis.RedDunePickups.createPickupDefinitions({
   spawnTelegraphDuration: specialEventConfig.spawnTelegraphDuration,
 });
 const pickupSystem = globalThis.RedDunePickups.createPickupSystem(pickupDefinitions);
+debugPanelVisible = debugConfig.showPanel;
 
 const keys = {
   left: false,
@@ -309,6 +313,10 @@ function loadHighScore() {
  * @param {number} score - Candidate score to store.
  */
 function saveHighScore(score) {
+  if (debugConfig.enabled) {
+    return;
+  }
+
   highScore = Math.max(highScore, score);
   try {
     window.localStorage.setItem(STORAGE_KEY, String(highScore));
@@ -371,6 +379,15 @@ function clamp(value, min, max) {
  */
 function lerp(start, end, alpha) {
   return start + (end - start) * alpha;
+}
+
+/**
+ * Returns whether the current run is allowed to persist competitive progress.
+ *
+ * @returns {boolean} True when high scores may be saved.
+ */
+function canPersistHighScore() {
+  return !debugConfig.enabled;
 }
 
 const { SPECIAL_EVENT_PHASE } = globalThis.RedDuneSpecialEvents;
@@ -484,6 +501,184 @@ function completeSpecialEvent() {
 }
 
 /**
+ * Returns whether debug tooling is enabled for this browser session.
+ *
+ * @returns {boolean} True when debug overrides or the debug panel are active.
+ */
+function isDebugModeEnabled() {
+  return debugConfig.enabled;
+}
+
+/**
+ * Formats a multiplier for the in-canvas debug panel.
+ *
+ * @param {number} value - Raw multiplier value.
+ * @returns {string} Human-readable multiplier string.
+ */
+function formatDebugMultiplier(value) {
+  return `x${value.toFixed(2)}`;
+}
+
+/**
+ * Resolves a valid debug pickup type if one was requested via the query string.
+ *
+ * @returns {string|null} Forced pickup type or null when no valid override is active.
+ */
+function getConfiguredDebugPickupType() {
+  const forcedType = debugConfig.pickups.forcedType;
+  return getPickupDefinition(forcedType) ? forcedType : null;
+}
+
+/**
+ * Returns the platform pickup type to use for automatic currency spawns while honoring debug overrides.
+ *
+ * @param {string} defaultType - Normal pickup type that would have been spawned.
+ * @param {{x:number, y:number, w:number, h:number}} platform - Target platform.
+ * @returns {string} Effective pickup type for this spawn attempt.
+ */
+function resolvePlatformPickupType(defaultType, platform) {
+  const forcedType = getConfiguredDebugPickupType();
+  if (!forcedType) {
+    return defaultType;
+  }
+
+  return pickupSystem.canSpawnOnPlatform(forcedType, platform) ? forcedType : defaultType;
+}
+
+/**
+ * Scales a spawn chance by the active debug multiplier.
+ *
+ * @param {number} baseChance - Baseline probability.
+ * @param {number} multiplier - Requested debug multiplier.
+ * @returns {number} Adjusted probability in the 0..1 range.
+ */
+function getDebugAdjustedChance(baseChance, multiplier) {
+  return debugTools.scaleChance(baseChance, multiplier);
+}
+
+/**
+ * Rolls whether a pickup-related spawn should happen after debug adjustments.
+ *
+ * @param {number} baseChance - Baseline probability.
+ * @returns {boolean} True when the spawn should happen.
+ */
+function shouldRollPickupSpawn(baseChance) {
+  return Math.random() < getDebugAdjustedChance(baseChance, debugConfig.pickups.spawnMultiplier);
+}
+
+/**
+ * Rolls whether a bug-related spawn should happen after debug adjustments.
+ *
+ * @param {number} baseChance - Baseline probability.
+ * @returns {boolean} True when the spawn should happen.
+ */
+function shouldRollBugSpawn(baseChance) {
+  return Math.random() < getDebugAdjustedChance(baseChance, debugConfig.spawns.bugMultiplier);
+}
+
+/**
+ * Scales a delay by the active rocket debug multiplier.
+ *
+ * @param {number} delayMs - Baseline delay.
+ * @param {number} [multiplier=1] - Additional multiplier contributed by gameplay systems.
+ * @param {number} [minDelay=0] - Minimum resulting delay.
+ * @returns {number} Adjusted delay in milliseconds.
+ */
+function getDebugAdjustedDelay(delayMs, multiplier = 1, minDelay = 0) {
+  return debugTools.scaleDelay(delayMs, multiplier * debugConfig.spawns.rocketMultiplier, minDelay);
+}
+
+/**
+ * Preloads backlog records into the lifecycle ledger for debugging balancing scenarios.
+ *
+ * @param {number} [count=debugConfig.initialRun.backlog] - Number of backlog records to create.
+ */
+function seedDebugBacklog(count = debugConfig.initialRun.backlog) {
+  for (let i = 0; i < count; i += 1) {
+    registerBugLifecycle(BUG_STATUS.BACKLOG);
+  }
+}
+
+/**
+ * Applies debug resource, score and backlog bootstrap values to a fresh run.
+ */
+function applyDebugRunBootstrap() {
+  player.lives = debugConfig.initialRun.lives;
+  runState.currencyCents = debugConfig.initialRun.currencyCents;
+  runState.actionScore = debugConfig.initialRun.actionScore;
+  runState.progressScore = debugConfig.initialRun.progressScore;
+  seedDebugBacklog();
+}
+
+/**
+ * Adds one extra backlog record during a debug run.
+ */
+function addDebugBacklogRecord() {
+  registerBugLifecycle(BUG_STATUS.BACKLOG);
+  statusMessage = "Debug-Backlog +1";
+}
+
+/**
+ * Reactivates a small number of historical bug records for debug and future backlog pickups.
+ *
+ * @param {number} [amount=1] - Maximum number of records to reactivate.
+ * @returns {number} Number of lifecycle records changed to reactivated.
+ */
+function reactivateHistoricalBugs(amount = 1) {
+  const candidates = [...bugLifecycle.records.values()].filter((record) => {
+    return record.status === BUG_STATUS.BACKLOG || record.status === BUG_STATUS.MISSED;
+  });
+  const reactivatedCount = Math.min(amount, candidates.length);
+
+  for (let i = 0; i < reactivatedCount; i += 1) {
+    setBugLifecycleStatus(candidates[i].id, BUG_STATUS.REACTIVATED);
+  }
+
+  return reactivatedCount;
+}
+
+/**
+ * Triggers the next debug special-event step and optionally requires a specific configured type.
+ *
+ * @param {string|null} [requestedType=null] - Requested event type from a pickup or debug action.
+ * @returns {boolean} True when the trigger was accepted.
+ */
+function triggerDebugEvent(requestedType = null) {
+  if (requestedType && !specialEventSystem.getDefinition(requestedType)) {
+    statusMessage = `Unbekannter Debug-Event: ${requestedType}`;
+    return false;
+  }
+
+  if (
+    requestedType &&
+    specialEventState.phase === SPECIAL_EVENT_PHASE.IDLE &&
+    debugConfig.specialEvent.forceType !== requestedType
+  ) {
+    statusMessage = `Setze ?debugEvent=${requestedType} fuer diesen Trigger`;
+    return false;
+  }
+
+  stepDebugSpecialEvent();
+  return true;
+}
+
+/**
+ * Advances the special-event state machine manually for debugging.
+ */
+function stepDebugSpecialEvent() {
+  if (specialEventState.phase === SPECIAL_EVENT_PHASE.IDLE) {
+    startSpecialEventAnnouncement();
+    return;
+  }
+  if (specialEventState.phase === SPECIAL_EVENT_PHASE.ANNOUNCE) {
+    activateSpecialEvent();
+    return;
+  }
+
+  completeSpecialEvent();
+}
+
+/**
  * Returns the number of currently falling bugs.
  *
  * @returns {number} Active falling bug count.
@@ -519,16 +714,19 @@ function getBugWaveSpawnPlatform() {
  * Spawns one falling bug for the bug-wave special event when capacity allows it.
  */
 function spawnBugWaveBug() {
-  if (getFallingBugCount() >= specialEventConfig.bugWaveMaxFalling) {
-    return;
-  }
+  const spawnAttempts = debugTools.getSpawnIterations(debugConfig.spawns.bugMultiplier);
+  for (let attempt = 0; attempt < spawnAttempts; attempt += 1) {
+    if (getFallingBugCount() >= specialEventConfig.bugWaveMaxFalling) {
+      return;
+    }
 
-  const platform = getBugWaveSpawnPlatform();
-  if (!platform) {
-    return;
-  }
+    const platform = getBugWaveSpawnPlatform();
+    if (!platform) {
+      return;
+    }
 
-  level.bugs.push(createFallingBug(platform));
+    level.bugs.push(createFallingBug(platform));
+  }
 }
 
 /**
@@ -578,55 +776,85 @@ function getVisibleBugSpawnPlatform() {
 }
 
 /**
+ * Picks a visible platform that can host a debug-spawned pickup.
+ *
+ * @param {string} type - Pickup type id.
+ * @returns {{x:number, y:number, w:number, h:number, kind:string}|null} Best matching platform or null when none fits.
+ */
+function getVisibleDebugPickupPlatform(type) {
+  const candidates = level.platforms.filter((platform) => {
+    if (!pickupSystem.canSpawnOnPlatform(type, platform)) {
+      return false;
+    }
+    if (platform.x + platform.w < cameraX - 20) {
+      return false;
+    }
+    return platform.x <= cameraX + canvas.width + 20;
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((left, right) => {
+    const leftDistance = Math.abs(left.x + left.w / 2 - (player.x + player.w / 2));
+    const rightDistance = Math.abs(right.x + right.w / 2 - (player.x + player.w / 2));
+    return leftDistance - rightDistance;
+  });
+  return candidates[0];
+}
+
+/**
  * Returns the current rocket spawn interval, with bug-wave countdowns and active bug-waves doubling the rate.
  *
  * @returns {number} Milliseconds until the next rocket spawn.
  */
 function getNextRocketSpawnDelay() {
   const baseDelay = framesToMs(randomInt(850, 1450));
-  const rocketSpawnMultiplier = getSpecialEventRocketSpawnMultiplier();
-  if (rocketSpawnMultiplier <= 1) {
-    return baseDelay;
-  }
-
-  return Math.max(framesToMs(425), Math.round(baseDelay / rocketSpawnMultiplier));
+  return getDebugAdjustedDelay(baseDelay, getSpecialEventRocketSpawnMultiplier(), framesToMs(425));
 }
 
 /**
  * Spawns extra visible gems during the Großauftrag event, including on already-traversed screen space.
  */
 function spawnBigOrderGem() {
-  const platform = getVisibleBigOrderPlatform();
-  if (!platform) {
-    return;
-  }
+  const spawnAttempts = debugTools.getSpawnIterations(debugConfig.pickups.spawnMultiplier);
+  for (let attempt = 0; attempt < spawnAttempts; attempt += 1) {
+    const platform = getVisibleBigOrderPlatform();
+    if (!platform) {
+      return;
+    }
 
-  addGemOnPlatform(platform, true);
+    addGemOnPlatform(platform, true);
+  }
 }
 
 /**
  * Spawns an extra visible walking bug on a currently visible platform.
  */
 function spawnVisiblePlatformBug() {
-  const platform = getVisibleBugSpawnPlatform();
-  if (!platform) {
-    return;
-  }
+  const spawnAttempts = debugTools.getSpawnIterations(debugConfig.spawns.bugMultiplier);
+  for (let attempt = 0; attempt < spawnAttempts; attempt += 1) {
+    const platform = getVisibleBugSpawnPlatform();
+    if (!platform) {
+      return;
+    }
 
-  const patrolMargin = 18;
-  const minX = platform.x + patrolMargin;
-  const maxX = platform.x + platform.w - 46 - patrolMargin;
-  if (maxX <= minX) {
-    return;
-  }
+    const patrolMargin = 18;
+    const minX = platform.x + patrolMargin;
+    const maxX = platform.x + platform.w - 46 - patrolMargin;
+    if (maxX <= minX) {
+      return;
+    }
 
-  const bugX = randomBetween(minX, maxX);
-  const speed = (Math.random() > 0.5 ? 1 : -1) * randomBetween(0.8, 1.5);
-  level.bugs.push(
-    createBug(bugX, platform.y - 38, platform.x + patrolMargin, platform.x + platform.w - patrolMargin, speed, {
-      telegraph: true,
-    })
-  );
+    const bugX = randomBetween(minX, maxX);
+    const speed = (Math.random() > 0.5 ? 1 : -1) * randomBetween(0.8, 1.5);
+    level.bugs.push(
+      createBug(bugX, platform.y - 38, platform.x + patrolMargin, platform.x + platform.w - patrolMargin, speed, {
+        telegraph: true,
+      })
+    );
+  }
 }
 
 /**
@@ -789,6 +1017,10 @@ function getTotalScore() {
  * Updates the persisted high score when the current run beats it.
  */
 function syncHighScore() {
+  if (!canPersistHighScore()) {
+    return;
+  }
+
   const total = getTotalScore();
   if (total > highScore) {
     saveHighScore(total);
@@ -1207,6 +1439,16 @@ function applyPickupEffect(type, pickup) {
     setStatusMessage(message) {
       statusMessage = message;
     },
+    onBacklogRevival({ amount }) {
+      const reactivatedCount = reactivateHistoricalBugs(amount);
+      if (reactivatedCount > 0) {
+        const bugEffect = createHitEffect(pickup.x, pickup.y - 10, "🐞");
+        spawnHudEmoji(bugEffect.x, bugEffect.y, bugEffect.emoji, "bugsOpen");
+      }
+    },
+    triggerEvent(typeId) {
+      triggerDebugEvent(typeId ?? null);
+    },
   });
 }
 
@@ -1303,7 +1545,7 @@ function getIncomeSourceSpawnMultiplier() {
  */
 function shouldSpawnIncomeSource(baseChance = 1) {
   return simulationCore.shouldSpawnIncomeSource({
-    baseChance,
+    baseChance: getDebugAdjustedChance(baseChance, debugConfig.spawns.incomeMultiplier),
     outstandingBugs: getOutstandingBugTotal(),
     randomValue: Math.random(),
   });
@@ -1428,7 +1670,7 @@ function getHudStats() {
         `Fortschrittspunkte: ${runModel.score.progress}`,
         "Fortschrittspunkte sind monoton und gehen durch spaetere Balance-Schwankungen nicht verloren.",
         "Balance lebt von Einnahmen und wenigen offenen Bugs.",
-        `Highscore: ${highScore}`,
+        canPersistHighScore() ? `Highscore: ${highScore}` : "Debug-Run speichert keinen Highscore.",
       ],
     },
   ];
@@ -2021,7 +2263,56 @@ function addPickupOnPlatform(platform, type = PICKUP_TYPE.CURRENCY, telegraph = 
  * @param {boolean} [telegraph=false] - Whether the pickup should fade and scale in before becoming active.
  */
 function addGemOnPlatform(platform, telegraph = false) {
-  addPickupOnPlatform(platform, PICKUP_TYPE.CURRENCY, telegraph);
+  const pickupType = resolvePlatformPickupType(PICKUP_TYPE.CURRENCY, platform);
+  addPickupOnPlatform(platform, pickupType, telegraph);
+}
+
+/**
+ * Spawns the configured debug pickup either on a visible platform or directly in front of the tiger.
+ *
+ * @returns {boolean} True when a pickup was spawned.
+ */
+function spawnDebugPickup() {
+  const pickupType = getConfiguredDebugPickupType() ?? PICKUP_TYPE.CURRENCY;
+  const definition = getPickupDefinition(pickupType);
+  if (!definition) {
+    statusMessage = `Debug-Pickup unbekannt: ${pickupType}`;
+    return false;
+  }
+
+  if (definition.platformSpawnable !== false) {
+    const platform = getVisibleDebugPickupPlatform(pickupType);
+    const pickupX = platform ? getSafePickupX(pickupType, platform) : null;
+    if (platform && pickupX !== null) {
+      const pickup = createPickup(pickupType, pickupX, platform.y - 32, {
+        telegraph: true,
+        triggerEventType: debugConfig.specialEvent.forceType,
+      });
+      if (pickup) {
+        level.pickups.push(pickup);
+        statusMessage = `Debug-Pickup gespawnt: ${definition.label}`;
+        return true;
+      }
+    }
+  }
+
+  const pickup = createPickup(
+    pickupType,
+    Math.max(player.x + player.w / 2 + 96, cameraX + 140),
+    Math.max(116, player.y - 72),
+    {
+      telegraph: true,
+      triggerEventType: debugConfig.specialEvent.forceType,
+    }
+  );
+  if (!pickup) {
+    statusMessage = `Debug-Pickup fehlgeschlagen: ${pickupType}`;
+    return false;
+  }
+
+  level.pickups.push(pickup);
+  statusMessage = `Debug-Pickup gespawnt: ${definition.label}`;
+  return true;
 }
 
 /**
@@ -2078,10 +2369,10 @@ function generateChunk() {
     addGroundHazard(ground);
     groundHasHazard = true;
   }
-  if (Math.random() < chunkRules.groundGemChance) {
+  if (shouldRollPickupSpawn(chunkRules.groundGemChance)) {
     addGemOnPlatform(ground);
   }
-  if (Math.random() < chunkRules.groundBugChance) {
+  if (shouldRollBugSpawn(chunkRules.groundBugChance)) {
     addBugOnPlatform(ground);
   }
 
@@ -2124,13 +2415,13 @@ function generateChunk() {
 
       level.platforms.push(plate);
 
-      if (Math.random() < chunkRules.plateGemChance) {
+      if (shouldRollPickupSpawn(chunkRules.plateGemChance)) {
         addGemOnPlatform(plate);
-        if (Math.random() < chunkRules.plateExtraGemChance) {
+        if (shouldRollPickupSpawn(chunkRules.plateExtraGemChance)) {
           addGemOnPlatform(plate);
         }
       }
-      if (Math.random() < chunkRules.plateBugChance) {
+      if (shouldRollBugSpawn(chunkRules.plateBugChance)) {
         addBugOnPlatform(plate);
       }
 
@@ -2167,10 +2458,10 @@ function generateChunk() {
 
       level.platforms.push(bonus);
       addGemOnPlatform(bonus);
-      if (Math.random() < chunkRules.bonusExtraGemChance) {
+      if (shouldRollPickupSpawn(chunkRules.bonusExtraGemChance)) {
         addGemOnPlatform(bonus);
       }
-      if (Math.random() < chunkRules.bonusBugChance) {
+      if (shouldRollBugSpawn(chunkRules.bonusBugChance)) {
         addBugOnPlatform(bonus);
       }
 
@@ -2230,6 +2521,7 @@ function resetPlayer(fullReset = false) {
     runState.actionScore = 0;
     runState.progressScore = 0;
     runState.farthestX = level.spawn.x;
+    applyDebugRunBootstrap();
     player.checkpointX = level.spawn.x;
     player.checkpointY = level.spawn.y;
     gameState = "playing";
@@ -2237,9 +2529,9 @@ function resetPlayer(fullReset = false) {
     activeHudInfo = null;
     cameraX = 0;
     worldTimeMs = 0;
-    rocketSpawnTimer = framesToMs(700 + randomInt(0, 320));
+    rocketSpawnTimer = getDebugAdjustedDelay(framesToMs(700 + randomInt(0, 320)), 1, framesToMs(350));
     resumeCountdownTimer = 0;
-    statusMessage = "Endloslauf gestartet";
+    statusMessage = isDebugModeEnabled() ? "Debug-Run gestartet" : "Endloslauf gestartet";
   }
 
   // A full reset rebuilds the world; a partial reset only restores the latest safe checkpoint.
@@ -3235,6 +3527,50 @@ function drawHud() {
 }
 
 /**
+ * Draws the lightweight in-canvas debug panel used for balancing and content testing.
+ */
+function drawDebugPanel() {
+  if (!isDebugModeEnabled() || !debugPanelVisible) {
+    return;
+  }
+
+  const runModel = getRunModel();
+  const forcedPickupType = debugConfig.pickups.forcedType;
+  const forcedEventType = debugConfig.specialEvent.forceType;
+  const lines = [
+    "DEBUG MODE  F3 panel  F6 event  F7 pickup  F8 backlog",
+    `persist: ${canPersistHighScore() ? "yes" : "no"} | state=${gameState} | pause=${pauseReason ?? "-"}`,
+    `event cfg: type=${forcedEventType ?? "auto"} | delay=${debugConfig.specialEvent.delayMs ?? "random"}ms`,
+    `event now: phase=${specialEventState.phase} | type=${specialEventState.type ?? "-"} | timer=${Math.ceil(specialEventState.timer)}ms`,
+    `spawn x: pickup=${formatDebugMultiplier(debugConfig.pickups.spawnMultiplier)} | income=${formatDebugMultiplier(debugConfig.spawns.incomeMultiplier)}`,
+    `spawn x: bug=${formatDebugMultiplier(debugConfig.spawns.bugMultiplier)} | rocket=${formatDebugMultiplier(debugConfig.spawns.rocketMultiplier)}`,
+    `forced pickup: ${forcedPickupType ?? "auto"} | backlog seed=${debugConfig.initialRun.backlog}`,
+    `start run: money=${debugConfig.initialRun.currencyCents}ct | action=${debugConfig.initialRun.actionScore} | progress=${debugConfig.initialRun.progressScore} | lives=${debugConfig.initialRun.lives}`,
+    `world: platforms=${level.platforms.length} | pickups=${level.pickups.length} | bugs=${level.bugs.filter((bug) => bug.alive).length} | rockets=${level.rockets.length}`,
+    `run: open=${runModel.bugs.openInRun} | backlog=${runModel.bugs.backlog} | money=${formatEuroAmount(runModel.resources.currencyCents)} | score=${runModel.score.total}`,
+    `economy: eur/h=${runModel.resources.euroRatePerHour} | balance=${formatDebugMultiplier(runModel.balanceMultiplier)} | x=${Math.floor(player.x)}`,
+  ];
+
+  ctx.save();
+  ctx.fillStyle = "rgba(10, 14, 22, 0.88)";
+  ctx.strokeStyle = "rgba(255, 227, 122, 0.28)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(16, 58, 616, 220, 18);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.font = "12px Consolas, monospace";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  lines.forEach((line, index) => {
+    ctx.fillStyle = index === 0 ? "#ffe37a" : "#eef3ff";
+    ctx.fillText(line, 30, 72 + index * 18);
+  });
+  ctx.restore();
+}
+
+/**
  * Draws the start and game-over overlay screens.
  */
 function drawOverlay() {
@@ -3332,7 +3668,13 @@ function drawOverlay() {
     ctx.font = "24px Trebuchet MS";
     ctx.fillStyle = "#ffd1aa";
     ctx.fillText(
-      isTouchDevice ? `Highscore: ${highScore}. Tippe für einen neuen Lauf` : `Highscore: ${highScore}. Drücke R für einen neuen Lauf`,
+      canPersistHighScore()
+        ? isTouchDevice
+          ? `Highscore: ${highScore}. Tippe für einen neuen Lauf`
+          : `Highscore: ${highScore}. Drücke R für einen neuen Lauf`
+        : isTouchDevice
+          ? "Debug-Run beendet. Tippe für einen neuen Lauf"
+          : "Debug-Run beendet. Drücke R für einen neuen Lauf",
       canvas.width / 2,
       220
     );
@@ -3514,6 +3856,7 @@ function render(time) {
   drawHud();
   drawSpecialEventStatus();
   drawHudEffects();
+  drawDebugPanel();
 }
 
 /**
@@ -3576,7 +3919,7 @@ function tryJump() {
 
   if (gameState === "ready") {
     gameState = "playing";
-    statusMessage = "Endloslauf gestartet";
+    statusMessage = isDebugModeEnabled() ? "Debug-Run gestartet" : "Endloslauf gestartet";
     player.visible = true;
     player.x = 42;
     player.y = -160;
@@ -3597,6 +3940,26 @@ function tryJump() {
 
 window.addEventListener("keydown", (event) => {
   const code = event.code;
+  if (isDebugModeEnabled() && code === "F3") {
+    event.preventDefault();
+    debugPanelVisible = !debugPanelVisible;
+    return;
+  }
+  if (isDebugModeEnabled() && code === "F6") {
+    event.preventDefault();
+    stepDebugSpecialEvent();
+    return;
+  }
+  if (isDebugModeEnabled() && code === "F7") {
+    event.preventDefault();
+    spawnDebugPickup();
+    return;
+  }
+  if (isDebugModeEnabled() && code === "F8") {
+    event.preventDefault();
+    addDebugBacklogRecord();
+    return;
+  }
   if (code === "KeyP") {
     event.preventDefault();
     toggleManualPause();

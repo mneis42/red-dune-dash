@@ -75,6 +75,21 @@ Nutzen:
 - neue Pickup-Arten koennen ueber Definitionen und Effekthooks hinzukommen
 - Kollisionscode im Hauptfile muss den fachlichen Effekt nicht selbst kennen
 
+### `systems/debug-tools.js`
+
+Zustaendig fuer die Entwicklungs- und Balancing-Konfiguration:
+
+- Query-Parameter fuer Debug-Runs
+- Spawn-Multiplikatoren
+- Startwerte fuer Ressourcen und Backlog
+- Hilfsfunktionen fuer Spawn-Chancen und Delays
+
+Nutzen:
+
+- Debug-Einstellungen bleiben aus der eigentlichen Spiellogik herausloesbar
+- Balancing-Tools sind zentral dokumentierbar und testbar
+- kuenftige Debug-Shortcuts oder Content-Werkzeuge koennen auf derselben Konfiguration aufbauen
+
 ### `systems/simulation-core.js`
 
 Zustaendig fuer browserfreie Kernregeln und deterministische Balancing-Logik:
