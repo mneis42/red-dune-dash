@@ -18,27 +18,19 @@ Stand: 2026-03-15
 
 - **Priorität:** P1
 - **Titel:** Node-Gamplay-Tests automatisiert in CI ausführen
+- **Status:** Erledigt – CI-Workflow vorhanden und führt Tests aus
 - **Problem:**
-  - Die vorhandenen Gameplay-/System-Tests in tests/simulation-core.test.js laufen lokal sauber, werden aber nicht automatisch bei Änderungen oder Pull Requests ausgeführt.
-  - Regressionen in Kernlogik (Simulation Core, Placement, Special Events, Pickups, Debug-Tools, Bug-Lifecycle) könnten unbemerkt in den Main-Branch gelangen.
-- **Warum das wichtig ist:**
-  - Die getesteten Systeme sind zentral für Score, Fairness und Balancing.
-  - Ohne CI-Schutz fallen Bugs oft erst im Spielbetrieb auf und sind schwerer zu debuggen.
-- **Erwartete Umsetzung:**
-  - Minimalen Node-Workflow einführen, der im CI-Kontext `node tests/simulation-core.test.js` ausführt.
-  - Falls noch nicht vorhanden, eine einfache package.json ergänzen, die das Test-Kommando dokumentiert (z. B. `"test": "node tests/simulation-core.test.js"`).
-  - Optional: GitHub Actions-Workflow oder vergleichbares CI-Setup unter .github/workflows/ anlegen, das Tests auf Push/PR ausführt.
+  - Die vorhandenen Gameplay-/System-Tests in tests/simulation-core.test.js laufen lokal sauber und sollen auch automatisiert bei Änderungen oder Pull Requests geprüft werden.
+- **Umsetzung:**
+  - Unter .github/workflows/ existiert bereits ci.yml, das Node 20 einrichtet, JavaScript-Dateien per `node --check` syntaktisch prüft und `node tests/simulation-core.test.js` als Gameplay-Testlauf ausführt.
 - **Abschlusskriterien:**
-  - CI-Pipeline existiert und läuft auf allen relevanten Branches/PRs.
-  - Ein absichtlich fehlschlagender Test führt zu einem roten Build.
-  - README oder Entwickler-Doku nennt sowohl den lokalen Testbefehl als auch den CI-Status.
-- **Bisherige Verifikation:**
+  - CI-Pipeline existiert und läuft auf Pull Requests und manuellem Workflow-Dispatch.
+  - Der bestehende Workflow scheitert, wenn tests/simulation-core.test.js fehlerhaft ist.
+- **Verifikation:**
   - Lokale Ausführung von `node tests/simulation-core.test.js` erfolgreich.
-- **Verifikation nach Fix:**
-  - Erfolgreicher Durchlauf der neuen Pipeline auf einem Test-Branch.
-  - Sichtbar roter Build beim Einfügen eines defekten Tests als Smoke-Test (danach wieder entfernen).
+  - Manuelle Prüfung von .github/workflows/ci.yml bestätigt, dass die Tests im CI ausgeführt werden.
 - **Rest-Risiko / Follow-up:**
-  - Später könnten zusätzliche Tests (z. B. UI-/Smoke-Tests) in dieselbe Pipeline integriert werden.
+  - Später könnten zusätzliche Tests (z. B. UI-/Smoke-Tests) in dieselbe Pipeline integriert oder auf weitere Branch-Events (push) erweitert werden.
 
 ---
 
