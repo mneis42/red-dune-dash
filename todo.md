@@ -38,7 +38,7 @@ Statusuebersicht. Die Detailbeschreibungen zu jedem Punkt folgen direkt darunter
 - [x] P1 - Event-System von hart codierten Sonderfaellen zu einer erweiterbaren Struktur umbauen
 - [x] P1 - Dead Code und unklare Regelpfade bei Platzierung und Kollision aufraeumen
 - [x] P1 - Offline-/PWA-Assets an die tatsaechlich verwendeten Inhalte angleichen
-- [ ] P2 - Den Monolithen in klar getrennte Spielsysteme zerlegen
+- [x] P2 - Den Monolithen in klar getrennte Spielsysteme zerlegen
 - [ ] P2 - Testbare Simulationskern-Logik einziehen
 - [ ] P2 - Item-/Pickup-System verallgemeinern statt nur "Gem = Geld" zu kennen
 - [ ] P3 - Debug-, Balancing- und Content-Werkzeuge ausbauen
