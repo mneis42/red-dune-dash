@@ -1961,9 +1961,12 @@ function cleanupWorld() {
   const cutoffX = cameraX - 900;
   level.platforms = level.platforms.filter((platform) => platform.x + platform.w > cutoffX);
   level.hazards = level.hazards.filter((hazard) => hazard.x + hazard.w > cutoffX);
-  level.gems = level.gems.filter((gem) => gem.collected || gem.x + gem.r > cutoffX);
-  level.bugs = level.bugs.filter((bug) => !bug.alive || bug.x + bug.w > cutoffX);
-  level.rockets = level.rockets.filter((rocket) => rocket.x + rocket.w > cutoffX && rocket.x < cameraX + canvas.width + 900);
+  // Collected pickups and defeated bugs should leave the active world immediately; historical run state lives elsewhere.
+  level.gems = level.gems.filter((gem) => !gem.collected && gem.x + gem.r > cutoffX);
+  level.bugs = level.bugs.filter((bug) => bug.alive && bug.x + bug.w > cutoffX);
+  level.rockets = level.rockets.filter(
+    (rocket) => rocket.active && rocket.x + rocket.w > cutoffX && rocket.x < cameraX + canvas.width + 900
+  );
 }
 
 /**

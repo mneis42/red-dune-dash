@@ -27,7 +27,24 @@ Damit kuenftige Features wie "Backlog-Gems holen alte Bugs zurueck" oder "Refact
 
 ## TODOs
 
-### P0 - ✅ Weltgenerator stabilisieren und fruehe `return`-Pfadfehler beseitigen
+Statusuebersicht. Die Detailbeschreibungen zu jedem Punkt folgen direkt darunter.
+
+- [x] P0 - Weltgenerator stabilisieren und fruehe `return`-Pfadfehler beseitigen
+- [x] P0 - Weltbereinigung korrigieren, damit eingesammelte oder tote Entities wirklich verschwinden
+- [ ] P0 - Mobile Resume-Pfad fuer Hintergrund-/App-Wechsel loesen
+- [ ] P0 - Alle gameplay-relevanten Timer und Counter auf echte Zeitbasis umstellen
+- [ ] P1 - Score-, Ressourcen- und Fortschrittsmodell fachlich sauber definieren
+- [ ] P1 - Bug-Lebenszyklus als eigenes Fachsystem modellieren
+- [ ] P1 - Event-System von hart codierten Sonderfaellen zu einer erweiterbaren Struktur umbauen
+- [ ] P1 - Dead Code und unklare Regelpfade bei Platzierung und Kollision aufraeumen
+- [ ] P1 - Offline-/PWA-Assets an die tatsaechlich verwendeten Inhalte angleichen
+- [ ] P2 - Den Monolithen in klar getrennte Spielsysteme zerlegen
+- [ ] P2 - Testbare Simulationskern-Logik einziehen
+- [ ] P2 - Item-/Pickup-System verallgemeinern statt nur "Gem = Geld" zu kennen
+- [ ] P3 - Debug-, Balancing- und Content-Werkzeuge ausbauen
+- [ ] P3 - Architektur- und Regelentscheidungen kurz dokumentieren
+
+### P0 - Weltgenerator stabilisieren und fruehe `return`-Pfadfehler beseitigen
 
 **Problem**
 
