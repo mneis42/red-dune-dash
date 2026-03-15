@@ -369,17 +369,7 @@ function framesToMs(frames) {
   return Math.round(frames * FRAME_DURATION_MS);
 }
 
-/**
- * Clamps a numeric value into a closed interval.
- *
- * @param {number} value - Value to clamp.
- * @param {number} min - Lower bound.
- * @param {number} max - Upper bound.
- * @returns {number} Clamped value.
- */
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+const clamp = simulationCore.clamp;
 
 /**
  * Linearly interpolates between two values.
@@ -3588,13 +3578,6 @@ function drawOverlay() {
 }
 
 /**
- * Placeholder portrait renderer. Portrait mode is currently handled via DOM/CSS instead.
- */
-function drawRotateOverlay() {
-  // Portrait mode is now handled via DOM/CSS with a fullscreen image.
-}
-
-/**
  * Draws the countdown used during hurt/respawn sequences.
  */
 function drawRespawnCountdown() {
@@ -3718,7 +3701,6 @@ function drawSpecialEventStatus() {
  */
 function render(time) {
   if (isPortraitMobileView()) {
-    drawRotateOverlay();
     return;
   }
 
