@@ -232,7 +232,7 @@ const hazardCycleConfig = {
 };
 const specialEventConfig = {
   minDelay: 120_000,
-  maxDelay: 600_000,
+  maxDelay: 300_000,
   announceDuration: 10_000,
   activeDuration: 30_000,
   bugWaveRocketSpawnMultiplier: 2,
@@ -405,6 +405,22 @@ function canPersistHighScore() {
 }
 
 const { SPECIAL_EVENT_PHASE } = globalThis.RedDuneSpecialEvents;
+
+function pickWeightedSpecialEventType(eventTypes) {
+  const openBugCount = getOutstandingBugTotal();
+  return globalThis.RedDuneSpecialEvents.pickWeightedEventType(
+    eventTypes,
+    (type) => {
+      if (type === "bug-wave") {
+        return 1 + Math.min(3, openBugCount * 0.25);
+      }
+
+      return 1;
+    },
+    Math.random()
+  );
+}
+
 const specialEventDefinitions = globalThis.RedDuneSpecialEvents.createSpecialEventDefinitions(
   specialEventConfig,
   {
@@ -425,6 +441,9 @@ const specialEventSystem = globalThis.RedDuneSpecialEvents.createSpecialEventSys
   randomInt,
   debugDelayMs: debugSpecialEventDelayMs,
   debugType: debugSpecialEventType,
+  pickType({ eventTypes }) {
+    return pickWeightedSpecialEventType(eventTypes);
+  },
   onStatusMessage: (message) => {
     statusMessage = message;
   },
@@ -639,13 +658,19 @@ function addDebugBacklogRecord() {
  * @returns {number} Number of lifecycle records changed to reactivated.
  */
 function reactivateHistoricalBugs(amount = 1) {
-  const candidates = [...bugLifecycle.records.values()].filter((record) => {
-    return record.status === BUG_STATUS.BACKLOG || record.status === BUG_STATUS.MISSED;
-  });
-  const reactivatedCount = Math.min(amount, candidates.length);
+  let reactivatedCount = 0;
 
-  for (let i = 0; i < reactivatedCount; i += 1) {
-    setBugLifecycleStatus(candidates[i].id, BUG_STATUS.REACTIVATED);
+  for (let i = 0; i < amount; i += 1) {
+    const record = bugLifecycleSystem.pickReactivatableRecord({
+      activeBugIds: getActiveWorldBugIds(),
+      randomInt,
+    });
+    if (!record) {
+      break;
+    }
+
+    setBugLifecycleStatus(record.id, BUG_STATUS.REACTIVATED);
+    reactivatedCount += 1;
   }
 
   return reactivatedCount;
@@ -701,6 +726,34 @@ function getFallingBugCount() {
   return level.bugs.filter((bug) => bug.alive && bug.falling).length;
 }
 
+function getActiveWorldBugIds() {
+  return new Set(
+    level.bugs
+      .filter((bug) => bug.alive && Number.isFinite(bug.bugId))
+      .map((bug) => bug.bugId)
+  );
+}
+
+function getBugWaveSpawnLifecycleOptions() {
+  if (Math.random() >= 0.5) {
+    return {};
+  }
+
+  const record = bugLifecycleSystem.pickReactivatableRecord({
+    activeBugIds: getActiveWorldBugIds(),
+    randomInt,
+  });
+  if (!record) {
+    return {};
+  }
+
+  setBugLifecycleStatus(record.id, BUG_STATUS.REACTIVATED);
+  return {
+    bugId: record.id,
+    lifecycleStatus: BUG_STATUS.REACTIVATED,
+  };
+}
+
 /**
  * Chooses a platform ahead of the camera that can receive a falling bug.
  *
@@ -739,7 +792,7 @@ function spawnBugWaveBug() {
       return;
     }
 
-    level.bugs.push(createFallingBug(platform));
+    level.bugs.push(createFallingBug(platform, getBugWaveSpawnLifecycleOptions()));
   }
 }
 
@@ -845,8 +898,10 @@ function spawnBigOrderGem() {
 
 /**
  * Spawns an extra visible walking bug on a currently visible platform.
+ *
+ * @param {{telegraph?: boolean, markerX?: number, markerY?: number, bugId?: number, lifecycleStatus?:"active-world"|"missed"|"backlog"|"resolved"|"reactivated"}} [options={}] - Optional lifecycle override for reactivated bugs.
  */
-function spawnVisiblePlatformBug() {
+function spawnVisiblePlatformBug(options = {}) {
   const spawnAttempts = debugTools.getSpawnIterations(debugConfig.spawns.bugMultiplier);
   for (let attempt = 0; attempt < spawnAttempts; attempt += 1) {
     const platform = getVisibleBugSpawnPlatform();
@@ -866,6 +921,7 @@ function spawnVisiblePlatformBug() {
     level.bugs.push(
       createBug(bugX, platform.y - 38, platform.x + patrolMargin, platform.x + platform.w - patrolMargin, speed, {
         telegraph: true,
+        ...options,
       })
     );
   }
@@ -882,7 +938,7 @@ function spawnBigOrderBug() {
  * Spawns an extra visible walking bug during the bug-wave event.
  */
 function spawnBugWaveGroundBug() {
-  spawnVisiblePlatformBug();
+  spawnVisiblePlatformBug(getBugWaveSpawnLifecycleOptions());
 }
 
 /**
@@ -1321,7 +1377,7 @@ function getBugLifecycleCounts() {
  * @param {number} minX - Patrol minimum x-position.
  * @param {number} maxX - Patrol maximum x-position.
  * @param {number} speed - Initial horizontal speed.
- * @param {{telegraph?: boolean, markerX?: number, markerY?: number, lifecycleStatus?:"active-world"|"missed"|"backlog"|"resolved"|"reactivated"}} [options={}] - Optional spawn preview settings.
+ * @param {{telegraph?: boolean, markerX?: number, markerY?: number, bugId?: number, lifecycleStatus?:"active-world"|"missed"|"backlog"|"resolved"|"reactivated"}} [options={}] - Optional spawn preview settings.
  * @returns {{x:number, y:number, w:number, h:number, minX:number, maxX:number, vx:number, vy:number, alive:boolean, falling:boolean, targetPlatformMinX:number, targetPlatformMaxX:number, targetGroundY:number}} Bug object.
  */
 function createBug(x, y, minX, maxX, speed, options = {}) {
@@ -1329,10 +1385,11 @@ function createBug(x, y, minX, maxX, speed, options = {}) {
     telegraph = false,
     markerX = x + 23,
     markerY = y + 19,
+    bugId = null,
     lifecycleStatus = BUG_STATUS.ACTIVE_WORLD,
   } = options;
   return {
-    bugId: registerBugLifecycle(lifecycleStatus),
+    bugId: Number.isFinite(bugId) ? bugId : registerBugLifecycle(lifecycleStatus),
     x,
     y,
     w: 46,
@@ -1357,15 +1414,16 @@ function createBug(x, y, minX, maxX, speed, options = {}) {
  * Creates a bug that drops from the sky and starts patrolling after landing.
  *
  * @param {{x:number, y:number, w:number}} platform - Platform that should receive the falling bug.
+ * @param {{telegraph?: boolean, markerX?: number, markerY?: number, bugId?: number, lifecycleStatus?:"active-world"|"missed"|"backlog"|"resolved"|"reactivated"}} [options={}] - Optional lifecycle override for reactivated bugs.
  * @returns {{x:number, y:number, w:number, h:number, minX:number, maxX:number, vx:number, vy:number, alive:boolean, falling:boolean, targetPlatformMinX:number, targetPlatformMaxX:number, targetGroundY:number}} Bug object.
  */
-function createFallingBug(platform) {
+function createFallingBug(platform, options = {}) {
   const patrolMargin = 18;
   const minX = platform.x + patrolMargin;
   const maxX = platform.x + platform.w - patrolMargin;
   const spawnX = clamp(randomBetween(minX, maxX - 46), minX, maxX - 46);
   const spawnY = randomBetween(-58, -22);
-  const bug = createBug(spawnX, spawnY, minX, maxX, 0);
+  const bug = createBug(spawnX, spawnY, minX, maxX, 0, options);
 
   bug.falling = true;
   bug.vy = randomBetween(0.6, 1.2);

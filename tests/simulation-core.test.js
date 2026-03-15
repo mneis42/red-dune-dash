@@ -104,6 +104,39 @@ test("bug lifecycle system tracks resolved and missed bugs independently of worl
   });
 });
 
+test("bug lifecycle system can pick historical unresolved bugs for reactivation without duplicating active world bugs", () => {
+  const bugSystem = bugLifecycle.createBugLifecycleSystem();
+  const activeBug = bugSystem.register(bugLifecycle.BUG_STATUS.ACTIVE_WORLD);
+  const missedBug = bugSystem.register(bugLifecycle.BUG_STATUS.MISSED);
+  const backlogBug = bugSystem.register(bugLifecycle.BUG_STATUS.BACKLOG);
+  const reactivatedBug = bugSystem.register(bugLifecycle.BUG_STATUS.REACTIVATED);
+  bugSystem.register(bugLifecycle.BUG_STATUS.RESOLVED);
+
+  const first = bugSystem.pickReactivatableRecord({
+    activeBugIds: [activeBug],
+    randomInt: () => 0,
+  });
+  assert.equal(first.id, missedBug);
+
+  const second = bugSystem.pickReactivatableRecord({
+    activeBugIds: [activeBug, missedBug],
+    randomInt: () => 0,
+  });
+  assert.equal(second.id, backlogBug);
+
+  const third = bugSystem.pickReactivatableRecord({
+    activeBugIds: [activeBug, missedBug, backlogBug],
+    randomInt: () => 0,
+  });
+  assert.equal(third.id, reactivatedBug);
+
+  const noneLeft = bugSystem.pickReactivatableRecord({
+    activeBugIds: [activeBug, missedBug, backlogBug, reactivatedBug],
+    randomInt: () => 0,
+  });
+  assert.equal(noneLeft, null);
+});
+
 test("placement system computes stable safe zones and nearest safe positions", () => {
   const placementSystem = placement.createPlacementSystem();
   const platform = { x: 100, y: 300, w: 300, h: 18 };
@@ -316,6 +349,73 @@ test("special event system can be driven deterministically through time and inje
   eventSystem.update(500);
   assert.equal(eventSystem.state.phase, specialEvents.SPECIAL_EVENT_PHASE.IDLE);
   assert.equal(statusMessages.at(-1), "Großauftrag abgeschlossen");
+});
+
+test("special event system supports weighted backlog-aware event selection", () => {
+  const eventTypes = ["bug-wave", "big-order"];
+  assert.equal(
+    specialEvents.pickWeightedEventType(
+      eventTypes,
+      (type) => (type === "bug-wave" ? 4 : 1),
+      0.1
+    ),
+    "bug-wave"
+  );
+  assert.equal(
+    specialEvents.pickWeightedEventType(
+      eventTypes,
+      (type) => (type === "bug-wave" ? 1 : 1),
+      0.9
+    ),
+    "big-order"
+  );
+
+  const config = {
+    minDelay: 1000,
+    maxDelay: 1000,
+    announceDuration: 500,
+    activeDuration: 500,
+    bugWaveRocketSpawnMultiplier: 2,
+    bugWaveMaxFalling: 7,
+    bugWaveGroundSpawnIntervalMin: 500,
+    bugWaveGroundSpawnIntervalMax: 600,
+    bigOrder: {
+      visibleExtraGemChance: 0,
+      visibleGemSpawnIntervalMin: 450,
+      visibleGemSpawnIntervalMax: 900,
+      visibleExtraBugChance: 0,
+      visibleBugSpawnIntervalMin: 1100,
+      visibleBugSpawnIntervalMax: 1800,
+    },
+  };
+  const definitions = specialEvents.createSpecialEventDefinitions(config, {
+    randomInt: (min) => min,
+    randomChance: () => 0,
+    lerp: (start, end, alpha) => start + (end - start) * alpha,
+    clamp: simulationCore.clamp,
+    getFallingBugCount: () => 0,
+    spawnBugWaveBug() {},
+    spawnBugWaveGroundBug() {},
+    spawnBigOrderGem() {},
+    spawnBigOrderBug() {},
+  });
+
+  const eventSystem = specialEvents.createSpecialEventSystem({
+    config,
+    definitions,
+    randomInt: (min) => min,
+    pickType({ eventTypes: availableTypes }) {
+      return specialEvents.pickWeightedEventType(
+        availableTypes,
+        (type) => (type === "bug-wave" ? 5 : 1),
+        0.2
+      );
+    },
+  });
+
+  eventSystem.update(1000);
+  assert.equal(eventSystem.state.phase, specialEvents.SPECIAL_EVENT_PHASE.ANNOUNCE);
+  assert.equal(eventSystem.state.type, "bug-wave");
 });
 
 test("generator helpers roll back failed optional chunk features without leaving partial state", () => {

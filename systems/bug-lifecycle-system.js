@@ -18,6 +18,12 @@
       records: new Map(),
     };
 
+    function getRandomInt(min, max) {
+      const normalizedMin = Math.ceil(Math.min(min, max));
+      const normalizedMax = Math.floor(Math.max(min, max));
+      return Math.floor(Math.random() * (normalizedMax - normalizedMin + 1)) + normalizedMin;
+    }
+
     function reset() {
       state.nextId = 1;
       state.records.clear();
@@ -57,6 +63,31 @@
       }
 
       setStatus(bugId, BUG_STATUS.MISSED);
+    }
+
+    function pickReactivatableRecord(options = {}) {
+      const {
+        activeBugIds = [],
+        randomInt = getRandomInt,
+      } = options;
+      const activeIdSet = activeBugIds instanceof Set ? activeBugIds : new Set(activeBugIds);
+      const candidates = [...state.records.values()].filter((record) => {
+        if (activeIdSet.has(record.id)) {
+          return false;
+        }
+
+        return (
+          record.status === BUG_STATUS.MISSED ||
+          record.status === BUG_STATUS.BACKLOG ||
+          record.status === BUG_STATUS.REACTIVATED
+        );
+      });
+
+      if (candidates.length === 0) {
+        return null;
+      }
+
+      return candidates[randomInt(0, candidates.length - 1)] ?? null;
     }
 
     function getCounts() {
@@ -101,6 +132,7 @@
       setStatus,
       markResolved,
       markMissed,
+      pickReactivatableRecord,
       getCounts,
     };
   }

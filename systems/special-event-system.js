@@ -15,6 +15,31 @@
     bonusBugChance: 0,
   });
 
+  function pickWeightedEventType(eventTypes, getWeight, randomValue = Math.random()) {
+    if (!Array.isArray(eventTypes) || eventTypes.length === 0) {
+      return null;
+    }
+
+    const weights = eventTypes.map((type) => {
+      const weight = Number(getWeight?.(type));
+      return Number.isFinite(weight) ? Math.max(0, weight) : 0;
+    });
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    if (totalWeight <= 0) {
+      return eventTypes[0] ?? null;
+    }
+
+    let threshold = Math.min(Math.max(Number(randomValue), 0), 0.999999999) * totalWeight;
+    for (let index = 0; index < eventTypes.length; index += 1) {
+      threshold -= weights[index];
+      if (threshold < 0) {
+        return eventTypes[index];
+      }
+    }
+
+    return eventTypes.at(-1) ?? null;
+  }
+
   /**
    * Creates the event definition table for the current balancing config and runtime hooks.
    *
@@ -139,7 +164,7 @@
   /**
    * Creates the runtime special-event scheduler and query helpers.
    *
-   * @param {{config:object,definitions:Record<string,object>,randomInt:Function,debugDelayMs:number|null,debugType:string|null,onStatusMessage?:Function}} options - Event system options.
+   * @param {{config:object,definitions:Record<string,object>,randomInt:Function,randomChance?:Function,debugDelayMs:number|null,debugType:string|null,pickType?:Function,onStatusMessage?:Function}} options - Event system options.
    * @returns {{state:{type:string|null,phase:string,timer:number,runtime:object},getDefinition:Function,getTitle:Function,getInfo:Function,getChunkGenerationRules:Function,getRocketSpawnMultiplier:Function,isActive:Function,scheduleNext:Function,reset:Function,startAnnouncement:Function,activate:Function,complete:Function,update:Function}} Special-event system.
    */
   function createSpecialEventSystem(options) {
@@ -147,8 +172,10 @@
       config,
       definitions,
       randomInt,
+      randomChance = Math.random,
       debugDelayMs = null,
       debugType = null,
+      pickType: customPickType = null,
       onStatusMessage = () => {},
     } = options;
 
@@ -223,6 +250,19 @@
       const eventTypes = Object.keys(definitions);
       if (eventTypes.length === 0) {
         return null;
+      }
+
+      if (typeof customPickType === "function") {
+        const nextType = customPickType({
+          eventTypes,
+          definitions,
+          getDefinition,
+          randomInt,
+          randomChance,
+        });
+        if (getDefinition(nextType)) {
+          return nextType;
+        }
       }
 
       return eventTypes[randomInt(0, eventTypes.length - 1)];
@@ -360,6 +400,7 @@
   globalScope.RedDuneSpecialEvents = Object.freeze({
     SPECIAL_EVENT_PHASE,
     baseChunkGenerationConfig,
+    pickWeightedEventType,
     createSpecialEventDefinitions,
     createSpecialEventSystem,
   });
