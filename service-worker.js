@@ -26,7 +26,7 @@ const NETWORK_FIRST_PATHS = new Set(
 
 function isCoreAppRequest(requestUrl) {
   const url = new URL(requestUrl);
-  return NETWORK_FIRST_PATHS.has(url.pathname) || NETWORK_FIRST_PATHS.has(`${url.pathname}${url.search}`);
+  return NETWORK_FIRST_PATHS.has(url.pathname);
 }
 
 async function networkFirst(request) {
