@@ -32,6 +32,8 @@
   `tests/service-worker.test.js` Zeilen mit `function test(name, fn)`, `fn();` und async-Testdefinition.
 
 ### P1 - CI testet Service Worker nicht
+- Status
+  Erledigt am 2026-03-15.
 - Problem
   Beide Workflows führen nur `tests/simulation-core.test.js` aus, nicht aber `tests/service-worker.test.js`.
 - Warum wichtig
@@ -42,13 +44,17 @@
   - CI- und Deploy-Testjob brechen bei SW-Testfehlern ab.
   - Gameplay- und SW-Tests laufen in beiden Workflows.
 - Verifizierung durchgeführt
-  Workflow-Dateien manuell geprüft; nur Gameplay-Teststep vorhanden.
+  Workflows erweitert und lokal mit den gleichen Befehlen geprüft:
+  - `node tests/simulation-core.test.js` (15/15 grün)
+  - `node tests/service-worker.test.js` (SW-Smoke-Tests grün)
 - Rest-Risiko / Follow-up
   Optional zusätzlich Matrix für mehrere Node-Versionen erwägen.
 - Relevante Stellen
   `.github/workflows/ci.yml` und `.github/workflows/deploy-pages.yml` bei „Run gameplay tests“.
 
 ### P1 - Cache-Versionierung im Deploy-Workflow ist inkonsistent zur SW-Implementierung
+- Status
+  Erledigt am 2026-03-15.
 - Problem
   Der Deploy-Step versucht `const CACHE_NAME = "..."` in `dist/service-worker.js` per `sed` zu ersetzen. Die reale SW-Zeile nutzt aber `globalThis.RED_DUNE_ASSET_MANIFEST?.cacheName ?? ...`, und das Manifest setzt weiterhin statisch `cacheName: "red-dune-dash-v3"`.
 - Warum wichtig
@@ -62,7 +68,10 @@
   - Neue Deployments erzeugen nachvollziehbar neue Cache-Namespaces.
   - SW-Updatepfad ist dokumentiert und reproduzierbar testbar.
 - Verifizierung durchgeführt
-  Deploy-Workflow, `service-worker.js` und `app-assets.js` gegengeprüft.
+  Deploy-Workflow umgestellt: Build stempelt jetzt den Manifest-Wert in `dist/app-assets.js` statt eines toten SW-Patterns.
+  Lokal geprüft:
+  - Workflow enthält `Stamp app and cache versions` und ersetzt `cacheName` in `dist/app-assets.js`.
+  - `node --check app-assets.js`, `node --check service-worker.js`, `node --check game-endless.js` ohne Fehler.
 - Rest-Risiko / Follow-up
   Nach Umstellung sollte ein E2E-Check (online -> update -> offline) dokumentiert werden.
 - Relevante Stellen
