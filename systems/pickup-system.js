@@ -22,6 +22,27 @@
     };
   }
 
+  function formatCurrencyAmount(currencyCents) {
+    if (!Number.isFinite(currencyCents)) {
+      return "0 ct";
+    }
+
+    if (currencyCents % 100 === 0) {
+      return `${currencyCents / 100} EUR`;
+    }
+
+    if (currencyCents >= 100) {
+      return `${(currencyCents / 100).toFixed(2).replace(".", ",")} EUR`;
+    }
+
+    return `${currencyCents} ct`;
+  }
+
+  function getPickupRenderScale(pickup) {
+    const renderScale = Number(pickup?.renderScale);
+    return Number.isFinite(renderScale) && renderScale > 0 ? renderScale : 1;
+  }
+
   /**
    * Creates the pickup type definitions used by the current run.
    *
@@ -54,13 +75,23 @@
           return context.shouldSpawnIncomeSource();
         },
         applyEffect(context) {
+          const currencyCents = Number.isFinite(context.pickup?.currencyCents)
+            ? context.pickup.currencyCents
+            : config.gemValueCents;
           const moneyEffect = context.createHitEffect(context.pickup.x, context.pickup.y, "€", "#ffe37a");
           const scoreEffect = context.createHitEffect(context.pickup.x + 16, context.pickup.y - 8, "⭐");
           context.spawnHudEmoji(moneyEffect.x, moneyEffect.y, moneyEffect.emoji, "gems");
           context.spawnHudEmoji(scoreEffect.x, scoreEffect.y, scoreEffect.emoji, "score");
-          context.runState.currencyCents += config.gemValueCents;
+          context.runState.currencyCents += currencyCents;
           context.runState.actionScore += config.scoreConfig.gemPickup;
-          context.setStatusMessage(`${config.gemValueCents} ct geborgen`);
+          context.onCurrencyCollected?.({
+            pickup: context.pickup,
+            currencyCents,
+            spawnBugOnCollect: context.pickup?.spawnBugOnCollect ?? null,
+          });
+          context.setStatusMessage(
+            context.pickup?.statusMessage ?? `${formatCurrencyAmount(currencyCents)} geborgen`
+          );
         },
       },
       [PICKUP_TYPE.EXTRA_LIFE]: {
@@ -236,12 +267,13 @@
         spawnDuration = definition.spawnTelegraphDuration ?? 0,
         ...metadata
       } = options;
+      const renderScale = getPickupRenderScale(metadata);
       return {
         ...metadata,
         type,
         x,
         y,
-        r: definition.radius ?? 14,
+        r: (definition.radius ?? 14) * renderScale,
         collected: false,
         spawnTimer: telegraph ? spawnDuration : 0,
         spawnDuration,
@@ -288,8 +320,16 @@
       return true;
     }
 
-    function getRenderModel(type) {
-      return getDefinition(type)?.render ?? null;
+    function getRenderModel(type, pickup = null) {
+      const definition = getDefinition(type);
+      if (!definition?.render) {
+        return null;
+      }
+
+      return {
+        ...definition.render,
+        scale: getPickupRenderScale(pickup),
+      };
     }
 
     return {
@@ -305,6 +345,7 @@
 
   globalScope.RedDunePickups = Object.freeze({
     PICKUP_TYPE,
+    formatCurrencyAmount,
     createPickupDefinitions,
     createPickupSystem,
   });

@@ -15,6 +15,36 @@
     bonusBugChance: 0,
   });
 
+  function clampChance(value, fallback = 0) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return fallback;
+    }
+
+    return Math.max(0, Math.min(1, numericValue));
+  }
+
+  function pickBigOrderCurrencyVariant(config, randomValue = Math.random()) {
+    const bonusEuroChance = clampChance(config?.bonusEuroChance, 0);
+    const baseCurrencyCents = Number.isFinite(config?.baseCurrencyCents) ? config.baseCurrencyCents : 10;
+    const bonusCurrencyCents = Number.isFinite(config?.bonusCurrencyCents) ? config.bonusCurrencyCents : 100;
+    const bonusRenderScale =
+      Number.isFinite(config?.bonusRenderScale) && config.bonusRenderScale > 0
+        ? config.bonusRenderScale
+        : 2;
+    const bugSpawnChance = clampChance(config?.bonusBugSpawnChance, 0.5);
+    const normalizedRandomValue = Math.max(0, Math.min(0.999999999, Number(randomValue) || 0));
+    const isBonus = normalizedRandomValue < bonusEuroChance;
+
+    return {
+      variant: isBonus ? "bonus-euro" : "standard-euro",
+      isBonus,
+      currencyCents: isBonus ? bonusCurrencyCents : baseCurrencyCents,
+      renderScale: isBonus ? bonusRenderScale : 1,
+      spawnBugOnCollect: isBonus ? { chance: bugSpawnChance, telegraph: true } : null,
+    };
+  }
+
   function pickWeightedEventType(eventTypes, getWeight, randomValue = Math.random()) {
     if (!Array.isArray(eventTypes) || eventTypes.length === 0) {
       return null;
@@ -44,7 +74,7 @@
    * Creates the event definition table for the current balancing config and runtime hooks.
    *
    * @param {object} specialEventConfig - Active event config block.
-   * @param {{randomInt:Function,lerp:Function,clamp:Function,getFallingBugCount:Function,spawnBugWaveBug:Function,spawnBugWaveGroundBug:Function,spawnBigOrderGem:Function,spawnBigOrderBug:Function}} hooks - Runtime hooks from the main game loop.
+   * @param {{randomInt:Function,lerp:Function,clamp:Function,getFallingBugCount:Function,spawnBugWaveBug:Function,spawnBugWaveGroundBug:Function,spawnBigOrderGem:Function}} hooks - Runtime hooks from the main game loop.
    * @returns {Record<string, object>} Event definition map.
    */
   function createSpecialEventDefinitions(specialEventConfig, hooks) {
@@ -57,7 +87,6 @@
       spawnBugWaveBug,
       spawnBugWaveGroundBug,
       spawnBigOrderGem,
-      spawnBigOrderBug,
     } = hooks;
 
     return {
@@ -112,20 +141,18 @@
         title: "Großauftrag",
         announcementTitle: "Großauftrag kommt rein",
         announcementPrompt: "Bereite dich vor",
-        activeStatusMessage: "Großauftrag aktiv. Mehr Moneten und mehr Bugs unterwegs",
+        activeStatusMessage: "Großauftrag aktiv. Mehr Moneten unterwegs",
         completionStatusMessage: "Großauftrag abgeschlossen",
         chunkGeneration: specialEventConfig.bigOrder,
         createRuntime(phase) {
           if (phase === SPECIAL_EVENT_PHASE.ANNOUNCE) {
             return {
               gemSpawnTimer: 900,
-              bugSpawnTimer: 1200,
             };
           }
           if (phase === SPECIAL_EVENT_PHASE.ACTIVE) {
             return {
               gemSpawnTimer: 700,
-              bugSpawnTimer: 1000,
             };
           }
           return {};
@@ -142,18 +169,6 @@
             state.runtime.gemSpawnTimer += randomInt(
               bigOrderConfig.visibleGemSpawnIntervalMin,
               bigOrderConfig.visibleGemSpawnIntervalMax
-            );
-          }
-
-          state.runtime.bugSpawnTimer -= delta;
-          while (state.runtime.bugSpawnTimer <= 0) {
-            spawnBigOrderBug();
-            if (randomChance() < bigOrderConfig.visibleExtraBugChance) {
-              spawnBigOrderBug();
-            }
-            state.runtime.bugSpawnTimer += randomInt(
-              bigOrderConfig.visibleBugSpawnIntervalMin,
-              bigOrderConfig.visibleBugSpawnIntervalMax
             );
           }
         },
@@ -400,6 +415,7 @@
   globalScope.RedDuneSpecialEvents = Object.freeze({
     SPECIAL_EVENT_PHASE,
     baseChunkGenerationConfig,
+    pickBigOrderCurrencyVariant,
     pickWeightedEventType,
     createSpecialEventDefinitions,
     createSpecialEventSystem,
