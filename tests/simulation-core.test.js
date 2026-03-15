@@ -328,7 +328,6 @@ test("special event system can be driven deterministically through time and inje
   const randomChance = simulationCore.createSequenceRandom([0.2, 0.95], 0.99);
   const counters = {
     bigOrderGems: 0,
-    bigOrderBugs: 0,
     bugWaveFalling: 0,
     bugWaveGround: 0,
   };
@@ -343,19 +342,13 @@ test("special event system can be driven deterministically through time and inje
     bugWaveGroundSpawnIntervalMax: 600,
     bigOrder: {
       groundGemChance: 1,
-      groundBugChance: 0.5,
       plateGemChance: 1,
       plateExtraGemChance: 0.9,
-      plateBugChance: 0.42,
       bonusPlatformChance: 0.44,
       bonusExtraGemChance: 1,
-      bonusBugChance: 0.3,
       visibleExtraGemChance: 0.75,
       visibleGemSpawnIntervalMin: 450,
       visibleGemSpawnIntervalMax: 900,
-      visibleExtraBugChance: 0.2,
-      visibleBugSpawnIntervalMin: 1100,
-      visibleBugSpawnIntervalMax: 1800,
     },
   };
   const definitions = specialEvents.createSpecialEventDefinitions(config, {
@@ -372,9 +365,6 @@ test("special event system can be driven deterministically through time and inje
     },
     spawnBigOrderGem() {
       counters.bigOrderGems += 1;
-    },
-    spawnBigOrderBug() {
-      counters.bigOrderBugs += 1;
     },
   });
   const statusMessages = [];
@@ -396,16 +386,14 @@ test("special event system can be driven deterministically through time and inje
 
   eventSystem.update(1000);
   assert.equal(eventSystem.state.phase, specialEvents.SPECIAL_EVENT_PHASE.ACTIVE);
-  assert.equal(statusMessages.at(-1), "Großauftrag aktiv. Mehr Moneten und mehr Bugs unterwegs");
+  assert.equal(statusMessages.at(-1), "Großauftrag aktiv. Mehr Moneten unterwegs");
 
   eventSystem.update(700);
   assert.equal(counters.bigOrderGems, 2);
-  assert.equal(counters.bigOrderBugs, 0);
+  assert.equal(counters.bugWaveFalling, 0);
+  assert.equal(counters.bugWaveGround, 0);
 
-  eventSystem.update(300);
-  assert.equal(counters.bigOrderBugs, 1);
-
-  eventSystem.update(500);
+  eventSystem.update(800);
   assert.equal(eventSystem.state.phase, specialEvents.SPECIAL_EVENT_PHASE.IDLE);
   assert.equal(statusMessages.at(-1), "Großauftrag abgeschlossen");
 });
@@ -442,9 +430,6 @@ test("special event system supports weighted backlog-aware event selection", () 
       visibleExtraGemChance: 0,
       visibleGemSpawnIntervalMin: 450,
       visibleGemSpawnIntervalMax: 900,
-      visibleExtraBugChance: 0,
-      visibleBugSpawnIntervalMin: 1100,
-      visibleBugSpawnIntervalMax: 1800,
     },
   };
   const definitions = specialEvents.createSpecialEventDefinitions(config, {
@@ -456,7 +441,6 @@ test("special event system supports weighted backlog-aware event selection", () 
     spawnBugWaveBug() {},
     spawnBugWaveGroundBug() {},
     spawnBigOrderGem() {},
-    spawnBigOrderBug() {},
   });
 
   const eventSystem = specialEvents.createSpecialEventSystem({

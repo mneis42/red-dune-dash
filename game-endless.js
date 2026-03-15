@@ -242,19 +242,13 @@ const specialEventConfig = {
   spawnTelegraphDuration: 1_000,
   bigOrder: {
     groundGemChance: 1,
-    groundBugChance: 0.5,
     plateGemChance: 1,
     plateExtraGemChance: 0.9,
-    plateBugChance: 0.42,
     bonusPlatformChance: 0.44,
     bonusExtraGemChance: 1,
-    bonusBugChance: 0.3,
     visibleExtraGemChance: 0.75,
     visibleGemSpawnIntervalMin: 450,
     visibleGemSpawnIntervalMax: 900,
-    visibleExtraBugChance: 0.2,
-    visibleBugSpawnIntervalMin: 1100,
-    visibleBugSpawnIntervalMax: 1800,
     baseCurrencyCents: GEM_VALUE_CENTS,
     bonusEuroChance: 0.3,
     bonusCurrencyCents: 100,
@@ -437,7 +431,6 @@ const specialEventDefinitions = globalThis.RedDuneSpecialEvents.createSpecialEve
     spawnBugWaveBug,
     spawnBugWaveGroundBug,
     spawnBigOrderGem,
-    spawnBigOrderBug,
   }
 );
 const specialEventSystem = globalThis.RedDuneSpecialEvents.createSpecialEventSystem({
@@ -940,13 +933,6 @@ function spawnVisiblePlatformBug(options = {}) {
       })
     );
   }
-}
-
-/**
- * Spawns an extra visible bug during Großauftrag without dropping it directly onto the tiger.
- */
-function spawnBigOrderBug() {
-  spawnVisiblePlatformBug();
 }
 
 /**

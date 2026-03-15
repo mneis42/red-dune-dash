@@ -75,7 +75,7 @@ Die Bugwelle ist ein Druck-Event:
 Der Großauftrag ist ein Ertrags-Event:
 
 - vergroessert die Chunk-Dekoration fuer Moneten und Bugs
-- spawnet zusaetzliche sichtbare Moneten und Bugs waehrend der Aktivphase
+- spawnet zusaetzliche sichtbare Moneten waehrend der Aktivphase
 - darf fuer zusaetzliche Euro-Spawns die normale, eher konservative Platzierungsdichte lockern, damit der Event-Effekt sichtbar bleibt
 - laesst bei zusaetzlichen sichtbaren Euro-Spawns mit 30% Chance eine groessere 1-EUR-Variante erscheinen
 - ein eingesammelter 1-EUR-Bonus kann mit 50% Chance einen telegraphierten Bug auf derselben Plattform entstehen lassen

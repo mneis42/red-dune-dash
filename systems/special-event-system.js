@@ -74,7 +74,7 @@
    * Creates the event definition table for the current balancing config and runtime hooks.
    *
    * @param {object} specialEventConfig - Active event config block.
-   * @param {{randomInt:Function,lerp:Function,clamp:Function,getFallingBugCount:Function,spawnBugWaveBug:Function,spawnBugWaveGroundBug:Function,spawnBigOrderGem:Function,spawnBigOrderBug:Function}} hooks - Runtime hooks from the main game loop.
+   * @param {{randomInt:Function,lerp:Function,clamp:Function,getFallingBugCount:Function,spawnBugWaveBug:Function,spawnBugWaveGroundBug:Function,spawnBigOrderGem:Function}} hooks - Runtime hooks from the main game loop.
    * @returns {Record<string, object>} Event definition map.
    */
   function createSpecialEventDefinitions(specialEventConfig, hooks) {
@@ -87,7 +87,6 @@
       spawnBugWaveBug,
       spawnBugWaveGroundBug,
       spawnBigOrderGem,
-      spawnBigOrderBug,
     } = hooks;
 
     return {
@@ -142,20 +141,18 @@
         title: "Großauftrag",
         announcementTitle: "Großauftrag kommt rein",
         announcementPrompt: "Bereite dich vor",
-        activeStatusMessage: "Großauftrag aktiv. Mehr Moneten und mehr Bugs unterwegs",
+        activeStatusMessage: "Großauftrag aktiv. Mehr Moneten unterwegs",
         completionStatusMessage: "Großauftrag abgeschlossen",
         chunkGeneration: specialEventConfig.bigOrder,
         createRuntime(phase) {
           if (phase === SPECIAL_EVENT_PHASE.ANNOUNCE) {
             return {
               gemSpawnTimer: 900,
-              bugSpawnTimer: 1200,
             };
           }
           if (phase === SPECIAL_EVENT_PHASE.ACTIVE) {
             return {
               gemSpawnTimer: 700,
-              bugSpawnTimer: 1000,
             };
           }
           return {};
@@ -172,18 +169,6 @@
             state.runtime.gemSpawnTimer += randomInt(
               bigOrderConfig.visibleGemSpawnIntervalMin,
               bigOrderConfig.visibleGemSpawnIntervalMax
-            );
-          }
-
-          state.runtime.bugSpawnTimer -= delta;
-          while (state.runtime.bugSpawnTimer <= 0) {
-            spawnBigOrderBug();
-            if (randomChance() < bigOrderConfig.visibleExtraBugChance) {
-              spawnBigOrderBug();
-            }
-            state.runtime.bugSpawnTimer += randomInt(
-              bigOrderConfig.visibleBugSpawnIntervalMin,
-              bigOrderConfig.visibleBugSpawnIntervalMax
             );
           }
         },
