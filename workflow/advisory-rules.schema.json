@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://red-dune-dash.local/workflow/advisory-rules.schema.json",
+  "title": "Red Dune Dash Advisory Rules",
+  "type": "object",
+  "required": ["version", "governance", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "governance": {
+      "type": "object",
+      "required": ["advisoryOnly", "routingAuthority", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "advisoryOnly": {
+          "type": "boolean",
+          "const": true
+        },
+        "routingAuthority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "unknownFileFallback": {
+      "$ref": "#/$defs/ruleLike"
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ruleLike": {
+      "type": "object",
+      "required": [
+        "id",
+        "area",
+        "riskTags",
+        "recommendedChecks",
+        "manualChecks",
+        "suggestedDocs",
+        "suggestedReading",
+        "ciSignals"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "riskTags": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "recommendedChecks": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "manualChecks": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "suggestedDocs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "suggestedReading": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "ciSignals": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "rule": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/ruleLike"
+        },
+        {
+          "type": "object",
+          "required": ["match"],
+          "properties": {
+            "match": {
+              "$ref": "#/$defs/stringArray",
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    }
+  }
+}

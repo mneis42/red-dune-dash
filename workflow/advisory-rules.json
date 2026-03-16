@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "governance": {
+    "advisoryOnly": true,
+    "routingAuthority": "AGENTS.md",
+    "note": "This file is advisory only. Canonical workflow routing stays in AGENTS.md and instruction files."
+  },
+  "unknownFileFallback": {
+    "id": "fallback-unclassified",
+    "area": "unclassified",
+    "riskTags": ["unknown-change-surface"],
+    "recommendedChecks": ["npm run check"],
+    "manualChecks": [
+      "review changed file manually and assign likely area",
+      "cross-check relevant docs if behavior changed"
+    ],
+    "suggestedDocs": ["README.md", "CONTRIBUTING.md", "docs/"],
+    "suggestedReading": ["AGENTS.md", "instructions/change-review.md"],
+    "ciSignals": ["advisory-fallback"]
+  },
+  "rules": [
+    {
+      "id": "gameplay-core",
+      "match": ["systems/**", "game-endless.js"],
+      "area": "gameplay",
+      "riskTags": ["game-balance", "cross-system-behavior"],
+      "recommendedChecks": ["npm run check", "npm run test:simulation"],
+      "manualChecks": [],
+      "suggestedDocs": ["docs/", "README.md"],
+      "suggestedReading": ["AGENTS.md", "instructions/feature-request.md", "instructions/bug-report.md"],
+      "ciSignals": ["syntax", "simulation-tests"]
+    },
+    {
+      "id": "pwa-offline",
+      "match": ["service-worker.js", "app-assets.js", "manifest.webmanifest"],
+      "area": "pwa",
+      "riskTags": ["offline", "caching", "installability"],
+      "recommendedChecks": ["npm run check", "npm run test:service-worker"],
+      "manualChecks": [
+        "run under local HTTP server",
+        "offline reload smoke check",
+        "installability sanity check",
+        "cache update path smoke check after asset or version changes"
+      ],
+      "suggestedDocs": ["README.md", "docs/"],
+      "suggestedReading": ["AGENTS.md", "instructions/change-review.md"],
+      "ciSignals": ["syntax", "service-worker-tests"]
+    },
+    {
+      "id": "workflow-docs",
+      "match": ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/**"],
+      "area": "workflow-docs",
+      "riskTags": ["process-drift", "instruction-consistency"],
+      "recommendedChecks": ["npm run check"],
+      "manualChecks": ["cross-read nearby docs for contradiction risk"],
+      "suggestedDocs": ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
+      "suggestedReading": ["AGENTS.md"],
+      "ciSignals": ["instruction-lint"]
+    },
+    {
+      "id": "ui-shell",
+      "match": ["index.html", "styles.css"],
+      "area": "ui-shell",
+      "riskTags": ["layout", "responsive-behavior"],
+      "recommendedChecks": [],
+      "manualChecks": ["responsive smoke check on mobile and desktop"],
+      "suggestedDocs": ["README.md"],
+      "suggestedReading": ["AGENTS.md", "instructions/change-review.md"],
+      "ciSignals": []
+    }
+  ]
+}

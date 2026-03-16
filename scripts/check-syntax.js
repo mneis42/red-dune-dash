@@ -12,7 +12,9 @@ const filesToCheck = [
   "systems/placement-system.js",
   "systems/respawn-helpers.js",
   "systems/simulation-core.js",
-  "systems/special-event-system.js"
+  "systems/special-event-system.js",
+  "scripts/advisory-rules.js",
+  "scripts/agent-advisory.js"
 ];
 
 for (const file of filesToCheck) {
