@@ -98,6 +98,18 @@ npm run test:simulation
 npm run test:service-worker
 ```
 
+For advisory change hints based on changed file paths, run:
+
+```powershell
+npm run agent:advisory
+```
+
+For machine-readable output, use:
+
+```powershell
+npm run agent:advisory:json
+```
+
 The GitHub Actions workflows also run the same syntax and test steps before deployment.
 
 ## Branch Workflow
@@ -149,5 +161,7 @@ For offline testing, use a local HTTP server instead of `file://`. The service w
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the expected workflow, language conventions, testing expectations, and collaboration model for both humans and AI agents.
 
 For repository-specific agent instructions, see [AGENTS.md](AGENTS.md).
+
+For the advisory change-rule model and governance boundaries, see [docs/advisory-rules.md](docs/advisory-rules.md).
 
 For full repository reviews, the canonical instructions live in [instructions/full-code-review.md](instructions/full-code-review.md).
