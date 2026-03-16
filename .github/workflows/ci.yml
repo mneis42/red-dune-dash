@@ -25,3 +25,13 @@ jobs:
 
       - name: Run test suite
         run: npm test
+
+      - name: Advisory change hints (non-blocking)
+        continue-on-error: true
+        run: |
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | paste -sd, -)
+          if [ -z "$CHANGED_FILES" ]; then
+            npm run agent:advisory
+          else
+            npm run agent:advisory -- --files "$CHANGED_FILES"
+          fi
