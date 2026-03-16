@@ -166,4 +166,6 @@ For the advisory change-rule model and governance boundaries, see [docs/advisory
 
 For local preflight hints before implementation (branch warning, changed-file advisory mapping, documentation-drift hints, unrelated-change hints, and guardrail signal), run `npm run agent:preflight`.
 
+For instruction and workflow link validation (process docs path and heading consistency), run `npm run instruction:lint`.
+
 For full repository reviews, the canonical instructions live in [instructions/full-code-review.md](instructions/full-code-review.md).

@@ -70,6 +70,14 @@ Emit machine-readable preflight JSON:
 npm run agent:preflight:json
 ```
 
+Run instruction and workflow markdown consistency checks:
+
+```bash
+npm run instruction:lint
+```
+
+This lint is focused on process docs and instruction references. It validates local markdown links and explicit heading anchors for the workflow surface (`AGENTS.md`, root process docs, `instructions/`, and `.github/` instruction docs).
+
 ## Matching Strategy
 
 - Rule matching is path-pattern based.
