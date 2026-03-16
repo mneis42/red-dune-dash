@@ -5,6 +5,7 @@ const {
   resolveTaskAreas,
   classifyRelatedChanges,
   validateScope,
+  buildDocumentationDriftHints,
   formatHumanReadable,
 } = require("../scripts/agent-preflight.js");
 
@@ -94,6 +95,29 @@ test("validateScope rejects unknown area names", () => {
   assert.deepEqual(result.invalidAreas, ["unknown-area"]);
 });
 
+test("buildDocumentationDriftHints returns all canonical mappings for matched areas", () => {
+  const advisory = createAdvisoryResult([], [], ["gameplay", "pwa", "workflow-docs"]);
+  const drift = buildDocumentationDriftHints(advisory);
+
+  assert.equal(drift.triggered, true);
+  assert.deepEqual(
+    drift.hints.map((entry) => entry.id),
+    ["gameplay-system-doc-drift", "pwa-offline-doc-drift", "workflow-instruction-doc-drift"]
+  );
+  assert.ok(drift.suggestedDocs.includes("README.md"));
+  assert.ok(drift.suggestedDocs.includes("CONTRIBUTING.md"));
+  assert.ok(drift.suggestedDocs.includes("instructions/"));
+});
+
+test("buildDocumentationDriftHints returns no hints for unrelated areas", () => {
+  const advisory = createAdvisoryResult([], [], ["tooling", "ui-shell"]);
+  const drift = buildDocumentationDriftHints(advisory);
+
+  assert.equal(drift.triggered, false);
+  assert.deepEqual(drift.hints, []);
+  assert.deepEqual(drift.suggestedDocs, []);
+});
+
 test("human output includes advisory policy note and unrelated section", () => {
   const output = formatHumanReadable({
     branchState: { current: "feature/x", onMain: false },
@@ -112,6 +136,22 @@ test("human output includes advisory policy note and unrelated section", () => {
       suggestedReading: ["AGENTS.md"],
       fallbackFiles: [],
     },
+    documentationDrift: {
+      advisoryOnly: true,
+      triggered: true,
+      note: "Documentation drift hints are advisory only and never block execution.",
+      hints: [
+        {
+          id: "workflow-instruction-doc-drift",
+          title: "Workflow/instruction changes likely need process docs sync",
+          reason: "Process updates should stay consistent across all workflow entry points.",
+          triggerAreas: ["workflow-docs"],
+          suggestedDocs: ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
+          advisoryOnly: true,
+        },
+      ],
+      suggestedDocs: ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
+    },
     unrelatedChanges: {
       heuristic: "outside task areas",
       unrelatedFiles: [{ filePath: "README.md", areas: ["workflow-docs"], ruleIds: ["workflow-docs"] }],
@@ -126,6 +166,8 @@ test("human output includes advisory policy note and unrelated section", () => {
 
   assert.match(output, /Unrelated local changes/);
   assert.match(output, /No setup history inference is used/);
+  assert.match(output, /Documentation drift hints/);
+  assert.match(output, /Workflow\/instruction changes likely need process docs sync/);
 });
 
 test("human output warns when running on main branch", () => {
@@ -145,6 +187,13 @@ test("human output warns when running on main branch", () => {
       suggestedDocs: [],
       suggestedReading: [],
       fallbackFiles: [],
+    },
+    documentationDrift: {
+      advisoryOnly: true,
+      triggered: false,
+      note: "Documentation drift hints are advisory only and never block execution.",
+      hints: [],
+      suggestedDocs: [],
     },
     unrelatedChanges: {
       heuristic: "outside task areas",
@@ -179,6 +228,13 @@ test("human output handles no-change scenario without file list items", () => {
       suggestedReading: [],
       fallbackFiles: [],
     },
+    documentationDrift: {
+      advisoryOnly: true,
+      triggered: false,
+      note: "Documentation drift hints are advisory only and never block execution.",
+      hints: [],
+      suggestedDocs: [],
+    },
     unrelatedChanges: {
       heuristic: "outside task areas",
       unrelatedFiles: [],
@@ -212,6 +268,22 @@ test("human output includes mixed change counts and fallback files section", () 
       suggestedDocs: ["README.md"],
       suggestedReading: ["AGENTS.md"],
       fallbackFiles: ["todo.md"],
+    },
+    documentationDrift: {
+      advisoryOnly: true,
+      triggered: true,
+      note: "Documentation drift hints are advisory only and never block execution.",
+      hints: [
+        {
+          id: "workflow-instruction-doc-drift",
+          title: "Workflow/instruction changes likely need process docs sync",
+          reason: "Process updates should stay consistent across all workflow entry points.",
+          triggerAreas: ["workflow-docs"],
+          suggestedDocs: ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
+          advisoryOnly: true,
+        },
+      ],
+      suggestedDocs: ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
     },
     unrelatedChanges: {
       heuristic: "outside task areas",
@@ -248,6 +320,22 @@ test("human output keeps section order deterministic", () => {
       suggestedReading: ["AGENTS.md"],
       fallbackFiles: [],
     },
+    documentationDrift: {
+      advisoryOnly: true,
+      triggered: true,
+      note: "Documentation drift hints are advisory only and never block execution.",
+      hints: [
+        {
+          id: "workflow-instruction-doc-drift",
+          title: "Workflow/instruction changes likely need process docs sync",
+          reason: "Process updates should stay consistent across all workflow entry points.",
+          triggerAreas: ["workflow-docs"],
+          suggestedDocs: ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
+          advisoryOnly: true,
+        },
+      ],
+      suggestedDocs: ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
+    },
     unrelatedChanges: {
       heuristic: "outside task areas",
       unrelatedFiles: [],
@@ -265,6 +353,7 @@ test("human output keeps section order deterministic", () => {
     "Matched rules",
     "Recommended checks",
     "Likely docs / instructions",
+    "Documentation drift hints",
     "Unrelated local changes",
     "Guardrail status",
   ];

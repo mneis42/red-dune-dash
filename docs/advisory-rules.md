@@ -82,6 +82,10 @@ npm run agent:preflight:json
 - `agent:preflight` is advisory-only and remains non-blocking for warnings.
 - The command reports whether the current branch is `main`.
 - The command reports changed files and matched advisory context.
+- The command reports documentation-drift hints with a fixed initial mapping:
+   - gameplay area changes suggest gameplay/system docs plus README review.
+   - pwa area changes suggest offline/PWA documentation review.
+   - workflow-docs area changes suggest README, CONTRIBUTING, AGENTS, and instructions review.
 - The command reports unrelated local changes using this heuristic:
    - a file is unrelated when none of its matched areas intersects with task areas.
    - task areas come from `--scope` when provided; otherwise from inferred matched areas.

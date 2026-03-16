@@ -195,6 +195,60 @@ function validateScope(scopeAreas, document) {
   };
 }
 
+const DOCUMENTATION_DRIFT_PROFILES = [
+  {
+    id: "gameplay-system-doc-drift",
+    triggerAreas: ["gameplay"],
+    title: "Gameplay/system changes likely need gameplay docs sync",
+    reason: "Gameplay logic can drift from technical and balancing documentation.",
+    suggestedDocs: [
+      "docs/simulation-core.md",
+      "docs/event-model.md",
+      "docs/pickup-model.md",
+      "docs/generator-rules.md",
+      "docs/placement-rules.md",
+      "docs/respawn-fairness.md",
+      "README.md",
+    ],
+  },
+  {
+    id: "pwa-offline-doc-drift",
+    triggerAreas: ["pwa"],
+    title: "PWA/service-worker changes likely need offline and PWA doc sync",
+    reason: "Caching, installability, and offline behavior should stay documented for local validation.",
+    suggestedDocs: ["README.md", "docs/asset-manifest.md"],
+  },
+  {
+    id: "workflow-instruction-doc-drift",
+    triggerAreas: ["workflow-docs"],
+    title: "Workflow/instruction changes likely need process docs sync",
+    reason: "Process updates should stay consistent across all workflow entry points.",
+    suggestedDocs: ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
+  },
+];
+
+function buildDocumentationDriftHints(advisoryResult) {
+  const matchedAreas = new Set(advisoryResult.merged.areas);
+  const hints = DOCUMENTATION_DRIFT_PROFILES.filter((profile) =>
+    profile.triggerAreas.some((area) => matchedAreas.has(area))
+  ).map((profile) => ({
+    id: profile.id,
+    title: profile.title,
+    reason: profile.reason,
+    triggerAreas: profile.triggerAreas,
+    suggestedDocs: profile.suggestedDocs,
+    advisoryOnly: true,
+  }));
+
+  return {
+    advisoryOnly: true,
+    triggered: hints.length > 0,
+    hints,
+    suggestedDocs: stableUnique(hints.flatMap((hint) => hint.suggestedDocs)),
+    note: "Documentation drift hints are advisory only and never block execution.",
+  };
+}
+
 function buildPreflightResult(options, document, changedState, advisoryResult) {
   const branch = getCurrentBranch();
   const branchState = {
@@ -224,6 +278,7 @@ function buildPreflightResult(options, document, changedState, advisoryResult) {
       fallbackFiles: advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath),
     },
     taskScope: taskAreaResolution,
+    documentationDrift: buildDocumentationDriftHints(advisoryResult),
     unrelatedChanges: relatedClassification,
     guardrail: detectGuardrailStatus(),
     governance: advisoryResult.governance,
@@ -281,6 +336,20 @@ function formatHumanReadable(result) {
     lines.push("- none");
   } else {
     docsAndReading.forEach((entry) => lines.push(`- ${entry}`));
+  }
+
+  lines.push("");
+  lines.push("Documentation drift hints");
+  if (!result.documentationDrift || result.documentationDrift.hints.length === 0) {
+    lines.push("- none");
+  } else {
+    result.documentationDrift.hints.forEach((hint) => {
+      lines.push(`- ${hint.title}`);
+      lines.push(`  Trigger areas: ${hint.triggerAreas.join(", ")}`);
+      lines.push(`  Suggested docs: ${hint.suggestedDocs.join(", ")}`);
+      lines.push(`  Why: ${hint.reason}`);
+    });
+    lines.push(`Note: ${result.documentationDrift.note}`);
   }
 
   lines.push("");
@@ -353,6 +422,7 @@ module.exports = {
   resolveTaskAreas,
   classifyRelatedChanges,
   validateScope,
+  buildDocumentationDriftHints,
   buildPreflightResult,
   formatHumanReadable,
 };
