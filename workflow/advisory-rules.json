@@ -67,6 +67,28 @@
       "suggestedDocs": ["README.md"],
       "suggestedReading": ["AGENTS.md", "instructions/change-review.md"],
       "ciSignals": []
+    },
+    {
+      "id": "repo-docs",
+      "match": ["docs/**", "workflow/**", "backlog/**", "workflow-ideas.md", "developer-todos.md", "todo.md"],
+      "area": "workflow-docs",
+      "riskTags": ["documentation-drift", "process-clarity"],
+      "recommendedChecks": ["npm run check"],
+      "manualChecks": ["cross-read nearby docs for contradiction risk"],
+      "suggestedDocs": ["README.md", "CONTRIBUTING.md", "docs/", "instructions/"],
+      "suggestedReading": ["AGENTS.md", "instructions/change-review.md"],
+      "ciSignals": ["instruction-lint"]
+    },
+    {
+      "id": "tooling-scripts-tests",
+      "match": ["scripts/**", "tests/**", "package.json"],
+      "area": "tooling",
+      "riskTags": ["verification-reliability", "developer-workflow"],
+      "recommendedChecks": ["npm run check", "npm test"],
+      "manualChecks": ["verify command output stays actionable and non-noisy"],
+      "suggestedDocs": ["README.md", "CONTRIBUTING.md", "docs/"],
+      "suggestedReading": ["AGENTS.md", "instructions/change-review.md"],
+      "ciSignals": ["syntax", "test-suite"]
     }
   ]
 }

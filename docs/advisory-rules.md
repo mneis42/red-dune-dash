@@ -52,12 +52,41 @@ List only files that required the fallback rule:
 npm run agent:advisory:unmatched
 ```
 
+Run preflight hints before implementation work:
+
+```bash
+npm run agent:preflight
+```
+
+Use explicit task scope to classify unrelated local changes with higher precision:
+
+```bash
+npm run agent:preflight -- --scope gameplay,pwa
+```
+
+Emit machine-readable preflight JSON:
+
+```bash
+npm run agent:preflight:json
+```
+
 ## Matching Strategy
 
 - Rule matching is path-pattern based.
 - A file can match multiple rules.
 - Multi-match output uses merge with de-duplication and stable ordering.
 - Unknown files get a generic fallback advisory rule if unknownFileFallback is configured.
+
+## Preflight Behavior Notes
+
+- `agent:preflight` is advisory-only and remains non-blocking for warnings.
+- The command reports whether the current branch is `main`.
+- The command reports changed files and matched advisory context.
+- The command reports unrelated local changes using this heuristic:
+   - a file is unrelated when none of its matched areas intersects with task areas.
+   - task areas come from `--scope` when provided; otherwise from inferred matched areas.
+- Hook guardrail status is based on current observable signal only (`.git/hooks/pre-commit` exists).
+- The command does not infer guardrail readiness from whether `npm run setup` was executed in the past.
 
 ## Rule Update Checklist
 

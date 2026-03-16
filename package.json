@@ -9,8 +9,11 @@
     "agent:advisory": "node scripts/agent-advisory.js",
     "agent:advisory:json": "node scripts/agent-advisory.js --json",
     "agent:advisory:unmatched": "node scripts/agent-advisory.js --unmatched",
-    "test": "npm run test:simulation && npm run test:service-worker && npm run test:advisory",
+    "agent:preflight": "node scripts/agent-preflight.js",
+    "agent:preflight:json": "node scripts/agent-preflight.js --json",
+    "test": "npm run test:simulation && npm run test:service-worker && npm run test:advisory && npm run test:preflight",
     "test:advisory": "node tests/advisory-rules.test.js",
+    "test:preflight": "node tests/agent-preflight.test.js",
     "test:simulation": "node tests/simulation-core.test.js",
     "test:service-worker": "node tests/service-worker.test.js",
     "verify": "npm run check && npm test"

@@ -14,7 +14,8 @@ const filesToCheck = [
   "systems/simulation-core.js",
   "systems/special-event-system.js",
   "scripts/advisory-rules.js",
-  "scripts/agent-advisory.js"
+  "scripts/agent-advisory.js",
+  "scripts/agent-preflight.js"
 ];
 
 for (const file of filesToCheck) {
