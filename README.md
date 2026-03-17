@@ -112,6 +112,18 @@ For machine-readable output, use:
 npm run agent:advisory:json
 ```
 
+For one unified local-change/postflight summary (changed files, checks, docs, impact, risks, and open questions), run:
+
+```powershell
+npm run agent:summary
+```
+
+If you want the command to execute recommended checks and include real outcomes, run:
+
+```powershell
+npm run agent:summary -- --run-checks
+```
+
 The GitHub Actions workflows also run the same syntax and test steps before deployment.
 
 ## Branch Workflow

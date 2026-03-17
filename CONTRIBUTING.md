@@ -56,6 +56,8 @@ You can also run `npm run test:simulation` or `npm run test:service-worker` when
 
 For advisory, non-blocking change hints based on touched file paths, run `npm run agent:advisory`.
 
+For a unified local-change/postflight summary suitable for commits, PRs, or handoffs, run `npm run agent:summary`.
+
 If you do not run a relevant check, say so explicitly in your summary or pull request.
 
 ## Reviews

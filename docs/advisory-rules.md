@@ -70,6 +70,24 @@ Emit machine-readable preflight JSON:
 npm run agent:preflight:json
 ```
 
+Run unified summary generation for local-change and postflight-style handoff contexts:
+
+```bash
+npm run agent:summary
+```
+
+Run recommended checks and include command outcomes in the same summary output:
+
+```bash
+npm run agent:summary -- --run-checks
+```
+
+Emit machine-readable summary JSON:
+
+```bash
+npm run agent:summary -- --json
+```
+
 Run instruction and workflow markdown consistency checks:
 
 ```bash
@@ -103,6 +121,13 @@ This lint is focused on process docs and instruction references. It validates lo
 - Hook guardrail status prefers configured `core.hooksPath` with `.githooks/pre-push` as primary signal.
 - If `core.hooksPath` is not configured, a legacy fallback signal checks `.git/hooks/pre-commit`.
 - The command reports current observable state only and does not infer readiness from past `npm run setup` runs.
+
+## Summary Behavior Notes
+
+- `agent:summary` is a single canonical summary command for both local-change and postflight-style usage.
+- The command always reports changed files, checks and outcomes, affected docs/instructions, user-visible impact, risks, and open questions.
+- The command includes a copy-ready short block for commit messages, PR descriptions, or handoff text.
+- Without `--run-checks`, recommended checks are listed as `not-run` to avoid overstating validation coverage.
 
 ## Rule Update Checklist
 
