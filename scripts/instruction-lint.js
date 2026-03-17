@@ -48,7 +48,7 @@ function normalizeHeadingText(heading) {
     .replace(/`+/g, "")
     .replace(/[\[\]()]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9\s-_]/g, "")
+    .replace(/[^a-z0-9\s_-]/g, "")
     .trim()
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
