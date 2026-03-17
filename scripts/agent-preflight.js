@@ -276,6 +276,87 @@ const DOCUMENTATION_DRIFT_PROFILES = [
   },
 ];
 
+const REVIEW_DEPTH_TIERS = {
+  light: {
+    expectedOutcomes: [
+      "single-area correctness verified",
+      "recommended checks acknowledged and run",
+    ],
+  },
+  standard: {
+    expectedOutcomes: [
+      "cross-area behavior reviewed",
+      "targeted regression checks and docs sanity completed",
+    ],
+  },
+  deep: {
+    expectedOutcomes: [
+      "high-risk impact review completed",
+      "workflow/PWA implications and rollback risk assessed",
+    ],
+  },
+};
+
+const REVIEW_DEPTH_HIGH_RISK_AREAS = new Set(["workflow-docs", "pwa"]);
+const REVIEW_DEPTH_HIGH_RISK_TAGS = new Set([
+  "offline",
+  "caching",
+  "installability",
+  "process-drift",
+  "instruction-consistency",
+]);
+
+function recommendReviewDepth(advisoryResult) {
+  const matchedAreas = advisoryResult.merged.areas;
+  const riskTags = advisoryResult.merged.riskTags;
+
+  const triggeringHighRiskAreas = matchedAreas.filter((area) => REVIEW_DEPTH_HIGH_RISK_AREAS.has(area));
+  const triggeringHighRiskTags = riskTags.filter((tag) => REVIEW_DEPTH_HIGH_RISK_TAGS.has(tag));
+
+  if (triggeringHighRiskAreas.length > 0 || triggeringHighRiskTags.length > 0) {
+    return {
+      tier: "deep",
+      rationale:
+        "High-risk workflow/PWA surface detected; prefer deep review. Mixed-risk diffs always use the highest-risk tier.",
+      reasons: stableUnique([
+        ...triggeringHighRiskAreas.map((area) => `high-risk area: ${area}`),
+        ...triggeringHighRiskTags.map((tag) => `high-risk tag: ${tag}`),
+      ]),
+      expectedOutcomes: REVIEW_DEPTH_TIERS.deep.expectedOutcomes,
+      advisoryOnly: true,
+      precedenceRule: "highest-risk-tier-wins",
+      routingAuthority: "AGENTS.md",
+    };
+  }
+
+  if (matchedAreas.length > 1 || riskTags.includes("cross-system-behavior")) {
+    return {
+      tier: "standard",
+      rationale: "Cross-cutting change surface detected; standard depth is recommended.",
+      reasons: stableUnique([
+        matchedAreas.length > 1 ? `multiple matched areas: ${matchedAreas.join(", ")}` : null,
+        riskTags.includes("cross-system-behavior") ? "risk tag: cross-system-behavior" : null,
+      ]).filter(Boolean),
+      expectedOutcomes: REVIEW_DEPTH_TIERS.standard.expectedOutcomes,
+      advisoryOnly: true,
+      precedenceRule: "highest-risk-tier-wins",
+      routingAuthority: "AGENTS.md",
+    };
+  }
+
+  return {
+    tier: "light",
+    rationale: "Contained change surface detected; light review is usually sufficient.",
+    reasons: [
+      matchedAreas.length === 1 ? `single matched area: ${matchedAreas[0]}` : "no matched area; limited local context",
+    ],
+    expectedOutcomes: REVIEW_DEPTH_TIERS.light.expectedOutcomes,
+    advisoryOnly: true,
+    precedenceRule: "highest-risk-tier-wins",
+    routingAuthority: "AGENTS.md",
+  };
+}
+
 function buildDocumentationDriftHints(advisoryResult) {
   const matchedAreas = new Set(advisoryResult.merged.areas);
   const hints = DOCUMENTATION_DRIFT_PROFILES.filter((profile) =>
@@ -307,6 +388,7 @@ function buildPreflightResult(options, document, changedState, advisoryResult) {
 
   const taskAreaResolution = resolveTaskAreas(options, advisoryResult);
   const relatedClassification = classifyRelatedChanges(advisoryResult, taskAreaResolution.areas);
+  const reviewDepth = recommendReviewDepth(advisoryResult);
 
   return {
     branchState,
@@ -327,6 +409,7 @@ function buildPreflightResult(options, document, changedState, advisoryResult) {
       fallbackFiles: advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath),
     },
     taskScope: taskAreaResolution,
+    reviewDepth,
     documentationDrift: buildDocumentationDriftHints(advisoryResult),
     unrelatedChanges: relatedClassification,
     guardrail: detectGuardrailStatus(),
@@ -334,6 +417,8 @@ function buildPreflightResult(options, document, changedState, advisoryResult) {
     policy: {
       advisoryOnly: true,
       exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   };
 }
@@ -386,6 +471,20 @@ function formatHumanReadable(result) {
   } else {
     docsAndReading.forEach((entry) => lines.push(`- ${entry}`));
   }
+
+  lines.push("");
+  lines.push("Review depth recommendation");
+  lines.push(`Tier: ${result.reviewDepth.tier}`);
+  lines.push(`Why: ${result.reviewDepth.rationale}`);
+  if (result.reviewDepth.reasons.length > 0) {
+    lines.push("Reasons");
+    result.reviewDepth.reasons.forEach((entry) => lines.push(`- ${entry}`));
+  }
+  lines.push("Expected outcomes");
+  result.reviewDepth.expectedOutcomes.forEach((entry) => lines.push(`- ${entry}`));
+  lines.push(
+    `Policy: advisory only; canonical workflow routing remains in ${result.reviewDepth.routingAuthority} (${result.reviewDepth.precedenceRule}).`
+  );
 
   lines.push("");
   lines.push("Documentation drift hints");
@@ -472,6 +571,7 @@ module.exports = {
   resolveTaskAreas,
   classifyRelatedChanges,
   validateScope,
+  recommendReviewDepth,
   buildDocumentationDriftHints,
   buildPreflightResult,
   formatHumanReadable,
