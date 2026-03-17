@@ -102,6 +102,68 @@ If many issues exist, lead with the most severe ones and compress the rest.
 If the user asks for a review, stay in review mode.
 Only edit code or files when the user explicitly asks for fixes or for the review to be applied.
 
+## Task Packages (Canonical Insertion Point)
+
+This section defines reusable task-package shapes for common repository work.
+Packages are advisory overlays for review framing and verification depth. They do not replace the canonical routing in `AGENTS.md` and they do not create a parallel workflow.
+
+How to use packages in this workflow:
+
+- Keep this change-review workflow as the primary process.
+- Select the package that best matches the changed behavior under review.
+- Use package checks to decide review depth and missing-verification findings.
+- If multiple packages apply, combine them and prioritize the highest-risk checks.
+
+### Package: Balancing Tweak
+
+Use when the diff changes economy, spawn rates, progression pacing, score pressure, or reward curves.
+
+- Typical files: `game-endless.js`, `styles.css`, `README.md` (balancing notes if touched)
+- Review checks:
+	- verify change rationale matches game progression goals
+	- verify no new softlock or unavoidable failure pattern appears
+	- verify player-facing guidance remains accurate after tuning changes
+
+### Package: PWA / Offline Reliability
+
+Use when the diff changes installability, caching, service worker lifecycle, or asset/version manifests.
+
+- Typical files: `service-worker.js`, `manifest.webmanifest`, `app-assets.js`, `version.json`
+- Review checks:
+	- verify update and cache invalidation paths are coherent
+	- verify offline behavior expectations are test-backed or manually validated
+	- verify versioning and cache keys move together to avoid stale clients
+
+### Package: Gameplay Bugfix
+
+Use when a player-facing defect is fixed in the reviewed change set.
+
+- Typical files: `game-endless.js`, tests in `tests/`, player-facing docs in `README.md`
+- Review checks:
+	- verify expected-vs-actual behavior is explicit
+	- verify regression coverage exists for the fixed path and adjacent edge case
+	- verify fix addresses root cause rather than only symptom masking
+
+### Package: Workflow / Docs Update
+
+Use when process docs, instructions, templates, or CI guidance are changed.
+
+- Typical files: `instructions/*.md`, `.github/instructions/*.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/`
+- Review checks:
+	- verify wording consistency across canonical and mirrored instruction files
+	- verify examples and commands are actionable in this repository
+	- verify workflow routing authority remains unchanged
+
+### Package: Targeted Review Readiness
+
+Use when validating that a small or medium diff is review-ready.
+
+- Typical files: changed implementation files plus related tests/docs
+- Review checks:
+	- verify change boundary is coherent and complete for the stated intent
+	- verify behavior changes have matching verification evidence
+	- verify reviewer can infer risk, expected behavior, and follow-up scope quickly
+
 ## Behavior Expectations For Agents
 
 - Be skeptical of regressions hidden behind small diffs.

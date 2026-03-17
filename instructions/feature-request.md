@@ -239,6 +239,68 @@ Use the most appropriate verification available for each TODO, for example:
 
 Before every implementation commit, the relevant checks must be green.
 
+## Task Packages (Canonical Insertion Point)
+
+This section defines reusable task-package shapes for common repository work.
+Packages are advisory overlays for planning and execution detail. They do not replace the canonical routing in `AGENTS.md` and they do not create a parallel workflow.
+
+How to use packages in this workflow:
+
+- Keep this feature-request workflow as the primary process.
+- Select the package that best matches the implementation slice.
+- Add package-specific checks and completion criteria into `todo.md` TODO items.
+- If multiple packages apply, combine them and keep the stricter verification set.
+
+### Package: Balancing Tweak
+
+Use when adjusting economy, spawn rates, progression pacing, score pressure, or reward curves.
+
+- Typical files: `game-endless.js`, `styles.css`, `README.md` (balancing notes if needed)
+- Required checks:
+	- manual before/after gameplay comparison for early, mid, and pressure phases
+	- verify no softlock or unavoidable failure state was introduced
+	- verify score/reward changes do not invalidate visible player guidance
+
+### Package: PWA / Offline Reliability
+
+Use when changing installability, cache behavior, service worker lifecycle, or asset versioning.
+
+- Typical files: `service-worker.js`, `manifest.webmanifest`, `app-assets.js`, `version.json`
+- Required checks:
+	- verify first load and repeat load behavior
+	- verify offline fallback or cache-hit behavior after an initial online visit
+	- verify update behavior when `version.json` and cached assets diverge
+
+### Package: Gameplay Bugfix
+
+Use when a player-facing gameplay defect is fixed as part of the feature delivery.
+
+- Typical files: `game-endless.js`, tests in `tests/`, player-facing docs in `README.md`
+- Required checks:
+	- reproduce baseline behavior before fix (or document why reproduction is blocked)
+	- verify fix for the reported path and at least one adjacent edge case
+	- add or update regression checks where practical
+
+### Package: Workflow / Docs Update
+
+Use when implementation affects process docs, instructions, templates, CI guardrails, or contributor workflows.
+
+- Typical files: `instructions/*.md`, `.github/instructions/*.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/`
+- Required checks:
+	- verify changed guidance is consistent across canonical and mirrored instruction files
+	- verify command examples exist and are executable in this repository context
+	- verify no wording contradicts routing authority in `AGENTS.md`
+
+### Package: Targeted Review Readiness
+
+Use before handing off a contained change set for lightweight review.
+
+- Typical files: changed implementation files plus related tests/docs
+- Required checks:
+	- ensure diff boundary is intentional and coherent
+	- ensure behavior changes are covered by tests or explicit manual verification notes
+	- ensure reviewer-facing context is present (risk, scope, and expected behavior)
+
 ## Behavior Expectations For Agents
 
 - Be thorough before coding.
