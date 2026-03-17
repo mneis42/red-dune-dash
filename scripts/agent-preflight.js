@@ -297,6 +297,9 @@ const REVIEW_DEPTH_TIERS = {
   },
 };
 
+const REVIEW_DEPTH_PRECEDENCE_RULE = "highest-risk-tier-wins";
+const ROUTING_AUTHORITY = "AGENTS.md";
+
 const REVIEW_DEPTH_HIGH_RISK_AREAS = new Set(["workflow-docs", "pwa"]);
 const REVIEW_DEPTH_HIGH_RISK_TAGS = new Set([
   "offline",
@@ -324,8 +327,6 @@ function recommendReviewDepth(advisoryResult) {
       ]),
       expectedOutcomes: REVIEW_DEPTH_TIERS.deep.expectedOutcomes,
       advisoryOnly: true,
-      precedenceRule: "highest-risk-tier-wins",
-      routingAuthority: "AGENTS.md",
     };
   }
 
@@ -339,8 +340,6 @@ function recommendReviewDepth(advisoryResult) {
       ]).filter(Boolean),
       expectedOutcomes: REVIEW_DEPTH_TIERS.standard.expectedOutcomes,
       advisoryOnly: true,
-      precedenceRule: "highest-risk-tier-wins",
-      routingAuthority: "AGENTS.md",
     };
   }
 
@@ -352,8 +351,6 @@ function recommendReviewDepth(advisoryResult) {
     ],
     expectedOutcomes: REVIEW_DEPTH_TIERS.light.expectedOutcomes,
     advisoryOnly: true,
-    precedenceRule: "highest-risk-tier-wins",
-    routingAuthority: "AGENTS.md",
   };
 }
 
@@ -417,7 +414,8 @@ function buildPreflightResult(options, document, changedState, advisoryResult) {
     policy: {
       advisoryOnly: true,
       exitCodePolicy: "non-blocking for advisory warnings",
-      routingAuthority: "AGENTS.md",
+      routingAuthority: ROUTING_AUTHORITY,
+      reviewDepthPrecedenceRule: REVIEW_DEPTH_PRECEDENCE_RULE,
       routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   };
@@ -483,7 +481,7 @@ function formatHumanReadable(result) {
   lines.push("Expected outcomes");
   result.reviewDepth.expectedOutcomes.forEach((entry) => lines.push(`- ${entry}`));
   lines.push(
-    `Policy: advisory only; canonical workflow routing remains in ${result.reviewDepth.routingAuthority} (${result.reviewDepth.precedenceRule}).`
+    `Policy: advisory only; canonical workflow routing remains in ${result.policy.routingAuthority} (${result.policy.reviewDepthPrecedenceRule}).`
   );
 
   lines.push("");

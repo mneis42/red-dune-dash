@@ -43,7 +43,6 @@ test("recommendReviewDepth returns deep for workflow/pwa risk with highest-risk 
   const result = recommendReviewDepth(advisory);
 
   assert.equal(result.tier, "deep");
-  assert.equal(result.precedenceRule, "highest-risk-tier-wins");
   assert.ok(result.reasons.includes("high-risk area: pwa"));
   assert.ok(result.reasons.includes("high-risk tag: offline"));
 });
@@ -216,8 +215,6 @@ test("human output includes advisory policy note and unrelated section", () => {
       reasons: ["high-risk area: workflow-docs"],
       expectedOutcomes: ["high-risk impact review completed"],
       advisoryOnly: true,
-      precedenceRule: "highest-risk-tier-wins",
-      routingAuthority: "AGENTS.md",
     },
     documentationDrift: {
       advisoryOnly: true,
@@ -244,6 +241,13 @@ test("human output includes advisory policy note and unrelated section", () => {
       active: true,
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+    },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   });
 
@@ -280,8 +284,6 @@ test("human output warns when running on main branch", () => {
       reasons: ["no matched area; limited local context"],
       expectedOutcomes: ["single-area correctness verified"],
       advisoryOnly: true,
-      precedenceRule: "highest-risk-tier-wins",
-      routingAuthority: "AGENTS.md",
     },
     documentationDrift: {
       advisoryOnly: true,
@@ -299,6 +301,13 @@ test("human output warns when running on main branch", () => {
       active: false,
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+    },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   });
 
@@ -329,8 +338,6 @@ test("human output handles no-change scenario without file list items", () => {
       reasons: ["no matched area; limited local context"],
       expectedOutcomes: ["single-area correctness verified"],
       advisoryOnly: true,
-      precedenceRule: "highest-risk-tier-wins",
-      routingAuthority: "AGENTS.md",
     },
     documentationDrift: {
       advisoryOnly: true,
@@ -348,6 +355,13 @@ test("human output handles no-change scenario without file list items", () => {
       active: false,
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+    },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   });
 
@@ -379,8 +393,6 @@ test("human output includes mixed change counts and fallback files section", () 
       reasons: ["high-risk area: workflow-docs"],
       expectedOutcomes: ["high-risk impact review completed"],
       advisoryOnly: true,
-      precedenceRule: "highest-risk-tier-wins",
-      routingAuthority: "AGENTS.md",
     },
     documentationDrift: {
       advisoryOnly: true,
@@ -407,6 +419,13 @@ test("human output includes mixed change counts and fallback files section", () 
       active: true,
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+    },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   });
 
@@ -439,8 +458,6 @@ test("human output keeps section order deterministic", () => {
       reasons: ["high-risk area: workflow-docs"],
       expectedOutcomes: ["high-risk impact review completed"],
       advisoryOnly: true,
-      precedenceRule: "highest-risk-tier-wins",
-      routingAuthority: "AGENTS.md",
     },
     documentationDrift: {
       advisoryOnly: true,
@@ -467,6 +484,13 @@ test("human output keeps section order deterministic", () => {
       active: true,
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+    },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   });
 
