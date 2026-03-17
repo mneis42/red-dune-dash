@@ -169,3 +169,11 @@ For local preflight hints before implementation (branch warning, changed-file ad
 For instruction and workflow link validation (process docs path and heading consistency), run `npm run instruction:lint`.
 
 For full repository reviews, the canonical instructions live in [instructions/full-code-review.md](instructions/full-code-review.md).
+
+## Structured Run Logs
+
+Structured run logs are intentionally limited to friction or failure incidents and are stored only in `logs/agent-runs/`.
+
+Use the trigger categories and minimal schema documented in [docs/agent-run-logs.md](docs/agent-run-logs.md).
+
+Do not create routine "all green" logs. Keep one log per triggering incident and append follow-ups to the same file when the root cause is unchanged.
