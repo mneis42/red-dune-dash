@@ -63,6 +63,20 @@ test("recommendReviewDepth returns light for contained non-high-risk changes", (
   assert.ok(result.reasons.includes("single matched area: gameplay"));
 });
 
+test("recommendReviewDepth ignores unclassified fallback for area-based cross-cutting tiering", () => {
+  const advisory = createAdvisoryResult(
+    [],
+    [],
+    ["gameplay", "unclassified"],
+    ["unknown-change-surface"]
+  );
+  const result = recommendReviewDepth(advisory);
+
+  assert.equal(result.tier, "light");
+  assert.ok(result.reasons.includes("single matched area: gameplay"));
+  assert.ok(result.reasons.includes("fallback area present: unclassified"));
+});
+
 test("parseScope splits comma-separated values with stable dedupe", () => {
   assert.deepEqual(parseScope("gameplay, pwa, gameplay"), ["gameplay", "pwa"]);
 });

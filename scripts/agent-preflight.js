@@ -311,9 +311,11 @@ const REVIEW_DEPTH_HIGH_RISK_TAGS = new Set([
 
 function recommendReviewDepth(advisoryResult) {
   const matchedAreas = advisoryResult.merged.areas;
+  const classifiedAreas = matchedAreas.filter((area) => area !== "unclassified");
+  const hasUnclassifiedArea = matchedAreas.includes("unclassified");
   const riskTags = advisoryResult.merged.riskTags;
 
-  const triggeringHighRiskAreas = matchedAreas.filter((area) => REVIEW_DEPTH_HIGH_RISK_AREAS.has(area));
+  const triggeringHighRiskAreas = classifiedAreas.filter((area) => REVIEW_DEPTH_HIGH_RISK_AREAS.has(area));
   const triggeringHighRiskTags = riskTags.filter((tag) => REVIEW_DEPTH_HIGH_RISK_TAGS.has(tag));
 
   if (triggeringHighRiskAreas.length > 0 || triggeringHighRiskTags.length > 0) {
@@ -330,12 +332,12 @@ function recommendReviewDepth(advisoryResult) {
     };
   }
 
-  if (matchedAreas.length > 1 || riskTags.includes("cross-system-behavior")) {
+  if (classifiedAreas.length > 1 || riskTags.includes("cross-system-behavior")) {
     return {
       tier: "standard",
       rationale: "Cross-cutting change surface detected; standard depth is recommended.",
       reasons: stableUnique([
-        matchedAreas.length > 1 ? `multiple matched areas: ${matchedAreas.join(", ")}` : null,
+        classifiedAreas.length > 1 ? `multiple matched areas: ${classifiedAreas.join(", ")}` : null,
         riskTags.includes("cross-system-behavior") ? "risk tag: cross-system-behavior" : null,
       ]).filter(Boolean),
       expectedOutcomes: REVIEW_DEPTH_TIERS.standard.expectedOutcomes,
@@ -346,9 +348,10 @@ function recommendReviewDepth(advisoryResult) {
   return {
     tier: "light",
     rationale: "Contained change surface detected; light review is usually sufficient.",
-    reasons: [
-      matchedAreas.length === 1 ? `single matched area: ${matchedAreas[0]}` : "no matched area; limited local context",
-    ],
+    reasons: stableUnique([
+      classifiedAreas.length === 1 ? `single matched area: ${classifiedAreas[0]}` : "no matched area; limited local context",
+      hasUnclassifiedArea ? "fallback area present: unclassified" : null,
+    ]).filter(Boolean),
     expectedOutcomes: REVIEW_DEPTH_TIERS.light.expectedOutcomes,
     advisoryOnly: true,
   };
