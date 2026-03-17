@@ -2,6 +2,8 @@
 
 Red Dune Dash is a browser-first endless runner about a Mars tiger chasing bugs, collecting coins, surviving engineering-themed hazards, and grabbing rockets for extra lives. The game combines arcade platforming with light serious-gaming ideas that make software-development challenges feel playful and accessible.
 
+▶ **[Play the game](https://mneis42.github.io/red-dune-dash)**
+
 This repository is also an experiment in AI-assisted software delivery. The goal is to learn how far current AI agents can take a game project with minimal human coding, where they already work well, where they struggle, and which instructions, workflows, and safeguards make them more reliable.
 
 ## Why This Repo Exists
