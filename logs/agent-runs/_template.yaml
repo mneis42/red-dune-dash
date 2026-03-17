@@ -1,0 +1,12 @@
+date: YYYY-MM-DD
+task_type: change-review | feature-request | bug-report | other
+short_goal: <one-line goal>
+changed_files:
+  - <path/to/file>
+checks:
+  - name: <command>
+    outcome: pass | fail | not-run
+friction_category: verify-failure | instruction-conflict | repeated-rework | human-rescue | blind-spot-after-green
+human_correction_needed: true | false
+missing_or_misleading_guardrail: <short description>
+improvement_proposal: <one concrete improvement>

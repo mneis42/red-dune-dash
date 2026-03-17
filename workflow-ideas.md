@@ -206,8 +206,14 @@ Suggested minimal schema:
 
 Suggested storage:
 
-- keep these logs in a dedicated folder such as `agent-runs/` or `logs/agent-runs/`
+- keep these logs in the dedicated folder `logs/agent-runs/`
 - do **not** mix them into `reviews/` or backlog artifacts
+
+Anti-noise rules:
+
+- create only one run log per triggering incident
+- do not write routine "all green" logs
+- if follow-up notes share the same root cause, update the existing log instead of creating a duplicate
 
 Why it helps:
 
