@@ -14,6 +14,8 @@ const AREA_USER_IMPACT = {
   unclassified: "Change surface is not fully classified; user-visible impact should be confirmed manually.",
 };
 
+const CHECK_LOG_TAIL_LIMIT = 4000;
+
 function stableUnique(values) {
   const seen = new Set();
   const result = [];
@@ -35,6 +37,7 @@ function parseArgs(argv) {
     files: null,
     rulesPath: null,
     runChecks: false,
+    includeLogs: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -49,6 +52,10 @@ function parseArgs(argv) {
     }
     if (arg === "--run-checks") {
       options.runChecks = true;
+      continue;
+    }
+    if (arg === "--include-logs") {
+      options.includeLogs = true;
       continue;
     }
     if (arg === "--files") {
@@ -98,6 +105,53 @@ function resolveUserImpact(advisoryResult) {
   return stableUnique(impacts);
 }
 
+function parseAllowedCheckCommand(command) {
+  const value = String(command || "").trim();
+  if (!value) {
+    return null;
+  }
+
+  if (value === "npm test") {
+    return { executable: "npm", args: ["test"] };
+  }
+
+  const match = value.match(/^npm\s+run\s+([A-Za-z0-9:_-]+)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    executable: "npm",
+    args: ["run", match[1]],
+  };
+}
+
+function getLogTail(output) {
+  const text = String(output || "");
+  if (text.length <= CHECK_LOG_TAIL_LIMIT) {
+    return text;
+  }
+
+  return text.slice(text.length - CHECK_LOG_TAIL_LIMIT);
+}
+
+function maybeAttachLogs(payload, result, options) {
+  const stdout = getLogTail(result.stdout);
+  const stderr = getLogTail(result.stderr);
+  const failed = payload.status === "fail";
+
+  if (!options.includeLogs && !failed) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    stdout,
+    stderr,
+    logsTruncated: String(result.stdout || "").length > CHECK_LOG_TAIL_LIMIT || String(result.stderr || "").length > CHECK_LOG_TAIL_LIMIT,
+  };
+}
+
 function buildCheckOutcomes(advisoryResult, options) {
   const checks = advisoryResult.merged.recommendedChecks;
   if (checks.length === 0) {
@@ -114,21 +168,32 @@ function buildCheckOutcomes(advisoryResult, options) {
   }
 
   return checks.map((command) => {
+    const parsedCommand = parseAllowedCheckCommand(command);
+    if (!parsedCommand) {
+      return {
+        command,
+        status: "skipped-unsafe",
+        durationMs: 0,
+        exitCode: null,
+        reason: "Unsupported command format for safe execution.",
+      };
+    }
+
     const startedAt = Date.now();
-    const result = spawnSync(command, {
-      shell: true,
+    const result = spawnSync(parsedCommand.executable, parsedCommand.args, {
+      shell: false,
       encoding: "utf8",
       stdio: "pipe",
     });
 
-    return {
+    const payload = {
       command,
       status: result.status === 0 ? "pass" : "fail",
       durationMs: Date.now() - startedAt,
       exitCode: Number.isInteger(result.status) ? result.status : 1,
-      stdout: String(result.stdout || ""),
-      stderr: String(result.stderr || ""),
     };
+
+    return maybeAttachLogs(payload, result, options);
   });
 }
 
@@ -155,6 +220,15 @@ function buildOpenQuestions(advisoryResult, checkOutcomes) {
   if (failedChecks.length > 0) {
     questions.push(
       `How should failed checks be handled before merge: ${failedChecks.map((entry) => entry.command).join(", ")}?`
+    );
+  }
+
+  const skippedChecks = checkOutcomes.filter((entry) => entry.status === "skipped-unsafe");
+  if (skippedChecks.length > 0) {
+    questions.push(
+      `Should unsupported recommended commands be normalized for safe execution: ${skippedChecks
+        .map((entry) => entry.command)
+        .join(", ")}?`
     );
   }
 
@@ -297,6 +371,7 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
+  parseAllowedCheckCommand,
   getChangedFiles,
   resolveUserImpact,
   buildCheckOutcomes,

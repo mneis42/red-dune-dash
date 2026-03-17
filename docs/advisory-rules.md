@@ -82,6 +82,12 @@ Run recommended checks and include command outcomes in the same summary output:
 npm run agent:summary -- --run-checks
 ```
 
+Include check logs explicitly in JSON/human output when checks are executed:
+
+```bash
+npm run agent:summary -- --run-checks --include-logs
+```
+
 Emit machine-readable summary JSON:
 
 ```bash
@@ -128,6 +134,8 @@ This lint is focused on process docs and instruction references. It validates lo
 - The command always reports changed files, checks and outcomes, affected docs/instructions, user-visible impact, risks, and open questions.
 - The command includes a copy-ready short block for commit messages, PR descriptions, or handoff text.
 - Without `--run-checks`, recommended checks are listed as `not-run` to avoid overstating validation coverage.
+- Check execution uses a safe allowlist-style parser (`npm test` and `npm run <script>`), not shell execution.
+- Check logs are not included for passing checks unless `--include-logs` is explicitly set.
 
 ## Rule Update Checklist
 

@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 
 const {
   parseArgs,
+  parseAllowedCheckCommand,
   resolveUserImpact,
   buildOpenQuestions,
   buildCopyBlock,
@@ -54,7 +55,29 @@ test("parseArgs supports json, staged, run-checks, files, and rules flags", () =
     files: ["a.js", "b.js"],
     rulesPath: "workflow/custom.json",
     runChecks: true,
+    includeLogs: false,
   });
+});
+
+test("parseArgs supports include-logs flag", () => {
+  const options = parseArgs(["--include-logs"]);
+  assert.equal(options.includeLogs, true);
+});
+
+test("parseAllowedCheckCommand accepts npm test and npm run script commands", () => {
+  assert.deepEqual(parseAllowedCheckCommand("npm test"), {
+    executable: "npm",
+    args: ["test"],
+  });
+  assert.deepEqual(parseAllowedCheckCommand("npm run check"), {
+    executable: "npm",
+    args: ["run", "check"],
+  });
+});
+
+test("parseAllowedCheckCommand rejects unsafe shell-like commands", () => {
+  assert.equal(parseAllowedCheckCommand("npm run check && rm -rf /"), null);
+  assert.equal(parseAllowedCheckCommand("node script.js"), null);
 });
 
 test("resolveUserImpact maps known areas and deduplicates output", () => {
