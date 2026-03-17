@@ -90,6 +90,9 @@ This lint is focused on process docs and instruction references. It validates lo
 - `agent:preflight` is advisory-only and remains non-blocking for warnings.
 - The command reports whether the current branch is `main`.
 - The command reports changed files and matched advisory context.
+- The command reports an advisory review-depth recommendation (`light`, `standard`, `deep`) with short rationale and expected outcomes.
+- Mixed-risk diffs follow explicit precedence: highest-risk tier wins.
+- Review-depth recommendations never replace task routing; canonical workflow routing remains in `AGENTS.md` and instruction files.
 - The command reports documentation-drift hints with a fixed initial mapping:
    - gameplay area changes suggest gameplay/system docs plus README review.
    - pwa area changes suggest offline/PWA documentation review.

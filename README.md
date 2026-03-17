@@ -164,7 +164,7 @@ For repository-specific agent instructions, see [AGENTS.md](AGENTS.md).
 
 For the advisory change-rule model and governance boundaries, see [docs/advisory-rules.md](docs/advisory-rules.md).
 
-For local preflight hints before implementation (branch warning, changed-file advisory mapping, documentation-drift hints, unrelated-change hints, and guardrail signal), run `npm run agent:preflight`.
+For local preflight hints before implementation (branch warning, changed-file advisory mapping, advisory review-depth recommendation, documentation-drift hints, unrelated-change hints, and guardrail signal), run `npm run agent:preflight`.
 
 For instruction and workflow link validation (process docs path and heading consistency), run `npm run instruction:lint`.
 
