@@ -4,7 +4,10 @@ source: workflow-ideas.md
 idea_number: 15
 priority: 11
 status: open
+planning_model: GPT-5.3-Codex
+execution_model: GPT-5.3-Codex
 created_at: 2026-03-16
+last_updated: 2026-03-17
 ---
 
 # TODO: Deployment Hardening After Validation Maturity
