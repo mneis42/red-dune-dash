@@ -4,6 +4,7 @@
   "private": true,
   "description": "Browser-first endless runner and AI-agent workflow experiment.",
   "scripts": {
+    "backlog:lint": "node scripts/backlog-template-lint.js",
     "check": "node scripts/check-syntax.js",
     "instruction:lint": "node scripts/instruction-lint.js",
     "setup": "node scripts/setup-hooks.js",
@@ -12,12 +13,13 @@
     "agent:advisory:unmatched": "node scripts/agent-advisory.js --unmatched",
     "agent:preflight": "node scripts/agent-preflight.js",
     "agent:preflight:json": "node scripts/agent-preflight.js --json",
-    "test": "npm run test:simulation && npm run test:service-worker && npm run test:advisory && npm run test:preflight && npm run test:instruction-lint",
+    "test": "npm run test:simulation && npm run test:service-worker && npm run test:advisory && npm run test:preflight && npm run test:instruction-lint && npm run test:backlog-lint",
     "test:advisory": "node tests/advisory-rules.test.js",
+    "test:backlog-lint": "node tests/backlog-template-lint.test.js",
     "test:instruction-lint": "node tests/instruction-lint.test.js",
     "test:preflight": "node tests/agent-preflight.test.js",
     "test:simulation": "node tests/simulation-core.test.js",
     "test:service-worker": "node tests/service-worker.test.js",
-    "verify": "npm run check && npm test && npm run instruction:lint"
+    "verify": "npm run check && npm test && npm run instruction:lint && npm run backlog:lint"
   }
 }
