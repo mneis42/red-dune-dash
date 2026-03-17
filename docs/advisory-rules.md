@@ -97,8 +97,9 @@ This lint is focused on process docs and instruction references. It validates lo
 - The command reports unrelated local changes using this heuristic:
    - a file is unrelated when none of its matched areas intersects with task areas.
    - task areas come from `--scope` when provided; otherwise from inferred matched areas.
-- Hook guardrail status is based on current observable signal only (`.git/hooks/pre-commit` exists).
-- The command does not infer guardrail readiness from whether `npm run setup` was executed in the past.
+- Hook guardrail status prefers configured `core.hooksPath` with `.githooks/pre-push` as primary signal.
+- If `core.hooksPath` is not configured, a legacy fallback signal checks `.git/hooks/pre-commit`.
+- The command reports current observable state only and does not infer readiness from past `npm run setup` runs.
 
 ## Rule Update Checklist
 
