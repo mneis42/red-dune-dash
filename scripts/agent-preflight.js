@@ -116,21 +116,35 @@ function readConfiguredHooksPath(cwd) {
   }
 }
 
+function resolveRepoRoot(cwd) {
+  try {
+    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return root || cwd;
+  } catch {
+    return cwd;
+  }
+}
+
 function detectGuardrailStatus(options = {}) {
   const cwd = options.cwd || process.cwd();
   const existsSync = options.existsSync || fs.existsSync;
+  const repoRoot = typeof options.resolveRepoRoot === "function" ? options.resolveRepoRoot(cwd) : resolveRepoRoot(cwd);
   const configuredHooksPath =
     typeof options.readHooksPath === "function" ? options.readHooksPath(cwd) : readConfiguredHooksPath(cwd);
 
   if (configuredHooksPath) {
     const resolvedHooksPath = path.isAbsolute(configuredHooksPath)
       ? configuredHooksPath
-      : path.resolve(cwd, configuredHooksPath);
+      : path.resolve(repoRoot, configuredHooksPath);
     const hookPath = path.join(resolvedHooksPath, "pre-push");
     const active = existsSync(hookPath);
 
     return {
-      signal: "core-hooks-path-pre-push-exists",
+      signal: "core-hooks-path-pre-push-checked",
       active,
       path: hookPath,
       note: active
@@ -141,7 +155,7 @@ function detectGuardrailStatus(options = {}) {
 
   const hookPath = path.join(cwd, ".git", "hooks", "pre-commit");
   return {
-    signal: "legacy-git-hooks-pre-commit-exists",
+    signal: "legacy-git-hooks-pre-commit-checked",
     active: existsSync(hookPath),
     path: hookPath,
     note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
