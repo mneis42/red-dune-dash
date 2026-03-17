@@ -87,7 +87,7 @@ test("main returns non-zero for invalid advisory rules without exiting host proc
     assert.equal(exitCode, 1);
   } finally {
     console.error = originalError;
-    fs.unlinkSync(tempFilePath);
+    fs.rmSync(tempFilePath, { force: true });
   }
 
   assert.equal(errors.some((line) => line.includes("Invalid advisory rules in")), true);
