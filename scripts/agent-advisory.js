@@ -169,4 +169,14 @@ function main() {
   console.log(formatHumanReadable(result));
 }
 
-main();
+module.exports = {
+  parseArgs,
+  runGit,
+  getChangedFiles,
+  formatHumanReadable,
+  main,
+};
+
+if (require.main === module) {
+  main();
+}
