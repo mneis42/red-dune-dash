@@ -6,6 +6,7 @@ const {
   resolveTaskAreas,
   classifyRelatedChanges,
   validateScope,
+  recommendReviewDepth,
   buildDocumentationDriftHints,
   formatHumanReadable,
 } = require("../scripts/agent-preflight.js");
@@ -16,13 +17,13 @@ function test(name, fn) {
   tests.push({ name, fn });
 }
 
-function createAdvisoryResult(perFile, matchedRules, mergedAreas) {
+function createAdvisoryResult(perFile, matchedRules, mergedAreas, mergedRiskTags = []) {
   return {
     perFile,
     matchedRules,
     merged: {
       areas: mergedAreas,
-      riskTags: [],
+      riskTags: mergedRiskTags,
       recommendedChecks: [],
       manualChecks: [],
       suggestedDocs: [],
@@ -36,6 +37,45 @@ function createAdvisoryResult(perFile, matchedRules, mergedAreas) {
     },
   };
 }
+
+test("recommendReviewDepth returns deep for workflow/pwa risk with highest-risk precedence", () => {
+  const advisory = createAdvisoryResult([], [], ["gameplay", "pwa"], ["cross-system-behavior", "offline"]);
+  const result = recommendReviewDepth(advisory);
+
+  assert.equal(result.tier, "deep");
+  assert.ok(result.reasons.includes("high-risk area: pwa"));
+  assert.ok(result.reasons.includes("high-risk tag: offline"));
+});
+
+test("recommendReviewDepth returns standard for cross-cutting gameplay without high-risk areas", () => {
+  const advisory = createAdvisoryResult([], [], ["gameplay", "tooling"], ["cross-system-behavior"]);
+  const result = recommendReviewDepth(advisory);
+
+  assert.equal(result.tier, "standard");
+  assert.match(result.rationale, /Cross-cutting/);
+});
+
+test("recommendReviewDepth returns light for contained non-high-risk changes", () => {
+  const advisory = createAdvisoryResult([], [], ["gameplay"], ["game-balance"]);
+  const result = recommendReviewDepth(advisory);
+
+  assert.equal(result.tier, "light");
+  assert.ok(result.reasons.includes("single matched area: gameplay"));
+});
+
+test("recommendReviewDepth ignores unclassified fallback for area-based cross-cutting tiering", () => {
+  const advisory = createAdvisoryResult(
+    [],
+    [],
+    ["gameplay", "unclassified"],
+    ["unknown-change-surface"]
+  );
+  const result = recommendReviewDepth(advisory);
+
+  assert.equal(result.tier, "light");
+  assert.ok(result.reasons.includes("single matched area: gameplay"));
+  assert.ok(result.reasons.includes("fallback area present: unclassified"));
+});
 
 test("parseScope splits comma-separated values with stable dedupe", () => {
   assert.deepEqual(parseScope("gameplay, pwa, gameplay"), ["gameplay", "pwa"]);
@@ -183,6 +223,13 @@ test("human output includes advisory policy note and unrelated section", () => {
       suggestedReading: ["AGENTS.md"],
       fallbackFiles: [],
     },
+    reviewDepth: {
+      tier: "deep",
+      rationale: "High-risk workflow/PWA surface detected; prefer deep review. Mixed-risk diffs always use the highest-risk tier.",
+      reasons: ["high-risk area: workflow-docs"],
+      expectedOutcomes: ["high-risk impact review completed"],
+      advisoryOnly: true,
+    },
     documentationDrift: {
       advisoryOnly: true,
       triggered: true,
@@ -209,12 +256,22 @@ test("human output includes advisory policy note and unrelated section", () => {
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
+    },
   });
 
   assert.match(output, /Unrelated local changes/);
   assert.match(output, /Current-state signal only/);
   assert.match(output, /Documentation drift hints/);
+  assert.match(output, /Review depth recommendation/);
+  assert.match(output, /Tier: deep/);
   assert.match(output, /Workflow\/instruction changes likely need process docs sync/);
+  assert.match(output, /canonical workflow routing remains in AGENTS\.md/);
 });
 
 test("human output warns when running on main branch", () => {
@@ -235,6 +292,13 @@ test("human output warns when running on main branch", () => {
       suggestedReading: [],
       fallbackFiles: [],
     },
+    reviewDepth: {
+      tier: "light",
+      rationale: "Contained change surface detected; light review is usually sufficient.",
+      reasons: ["no matched area; limited local context"],
+      expectedOutcomes: ["single-area correctness verified"],
+      advisoryOnly: true,
+    },
     documentationDrift: {
       advisoryOnly: true,
       triggered: false,
@@ -251,6 +315,13 @@ test("human output warns when running on main branch", () => {
       active: false,
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+    },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   });
 
@@ -275,6 +346,13 @@ test("human output handles no-change scenario without file list items", () => {
       suggestedReading: [],
       fallbackFiles: [],
     },
+    reviewDepth: {
+      tier: "light",
+      rationale: "Contained change surface detected; light review is usually sufficient.",
+      reasons: ["no matched area; limited local context"],
+      expectedOutcomes: ["single-area correctness verified"],
+      advisoryOnly: true,
+    },
     documentationDrift: {
       advisoryOnly: true,
       triggered: false,
@@ -291,6 +369,13 @@ test("human output handles no-change scenario without file list items", () => {
       active: false,
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+    },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
     },
   });
 
@@ -315,6 +400,13 @@ test("human output includes mixed change counts and fallback files section", () 
       suggestedDocs: ["README.md"],
       suggestedReading: ["AGENTS.md"],
       fallbackFiles: ["todo.md"],
+    },
+    reviewDepth: {
+      tier: "deep",
+      rationale: "High-risk workflow/PWA surface detected; prefer deep review. Mixed-risk diffs always use the highest-risk tier.",
+      reasons: ["high-risk area: workflow-docs"],
+      expectedOutcomes: ["high-risk impact review completed"],
+      advisoryOnly: true,
     },
     documentationDrift: {
       advisoryOnly: true,
@@ -342,6 +434,13 @@ test("human output includes mixed change counts and fallback files section", () 
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
+    },
   });
 
   assert.match(output, /Changed files: 4 \(staged 1, unstaged 2, untracked 1\)/);
@@ -366,6 +465,13 @@ test("human output keeps section order deterministic", () => {
       suggestedDocs: ["README.md"],
       suggestedReading: ["AGENTS.md"],
       fallbackFiles: [],
+    },
+    reviewDepth: {
+      tier: "deep",
+      rationale: "High-risk workflow/PWA surface detected; prefer deep review. Mixed-risk diffs always use the highest-risk tier.",
+      reasons: ["high-risk area: workflow-docs"],
+      expectedOutcomes: ["high-risk impact review completed"],
+      advisoryOnly: true,
     },
     documentationDrift: {
       advisoryOnly: true,
@@ -393,6 +499,13 @@ test("human output keeps section order deterministic", () => {
       path: ".git/hooks/pre-commit",
       note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
+    policy: {
+      advisoryOnly: true,
+      exitCodePolicy: "non-blocking for advisory warnings",
+      routingAuthority: "AGENTS.md",
+      reviewDepthPrecedenceRule: "highest-risk-tier-wins",
+      routingNote: "Review depth is advisory only and cannot override canonical workflow routing.",
+    },
   });
 
   const sectionOrder = [
@@ -400,6 +513,7 @@ test("human output keeps section order deterministic", () => {
     "Matched rules",
     "Recommended checks",
     "Likely docs / instructions",
+    "Review depth recommendation",
     "Documentation drift hints",
     "Unrelated local changes",
     "Guardrail status",
