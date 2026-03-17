@@ -103,13 +103,48 @@ function collectChangedFiles(options) {
   };
 }
 
-function detectGuardrailStatus() {
-  const hookPath = path.join(process.cwd(), ".git", "hooks", "pre-commit");
+function readConfiguredHooksPath(cwd) {
+  try {
+    const configured = execFileSync("git", ["config", "--get", "core.hooksPath"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return configured || null;
+  } catch {
+    return null;
+  }
+}
+
+function detectGuardrailStatus(options = {}) {
+  const cwd = options.cwd || process.cwd();
+  const existsSync = options.existsSync || fs.existsSync;
+  const configuredHooksPath =
+    typeof options.readHooksPath === "function" ? options.readHooksPath(cwd) : readConfiguredHooksPath(cwd);
+
+  if (configuredHooksPath) {
+    const resolvedHooksPath = path.isAbsolute(configuredHooksPath)
+      ? configuredHooksPath
+      : path.resolve(cwd, configuredHooksPath);
+    const hookPath = path.join(resolvedHooksPath, "pre-push");
+    const active = existsSync(hookPath);
+
+    return {
+      signal: "core-hooks-path-pre-push-exists",
+      active,
+      path: hookPath,
+      note: active
+        ? "Detected via configured core.hooksPath and pre-push hook. Current-state signal only."
+        : "core.hooksPath is configured but expected pre-push hook is missing. Current-state signal only.",
+    };
+  }
+
+  const hookPath = path.join(cwd, ".git", "hooks", "pre-commit");
   return {
-    signal: "git-hooks-pre-commit-exists",
-    active: fs.existsSync(hookPath),
+    signal: "legacy-git-hooks-pre-commit-exists",
+    active: existsSync(hookPath),
     path: hookPath,
-    note: "Current-state signal only. No setup history inference is used.",
+    note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
   };
 }
 
@@ -419,6 +454,7 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   parseScope,
+  detectGuardrailStatus,
   resolveTaskAreas,
   classifyRelatedChanges,
   validateScope,
