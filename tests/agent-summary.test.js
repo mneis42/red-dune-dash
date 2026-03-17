@@ -56,12 +56,27 @@ test("parseArgs supports json, staged, run-checks, files, and rules flags", () =
     rulesPath: "workflow/custom.json",
     runChecks: true,
     includeLogs: false,
+    errors: [],
   });
 });
 
 test("parseArgs supports include-logs flag", () => {
   const options = parseArgs(["--include-logs"]);
   assert.equal(options.includeLogs, true);
+});
+
+test("parseArgs reports missing values for --files and --rules without consuming next flags", () => {
+  const options = parseArgs(["--files", "--rules", "workflow/custom.json"]);
+
+  assert.ok(options.errors.includes("Missing value for --files."));
+  assert.equal(options.files, null);
+  assert.equal(options.rulesPath, "workflow/custom.json");
+});
+
+test("parseArgs reports missing value for --rules", () => {
+  const options = parseArgs(["--rules"]);
+  assert.ok(options.errors.includes("Missing value for --rules."));
+  assert.equal(options.rulesPath, null);
 });
 
 test("parseAllowedCheckCommand accepts npm test and npm run script commands", () => {
@@ -135,6 +150,14 @@ test("buildSummaryResult includes required summary fields", () => {
   assert.ok(Array.isArray(result.risks));
   assert.ok(Array.isArray(result.openQuestions));
   assert.equal(typeof result.copyBlock, "string");
+});
+
+test("buildSummaryResult prefers normalized advisory changedFiles output", () => {
+  const advisory = createAdvisoryResult({ perFile: [] });
+  advisory.changedFiles = ["README.md", "scripts/agent-summary.js"];
+
+  const result = buildSummaryResult(["./README.md", "scripts\\agent-summary.js"], advisory, { runChecks: false });
+  assert.deepEqual(result.changedFiles, ["README.md", "scripts/agent-summary.js"]);
 });
 
 test("formatHumanReadable contains expected stable sections", () => {

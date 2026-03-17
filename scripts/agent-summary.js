@@ -15,6 +15,7 @@ const AREA_USER_IMPACT = {
 };
 
 const CHECK_LOG_TAIL_LIMIT = 4000;
+const CHECK_COMMAND_TIMEOUT_MS = 120000;
 
 function stableUnique(values) {
   const seen = new Set();
@@ -38,7 +39,17 @@ function parseArgs(argv) {
     rulesPath: null,
     runChecks: false,
     includeLogs: false,
+    errors: [],
   };
+
+  function readOptionValue(optionName, index) {
+    const candidate = argv[index + 1];
+    if (!candidate || String(candidate).startsWith("--")) {
+      options.errors.push(`Missing value for ${optionName}.`);
+      return null;
+    }
+    return String(candidate);
+  }
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -59,7 +70,10 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--files") {
-      const value = argv[index + 1] || "";
+      const value = readOptionValue("--files", index);
+      if (value === null) {
+        continue;
+      }
       index += 1;
       options.files = value
         .split(",")
@@ -68,8 +82,12 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--rules") {
-      options.rulesPath = argv[index + 1] || null;
+      const value = readOptionValue("--rules", index);
+      if (value === null) {
+        continue;
+      }
       index += 1;
+      options.rulesPath = value;
       continue;
     }
   }
@@ -184,7 +202,32 @@ function buildCheckOutcomes(advisoryResult, options) {
       shell: false,
       encoding: "utf8",
       stdio: "pipe",
+      timeout: CHECK_COMMAND_TIMEOUT_MS,
     });
+
+    if (result.error) {
+      const payload = {
+        command,
+        status: "error",
+        durationMs: Date.now() - startedAt,
+        exitCode: Number.isInteger(result.status) ? result.status : null,
+        signal: result.signal || null,
+        reason: result.error.message,
+      };
+      return maybeAttachLogs(payload, result, options);
+    }
+
+    if (result.signal) {
+      const payload = {
+        command,
+        status: "failed-signal",
+        durationMs: Date.now() - startedAt,
+        exitCode: Number.isInteger(result.status) ? result.status : null,
+        signal: result.signal,
+        reason: `Process ended by signal ${result.signal}.`,
+      };
+      return maybeAttachLogs(payload, result, options);
+    }
 
     const payload = {
       command,
@@ -260,9 +303,12 @@ function buildCopyBlock(result) {
 function buildSummaryResult(changedFiles, advisoryResult, options) {
   const checkOutcomes = buildCheckOutcomes(advisoryResult, options);
   const risks = stableUnique(advisoryResult.merged.riskTags);
+  const normalizedChangedFiles = Array.isArray(advisoryResult.changedFiles)
+    ? advisoryResult.changedFiles
+    : changedFiles;
 
   const result = {
-    changedFiles,
+    changedFiles: normalizedChangedFiles,
     advisory: {
       matchedRuleIds: advisoryResult.matchedRules.map((rule) => rule.id),
       mergedAreas: advisoryResult.merged.areas,
@@ -304,7 +350,12 @@ function formatHumanReadable(result, options) {
     lines.push("- none");
   } else {
     result.checkOutcomes.forEach((entry) => {
-      const detail = entry.status === "not-run" ? "not run" : `${entry.status} (exit ${entry.exitCode}, ${entry.durationMs}ms)`;
+      const detail =
+        entry.status === "not-run"
+          ? "not run"
+          : `${entry.status} (exit ${entry.exitCode ?? "n/a"}, ${entry.durationMs}ms${entry.signal ? `, signal ${entry.signal}` : ""}${
+              entry.reason ? `, reason: ${entry.reason}` : ""
+            })`;
       lines.push(`- ${entry.command}: ${detail}`);
     });
   }
@@ -343,6 +394,11 @@ function formatHumanReadable(result, options) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.errors.length > 0) {
+    options.errors.forEach((entry) => console.error(entry));
+    process.exit(1);
+  }
+
   const { absolutePath, document } = loadAdvisoryDocument(options.rulesPath || undefined);
   const validation = validateAdvisoryDocument(document);
 
