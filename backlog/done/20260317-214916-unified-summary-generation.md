@@ -3,8 +3,11 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 7
 priority: 3
-status: open
+status: done
+planning_model: GPT-5.3-Codex
+execution_model: GPT-5.3-Codex
 created_at: 2026-03-16
+last_updated: 2026-03-17
 ---
 
 # TODO: Unified Summary Generation
