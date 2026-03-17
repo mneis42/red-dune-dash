@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 
 const {
   parseScope,
+  detectGuardrailStatus,
   resolveTaskAreas,
   classifyRelatedChanges,
   validateScope,
@@ -55,6 +56,52 @@ test("resolveTaskAreas infers areas from matches and drops unclassified", () => 
   assert.deepEqual(result, {
     areas: ["gameplay"],
     source: "matched-areas",
+  });
+});
+
+test("detectGuardrailStatus prefers configured hooksPath pre-push hook", () => {
+  const result = detectGuardrailStatus({
+    cwd: "/repo/subdir",
+    resolveRepoRoot: () => "/repo",
+    readHooksPath: () => ".githooks",
+    existsSync: (candidatePath) => candidatePath === "/repo/.githooks/pre-push",
+  });
+
+  assert.deepEqual(result, {
+    signal: "core-hooks-path-pre-push-checked",
+    active: true,
+    path: "/repo/.githooks/pre-push",
+    note: "Detected via configured core.hooksPath and pre-push hook. Current-state signal only.",
+  });
+});
+
+test("detectGuardrailStatus reports inactive when configured pre-push hook is missing", () => {
+  const result = detectGuardrailStatus({
+    cwd: "/repo",
+    readHooksPath: () => ".githooks",
+    existsSync: () => false,
+  });
+
+  assert.deepEqual(result, {
+    signal: "core-hooks-path-pre-push-checked",
+    active: false,
+    path: "/repo/.githooks/pre-push",
+    note: "core.hooksPath is configured but expected pre-push hook is missing. Current-state signal only.",
+  });
+});
+
+test("detectGuardrailStatus falls back to legacy pre-commit signal without hooksPath", () => {
+  const result = detectGuardrailStatus({
+    cwd: "/repo",
+    readHooksPath: () => null,
+    existsSync: (candidatePath) => candidatePath === "/repo/.git/hooks/pre-commit",
+  });
+
+  assert.deepEqual(result, {
+    signal: "legacy-git-hooks-pre-commit-checked",
+    active: true,
+    path: "/repo/.git/hooks/pre-commit",
+    note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
   });
 });
 
@@ -157,15 +204,15 @@ test("human output includes advisory policy note and unrelated section", () => {
       unrelatedFiles: [{ filePath: "README.md", areas: ["workflow-docs"], ruleIds: ["workflow-docs"] }],
     },
     guardrail: {
-      signal: "git-hooks-pre-commit-exists",
+      signal: "legacy-git-hooks-pre-commit-checked",
       active: true,
       path: ".git/hooks/pre-commit",
-      note: "Current-state signal only. No setup history inference is used.",
+      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
   });
 
   assert.match(output, /Unrelated local changes/);
-  assert.match(output, /No setup history inference is used/);
+  assert.match(output, /Current-state signal only/);
   assert.match(output, /Documentation drift hints/);
   assert.match(output, /Workflow\/instruction changes likely need process docs sync/);
 });
@@ -200,10 +247,10 @@ test("human output warns when running on main branch", () => {
       unrelatedFiles: [],
     },
     guardrail: {
-      signal: "git-hooks-pre-commit-exists",
+      signal: "legacy-git-hooks-pre-commit-checked",
       active: false,
       path: ".git/hooks/pre-commit",
-      note: "Current-state signal only. No setup history inference is used.",
+      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
   });
 
@@ -240,10 +287,10 @@ test("human output handles no-change scenario without file list items", () => {
       unrelatedFiles: [],
     },
     guardrail: {
-      signal: "git-hooks-pre-commit-exists",
+      signal: "legacy-git-hooks-pre-commit-checked",
       active: false,
       path: ".git/hooks/pre-commit",
-      note: "Current-state signal only. No setup history inference is used.",
+      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
   });
 
@@ -290,10 +337,10 @@ test("human output includes mixed change counts and fallback files section", () 
       unrelatedFiles: [{ filePath: "scripts/agent-preflight.js", areas: ["tooling"], ruleIds: ["tooling-scripts-tests"] }],
     },
     guardrail: {
-      signal: "git-hooks-pre-commit-exists",
+      signal: "legacy-git-hooks-pre-commit-checked",
       active: true,
       path: ".git/hooks/pre-commit",
-      note: "Current-state signal only. No setup history inference is used.",
+      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
   });
 
@@ -341,10 +388,10 @@ test("human output keeps section order deterministic", () => {
       unrelatedFiles: [],
     },
     guardrail: {
-      signal: "git-hooks-pre-commit-exists",
+      signal: "legacy-git-hooks-pre-commit-checked",
       active: true,
       path: ".git/hooks/pre-commit",
-      note: "Current-state signal only. No setup history inference is used.",
+      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
     },
   });
 
