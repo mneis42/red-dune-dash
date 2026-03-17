@@ -6,6 +6,9 @@ For lightweight reviews of uncommitted changes, staged diffs, small change sets,
 
 For new feature ideas and feature requests, follow the planning-and-delivery workflow in [instructions/feature-request.md](instructions/feature-request.md).
 
+For prioritized idea files created directly under `backlog/` (for example `backlog/1-todo-*.md`), use either `templates/todo-backlog-item-template.md` (`workflow_type: backlog-item`) or `templates/todo-feature-request-template.md` (`workflow_type: feature-request`) and keep the file structure compatible with the selected template.
+For new prioritized backlog-item files, always include `planning_model`, `execution_model`, `created_at`, and `last_updated` metadata in frontmatter.
+
 For bug reports and gameplay defects, follow the bug analysis and fix workflow in [instructions/bug-report.md](instructions/bug-report.md).
 
 For full-code-review runs, enforce the mandatory stop-prevention checklist in `instructions/full-code-review.md` before ending any response.

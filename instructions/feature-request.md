@@ -40,6 +40,9 @@ Before any implementation starts, evaluate the feature idea from all of the foll
 
 Write the result of the analysis into a root-level `todo.md`.
 
+Use `templates/todo-feature-request-template.md` as the default starting structure.
+If that file is unavailable for any reason, use `templates/todo-template.md`.
+
 This file must be understandable on its own and must act as the source of truth for the feature plan and the later execution work.
 
 ### Required contents of `todo.md`
@@ -92,6 +95,8 @@ Do not skip steps.
 
 Before ending any response, explicitly verify all of the following:
 
+- Before `todo.md` was created, a new suitably named local branch was created from `origin/main` and checked out.
+- All analysis work, implementation work, and any local commits are being done on that branch.
 - If analysis is still in progress, the feature idea has not skipped straight to implementation.
 - `todo.md` exists and reflects the latest analysis and implementation plan.
 - If the developer has not yet chosen between immediate implementation and backlog storage, the run is paused only at that decision gate and not earlier.
@@ -107,13 +112,14 @@ If any checklist item is not satisfied, continue working instead of stopping.
 
 Answer each item with `YES` or `NO`:
 
-1. Has the feature idea been analyzed for game fit, consistency, architecture, risk, and testing before implementation?
-2. Is `todo.md` fully up to date and usable as a standalone execution plan?
-3. If the developer has not yet decided between implementation and backlog, is the run paused exactly at that decision gate?
-4. If the developer chose immediate implementation, is there no higher-priority open TODO than the one currently being worked on?
-5. If the developer chose backlog storage, has `todo.md` been moved to `backlog/{short-description}.md`?
-6. Before every implementation commit so far, were the relevant tests green?
-7. If all TODOs are done, has final verification passed and has `todo.md` been archived to `backlog/done/{timestamp}-{short-title}.md` without an extra commit afterward?
+1. Before `todo.md` was created, was a new suitably named local branch created from `origin/main` and used for the rest of the workflow?
+2. Has the feature idea been analyzed for game fit, consistency, architecture, risk, and testing before implementation?
+3. Is `todo.md` fully up to date and usable as a standalone execution plan?
+4. If the developer has not yet decided between implementation and backlog, is the run paused exactly at that decision gate?
+5. If the developer chose immediate implementation, is there no higher-priority open TODO than the one currently being worked on?
+6. If the developer chose backlog storage, has `todo.md` been moved to `backlog/{short-description}.md`?
+7. Before every implementation commit so far, were the relevant tests green?
+8. If all TODOs are done, has final verification passed and has `todo.md` been archived to `backlog/done/{timestamp}-{short-title}.md` without an extra commit afterward?
 
 Decision rule:
 
@@ -121,6 +127,11 @@ Decision rule:
 - End the run only when all applicable answers are `YES`.
 
 ### 1. Analyze the feature request
+
+Before creating or replacing `todo.md`, create and check out a new suitably named local branch from `origin/main`.
+Do not continue the workflow on `main` or on an unrelated existing branch.
+Perform the remaining analysis, planning, backlog handling, implementation work, and all local commits on that branch.
+Do not push unless the developer explicitly asks for it.
 
 - Inspect the relevant repository context before proposing implementation work.
 - Evaluate whether the idea fits the current game, systems, UI, progression, and technical direction.
@@ -131,7 +142,7 @@ Decision rule:
 ### 2. Create the planning backlog in `todo.md`
 
 - Create or replace the root `todo.md` with the full analysis and planned implementation backlog.
-- Record which model produced the planning document. If the runtime exposes the exact model name, write that exact name. If not, record a clear fallback such as `unknown-model` or `model-name-not-exposed-by-runtime`.
+- Record which model produced the planning document. If the runtime exposes the exact model name, write that exact name. If not, ask the developer for the model name and wait for clarification instead of recording a fallback value.
 - Break the feature into incremental TODOs that can be completed and verified one by one.
 - Include risks, mitigations, and test expectations for each meaningful step.
 - Prefer plans that protect architecture, readability, maintainability, extensibility, and game consistency over the fastest possible implementation path.
@@ -155,9 +166,9 @@ After the developer explicitly chooses immediate implementation:
 - Always pick the highest-priority remaining TODO first.
 - If a TODO is too large, split it into smaller TODOs in `todo.md` before implementation.
 - Keep `todo.md` current so status, scope, and risks stay accurate.
-- For each TODO that is executed, record which model performed that step. If the exact model name is unavailable, record the same clear fallback used for the planning metadata.
+- For each TODO that is executed, record which model performed that step. If the exact model name is unavailable, ask the developer for clarification and use that answer consistently.
 - Reprioritize if newly discovered issues are more urgent than the remaining plan.
-- Make cohesive local commits with English commit messages.
+- Make cohesive local commits with English commit messages on the prepared branch from `origin/main`.
 - Do not batch unrelated TODOs into one commit unless they are inseparable.
 
 ### 5. Verify every step before committing

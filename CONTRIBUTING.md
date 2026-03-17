@@ -54,6 +54,8 @@ For the full local verification flow, you can also use `npm run verify`.
 
 You can also run `npm run test:simulation` or `npm run test:service-worker` when only one suite is relevant.
 
+For advisory, non-blocking change hints based on touched file paths, run `npm run agent:advisory`.
+
 If you do not run a relevant check, say so explicitly in your summary or pull request.
 
 ## Reviews

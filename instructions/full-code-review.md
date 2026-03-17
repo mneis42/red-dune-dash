@@ -51,11 +51,14 @@ In practice, a full review includes root-level source files, configuration files
 
 Write the complete result of the review into a root-level `todo.md`.
 
+Use `templates/todo-full-code-review-template.md` as the default starting structure.
+If that file is unavailable for any reason, use `templates/todo-template.md`.
+
 This file must be understandable on its own and must serve as the actionable backlog for the follow-up implementation work.
 
 ### Requirements for `todo.md`
 
-- Record planning model metadata for the review backlog. If the runtime exposes the exact model name, write that exact name. If not, record a clear fallback such as `unknown-model` or `model-name-not-exposed-by-runtime`.
+- Record planning model metadata for the review backlog. If the runtime exposes the exact model name, write that exact name. If not, ask the developer for the model name and wait for clarification instead of recording a fallback value.
 - Use clear TODO items with explicit priorities.
 - Explain each issue well enough that it is still understandable later.
 - Make the backlog incremental so items can be solved one by one.
@@ -76,7 +79,7 @@ Use these priorities consistently:
 
 Each TODO should contain:
 
-- execution model metadata for the agent or model that completed the TODO. If the exact model name is unavailable, record a clear fallback instead of guessing.
+- execution model metadata for the agent or model that completed the TODO. If the exact model name is unavailable, ask the developer for clarification instead of recording a fallback or guessing.
 - priority
 - concise title
 - problem description
@@ -96,6 +99,8 @@ Do not skip steps.
 
 Before ending any response during a full-code-review run, explicitly verify all of the following:
 
+- Before `todo.md` was created, a new suitably named local branch was created from `origin/main` and checked out.
+- All review, implementation, and backlog commits are being made on that branch.
 - `todo.md` was created and committed locally.
 - The highest-priority open TODO is actively being executed.
 - If no TODO is in progress, confirm all TODOs are complete and final verification has passed.
@@ -108,11 +113,12 @@ If any checklist item is not satisfied, continue working instead of stopping.
 
 Answer each item with `YES` or `NO`:
 
-1. Is the review backlog in `todo.md` fully up to date and committed locally?
-2. Is there no higher-priority open TODO than the one currently being worked on?
-3. If all TODOs are marked done, has full final verification actually been executed and passed?
-4. If verification passed, has `todo.md` already been moved to `reviews/yyyyMMdd-HHmmss-complete.md` and left uncommitted?
-5. If any work remains, is there a real blocker documented (and not just a pause for confirmation)?
+1. Before `todo.md` was created, was a new suitably named local branch created from `origin/main` and used for the rest of the workflow?
+2. Is the review backlog in `todo.md` fully up to date and committed locally?
+3. Is there no higher-priority open TODO than the one currently being worked on?
+4. If all TODOs are marked done, has full final verification actually been executed and passed?
+5. If verification passed, has `todo.md` already been moved to `reviews/yyyyMMdd-HHmmss-complete.md` and left uncommitted?
+6. If any work remains, is there a real blocker documented (and not just a pause for confirmation)?
 
 Decision rule:
 
@@ -121,11 +127,16 @@ Decision rule:
 
 ### 1. Perform the full review
 
+Before creating or replacing `todo.md`, create and check out a new suitably named local branch from `origin/main`.
+Do not continue the workflow on `main` or on an unrelated existing branch.
+Perform the full review, `todo.md` creation, follow-up implementation, and all required local commits on that branch.
+Do not push unless the developer explicitly asks for it.
+
 - Inspect the whole repository except `reviews/`.
 - Evaluate the project against the full review scope listed above.
 - Produce a fresh root-level `todo.md` containing the complete prioritized result.
 - Record the current baseline status of relevant checks in `todo.md`, such as tests, build, linting, type checks, and pipeline health, including what passes, what fails, what is missing, and what could not be run.
-- Record which model produced the initial review backlog. If the exact model name is not exposed by the runtime, record an explicit fallback rather than inventing a more specific name.
+- Record which model produced the initial review backlog. If the exact model name is not exposed by the runtime, ask the developer for it instead of inventing a fallback.
 
 ### 2. Create a local commit for the review backlog
 
@@ -135,6 +146,7 @@ Requirements:
 
 - The commit message must be in English.
 - The commit must be local only.
+- The commit must be created on the review branch prepared from `origin/main`.
 - Do not push.
 
 ### 3. Execute the TODOs one by one
@@ -149,7 +161,7 @@ Rules:
 - Implement the fix completely enough that the item can genuinely be considered done.
 - Verify the change with appropriate checks before committing.
 - Update `todo.md` so the current status remains accurate and understandable.
-- Record which model executed each completed TODO. If the runtime does not expose the exact model name, use the same explicit fallback convention as for the planning metadata.
+- Record which model executed each completed TODO. If the runtime does not expose the exact model name, ask the developer for clarification and use that answer consistently.
 - If new problems are discovered while implementing a TODO, add them to `todo.md` with the correct priority instead of silently folding them into an unrelated item.
 - Reprioritize the remaining TODOs when newly discovered issues are more urgent than the current backlog order.
 - Create a new local git commit after finishing each TODO.
