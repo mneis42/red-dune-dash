@@ -38,6 +38,12 @@ test("buildHeadingAnchors applies duplicate-suffix strategy", () => {
   assert.equal(anchors.has("repeated-2"), true);
 });
 
+test("buildHeadingAnchors removes punctuation from heading anchors", () => {
+  const anchors = buildHeadingAnchors("## Release v2.0: Overview");
+  assert.equal(anchors.has("release-v20-overview"), true);
+  assert.equal(anchors.has("release-v2.0:-overview"), false);
+});
+
 test("runInstructionLint succeeds for valid canonical references and anchors", () => {
   withTempRepo(({ root, write }) => {
     write(
