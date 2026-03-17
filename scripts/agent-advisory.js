@@ -122,15 +122,15 @@ function formatHumanReadable(result) {
   return lines.join("\n");
 }
 
-function main() {
-  const options = parseArgs(process.argv.slice(2));
+function main(argv = process.argv.slice(2)) {
+  const options = parseArgs(argv);
   const { absolutePath, document } = loadAdvisoryDocument(options.rulesPath || undefined);
   const validation = validateAdvisoryDocument(document);
 
   if (!validation.valid) {
     console.error(`Invalid advisory rules in ${absolutePath}`);
     validation.errors.forEach((entry) => console.error(`- ${entry}`));
-    process.exit(1);
+    return 1;
   }
 
   const changedFiles = getChangedFiles(options);
@@ -148,25 +148,26 @@ function main() {
 
     if (options.json) {
       console.log(JSON.stringify(payload, null, 2));
-      return;
+      return 0;
     }
 
     console.log("Unmatched advisory files");
     console.log("========================");
     if (unmatchedFiles.length === 0) {
       console.log("None.");
-      return;
+      return 0;
     }
     unmatchedFiles.forEach((entry) => console.log(`- ${entry}`));
-    return;
+    return 0;
   }
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
-    return;
+    return 0;
   }
 
   console.log(formatHumanReadable(result));
+  return 0;
 }
 
 module.exports = {
@@ -178,5 +179,8 @@ module.exports = {
 };
 
 if (require.main === module) {
-  main();
+  const exitCode = main();
+  if (exitCode !== 0) {
+    process.exit(exitCode);
+  }
 }

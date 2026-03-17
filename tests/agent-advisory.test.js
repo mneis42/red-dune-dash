@@ -1,4 +1,7 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 const tests = [];
 
@@ -48,26 +51,17 @@ test("module exports reusable CLI helpers", () => {
 
 test("main keeps JSON behavior when executed programmatically", () => {
   const cli = loadCliModuleFresh();
-  const originalArgv = process.argv;
   const originalLog = console.log;
   const output = [];
-
-  process.argv = [
-    "node",
-    "scripts/agent-advisory.js",
-    "--json",
-    "--files",
-    "version.json",
-  ];
 
   console.log = (...args) => {
     output.push(args.map((value) => String(value)).join(" "));
   };
 
   try {
-    cli.main();
+    const exitCode = cli.main(["--json", "--files", "version.json"]);
+    assert.equal(exitCode, 0);
   } finally {
-    process.argv = originalArgv;
     console.log = originalLog;
   }
 
@@ -75,6 +69,28 @@ test("main keeps JSON behavior when executed programmatically", () => {
   const payload = JSON.parse(output[0]);
   assert.deepEqual(payload.changedFiles, ["version.json"]);
   assert.equal(Array.isArray(payload.perFile), true);
+});
+
+test("main returns non-zero for invalid advisory rules without exiting host process", () => {
+  const cli = loadCliModuleFresh();
+  const tempFilePath = path.join(os.tmpdir(), `invalid-advisory-${Date.now()}.json`);
+  const originalError = console.error;
+  const errors = [];
+
+  fs.writeFileSync(tempFilePath, JSON.stringify({ version: 1, rules: [] }), "utf8");
+  console.error = (...args) => {
+    errors.push(args.map((value) => String(value)).join(" "));
+  };
+
+  try {
+    const exitCode = cli.main(["--rules", tempFilePath]);
+    assert.equal(exitCode, 1);
+  } finally {
+    console.error = originalError;
+    fs.unlinkSync(tempFilePath);
+  }
+
+  assert.equal(errors.some((line) => line.includes("Invalid advisory rules in")), true);
 });
 
 async function runTests() {
