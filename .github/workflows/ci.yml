@@ -59,7 +59,6 @@ jobs:
           node-version: 24
 
       - name: Advisory change hints (non-blocking)
-        continue-on-error: true
         run: |
           EVENT_NAME="${{ github.event_name }}"
           BASE_SHA=""
