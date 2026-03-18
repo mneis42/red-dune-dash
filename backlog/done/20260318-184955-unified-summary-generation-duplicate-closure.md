@@ -3,11 +3,11 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 7
 priority: 3
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-16
-last_updated: 2026-03-17
+last_updated: 2026-03-18
 ---
 
 # TODO: Unified Summary Generation
@@ -42,3 +42,4 @@ Provide one summary tool that covers local-change and postflight summary needs i
 ## Notes
 
 - Prefer deterministic signals over free-text inference.
+- This done entry closes a duplicate open backlog file; implementation already exists in `backlog/done/20260317-214916-unified-summary-generation.md`.
