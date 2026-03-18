@@ -10,7 +10,7 @@ last_updated: <YYYY-MM-DD>
 
 # Red Dune Dash TODO
 
-Dieses Dokument ist die einzige Quelle fuer Prioritaeten, Ausfuehrungsstatus und Verifikation im aktuellen Run.
+This document is the single source of truth for priorities, execution status, and verification in the current run.
 
 Model note: If the exact model name is not visible in runtime, ask the developer for the model name and wait for the answer. Do not write fallback values.
 
