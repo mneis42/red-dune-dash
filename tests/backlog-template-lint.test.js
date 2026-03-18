@@ -232,7 +232,7 @@ test("validateBacklogFile rejects unsupported workflow_type", () => {
   });
 });
 
-test("runBacklogTemplateLint checks prioritized files only", () => {
+test("runBacklogTemplateLint checks prioritized and done backlog files", () => {
   withTempRepo(({ root, write }) => {
     write(
       "backlog/12-todo-valid.md",
@@ -385,6 +385,58 @@ test("runBacklogTemplateLint rejects open-vs-done topic collisions", () => {
       result.issues.some((entry) => entry.includes("Open backlog item duplicates archived topic")),
       true
     );
+  });
+});
+
+test("runBacklogTemplateLint reports all matching done paths for open-vs-done collisions", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "backlog/12-todo-open-item.md",
+      [
+        "---",
+        "workflow_type: backlog-item",
+        "source: workflow-ideas.md",
+        "priority: 12",
+        "status: open",
+        "planning_model: GPT-5.3-Codex",
+        "execution_model: GPT-5.3-Codex",
+        "created_at: 2026-03-18",
+        "last_updated: 2026-03-18",
+        "---",
+        "",
+        "# TODO: Add Guardrails",
+        "",
+        "## Goal",
+        "x",
+        "## Scope",
+        "- x",
+        "## Out Of Scope",
+        "- x",
+        "## Acceptance Criteria",
+        "- x",
+        "## Suggested Verification",
+        "- npm run check",
+        "## Notes",
+      ].join("\n")
+    );
+
+    write(
+      "backlog/done/20260318-120000-add-guardrails.md",
+      ["---", "status: done", "---", "# TODO: Add guardrails"].join("\n")
+    );
+
+    write(
+      "backlog/done/20260318-130000-add-guardrails.md",
+      ["---", "status: done", "---", "# TODO: Add Guardrails"].join("\n")
+    );
+
+    const result = runBacklogTemplateLint({ repoRoot: root });
+    const collisionIssue = result.issues.find((entry) =>
+      entry.includes("Open backlog item duplicates archived topic")
+    );
+    assert.equal(Boolean(collisionIssue), true);
+    assert.equal(collisionIssue.includes("20260318-120000-add-guardrails.md"), true);
+    assert.equal(collisionIssue.includes("20260318-130000-add-guardrails.md"), true);
   });
 });
 

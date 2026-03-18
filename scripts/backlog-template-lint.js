@@ -190,10 +190,8 @@ function validateDoneBacklogFile(repoRoot, filePath) {
   return { issues, content, key: buildComparableKey(content, filePath) };
 }
 
-function validateBacklogFile(repoRoot, filePath) {
+function validateBacklogContent(filePath, content) {
   const issues = [];
-  const absolutePath = path.join(repoRoot, filePath);
-  const content = fs.readFileSync(absolutePath, "utf8");
   const { map: frontmatter, hasFrontmatter } = parseFrontmatter(content);
 
   if (!hasFrontmatter) {
@@ -262,6 +260,12 @@ function validateBacklogFile(repoRoot, filePath) {
   return issues;
 }
 
+function validateBacklogFile(repoRoot, filePath) {
+  const absolutePath = path.join(repoRoot, filePath);
+  const content = fs.readFileSync(absolutePath, "utf8");
+  return validateBacklogContent(filePath, content);
+}
+
 function runBacklogTemplateLint(options = {}) {
   const repoRoot = path.resolve(options.repoRoot || process.cwd());
   const files = listPrioritizedBacklogFiles(repoRoot);
@@ -274,7 +278,7 @@ function runBacklogTemplateLint(options = {}) {
     const absolutePath = path.join(repoRoot, filePath);
     const content = fs.readFileSync(absolutePath, "utf8");
     openKeys.push({ filePath, key: buildComparableKey(content, filePath) });
-    issues.push(...validateBacklogFile(repoRoot, filePath));
+    issues.push(...validateBacklogContent(filePath, content));
   }
 
   for (const filePath of doneFiles) {
@@ -291,12 +295,20 @@ function runBacklogTemplateLint(options = {}) {
     );
   }
 
-  const doneByKey = new Map(doneKeys.map((entry) => [entry.key, entry.filePath]));
+  const doneByKey = new Map();
+  for (const entry of doneKeys) {
+    if (!doneByKey.has(entry.key)) {
+      doneByKey.set(entry.key, []);
+    }
+    doneByKey.get(entry.key).push(entry.filePath);
+  }
+
   for (const entry of openKeys) {
-    const donePath = doneByKey.get(entry.key);
-    if (donePath) {
+    const donePaths = doneByKey.get(entry.key);
+    if (donePaths && donePaths.length > 0) {
+      const sortedDonePaths = [...donePaths].sort();
       issues.push(
-        `Open backlog item duplicates archived topic "${entry.key}": ${entry.filePath} (open) vs ${donePath} (done).`
+        `Open backlog item duplicates archived topic "${entry.key}": ${entry.filePath} (open) vs ${sortedDonePaths.join(", ")} (done).`
       );
     }
   }
@@ -351,6 +363,7 @@ module.exports = {
   normalizeFileStem,
   buildComparableKey,
   findDuplicateKeys,
+  validateBacklogContent,
   validateBacklogFile,
   validateDoneBacklogFile,
   runBacklogTemplateLint,
