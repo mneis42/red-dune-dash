@@ -44,6 +44,7 @@ jobs:
         run: npm run backlog:lint
 
   advisory-hints:
+    continue-on-error: true
     runs-on: ubuntu-latest
 
     steps:
@@ -90,12 +91,18 @@ jobs:
 
   test:
     name: test (compatibility gate)
+    if: ${{ always() }}
     needs:
       - core-verify
-      - advisory-hints
     runs-on: ubuntu-latest
 
     steps:
       - name: Compatibility success gate
         # Keep job id "test" stable for required-check compatibility.
-        run: echo "Core verification matrix and advisory hints completed successfully."
+        run: |
+          if [ "${{ needs.core-verify.result }}" = "success" ]; then
+            echo "Core verification matrix completed successfully."
+          else
+            echo "Core verification matrix result: ${{ needs.core-verify.result }}"
+            exit 1
+          fi
