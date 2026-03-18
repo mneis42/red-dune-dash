@@ -285,7 +285,7 @@ function lintPrePrChecklistReferences(repoRoot, byPath) {
     issues.push(
       createIssue(
         "missing-canonical-file",
-        PRE_PR_CHECKLIST_REQUIRED_REFERENCE_PATHS[0],
+        "AGENTS.md",
         1,
         `Canonical instruction file is missing: ${PRE_PR_CHECKLIST_PATH}`
       )

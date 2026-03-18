@@ -248,6 +248,40 @@ test("runInstructionLint reports missing required checklist-reference files with
   });
 });
 
+test("runInstructionLint reports missing canonical checklist file against stable AGENTS.md path", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "AGENTS.md",
+      [
+        "# Agent Instructions",
+        "",
+        "- [Full](instructions/full-code-review.md)",
+        "- [Change](instructions/change-review.md)",
+        "- [Feature](instructions/feature-request.md)",
+        "- [Bug](instructions/bug-report.md)",
+      ].join("\n")
+    );
+
+    write("README.md", "# Readme\n");
+    write("CONTRIBUTING.md", "# Contributing\n");
+    write("instructions/full-code-review.md", "# Full\n");
+    write("instructions/change-review.md", "# Change\n");
+    write("instructions/feature-request.md", "# Feature\n");
+    write("instructions/bug-report.md", "# Bug\n");
+    write(".github/copilot-instructions.md", "# Copilot\n");
+
+    const result = runInstructionLint({ repoRoot: root });
+    const finding = result.issues.find(
+      (issue) =>
+        issue.code === "missing-canonical-file" &&
+        issue.message.includes("instructions/pre-pr-checklist.md")
+    );
+
+    assert.ok(finding);
+    assert.equal(finding.filePath, "AGENTS.md");
+  });
+});
+
 test("all known issue codes have explicit severity mapping", () => {
   const requiredCodes = [
     "missing-canonical-file",

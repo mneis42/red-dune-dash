@@ -8,6 +8,7 @@ const {
   buildCopyBlock,
   buildSummaryResult,
   buildPrePrChecklistOutcome,
+  isFailingCheckStatus,
   formatHumanReadable,
 } = require("../scripts/agent-summary.js");
 
@@ -273,6 +274,15 @@ test("buildSummaryResult treats error and failed-signal check statuses as failur
 
   assert.ok(checklist.likelyReviewerObjections.includes("Failing checks must be resolved before merge."));
   assert.ok(checklist.remainingRisks.includes("failed-checks"));
+});
+
+test("isFailingCheckStatus is true for fail, error, failed-signal", () => {
+  assert.equal(isFailingCheckStatus("fail"), true);
+  assert.equal(isFailingCheckStatus("error"), true);
+  assert.equal(isFailingCheckStatus("failed-signal"), true);
+  assert.equal(isFailingCheckStatus("pass"), false);
+  assert.equal(isFailingCheckStatus("not-run"), false);
+  assert.equal(isFailingCheckStatus("skipped-unsafe"), false);
 });
 
 async function runTests() {

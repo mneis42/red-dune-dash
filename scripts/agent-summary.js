@@ -271,6 +271,10 @@ function buildCheckOutcomes(advisoryResult, options) {
   });
 }
 
+function isFailingCheckStatus(status) {
+  return status === "fail" || status === "error" || status === "failed-signal";
+}
+
 function buildOpenQuestions(advisoryResult, checkOutcomes) {
   const questions = [];
   const fallbackFiles = advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
@@ -290,7 +294,7 @@ function buildOpenQuestions(advisoryResult, checkOutcomes) {
     );
   }
 
-  const failedChecks = checkOutcomes.filter((entry) => entry.status === "fail");
+  const failedChecks = checkOutcomes.filter((entry) => isFailingCheckStatus(entry.status));
   if (failedChecks.length > 0) {
     questions.push(
       `How should failed checks be handled before merge: ${failedChecks.map((entry) => entry.command).join(", ")}?`
@@ -389,9 +393,7 @@ function evaluateSplitDecision(changedFiles, advisoryResult, options) {
 function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes, risks, options) {
   const split = evaluateSplitDecision(changedFiles, advisoryResult, options);
   const skippedChecks = checkOutcomes.filter((entry) => entry.status === "not-run" || entry.status === "skipped-unsafe");
-  const failedChecks = checkOutcomes.filter(
-    (entry) => entry.status === "fail" || entry.status === "error" || entry.status === "failed-signal"
-  );
+  const failedChecks = checkOutcomes.filter((entry) => isFailingCheckStatus(entry.status));
   const fallbackFiles = advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
 
   const likelyReviewerObjections = [];
@@ -631,6 +633,7 @@ module.exports = {
   evaluateSplitDecision,
   buildPrePrChecklistOutcome,
   buildCheckOutcomes,
+  isFailingCheckStatus,
   buildOpenQuestions,
   buildCopyBlock,
   buildSummaryResult,
