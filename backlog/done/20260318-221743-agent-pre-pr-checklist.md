@@ -4,7 +4,7 @@ source: agent-review-friction
 priority: 1
 status: done
 planning_model: GPT-5.4 Thinking
-execution_model: GPT-5.4 Thinking
+execution_model: GPT-5.3-Codex
 created_at: 2026-03-18
 last_updated: 2026-03-18
 ---
