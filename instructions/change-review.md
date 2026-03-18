@@ -120,9 +120,9 @@ Use when the diff changes economy, spawn rates, progression pacing, score pressu
 
 - Typical files: `game-endless.js`, `styles.css`, `README.md` (balancing notes if touched)
 - Review checks:
-	- verify change rationale matches game progression goals
-	- verify no new softlock or unavoidable failure pattern appears
-	- verify player-facing guidance remains accurate after tuning changes
+  - verify change rationale matches game progression goals
+  - verify no new softlock or unavoidable failure pattern appears
+  - verify player-facing guidance remains accurate after tuning changes
 
 ### Package: PWA / Offline Reliability
 
@@ -130,9 +130,9 @@ Use when the diff changes installability, caching, service worker lifecycle, or 
 
 - Typical files: `service-worker.js`, `manifest.webmanifest`, `app-assets.js`, `version.json`
 - Review checks:
-	- verify update and cache invalidation paths are coherent
-	- verify offline behavior expectations are test-backed or manually validated
-	- verify versioning and cache keys move together to avoid stale clients
+  - verify update and cache invalidation paths are coherent
+  - verify offline behavior expectations are test-backed or manually validated
+  - verify versioning and cache keys move together to avoid stale clients
 
 ### Package: Gameplay Bugfix
 
@@ -140,9 +140,9 @@ Use when a player-facing defect is fixed in the reviewed change set.
 
 - Typical files: `game-endless.js`, tests in `tests/`, player-facing docs in `README.md`
 - Review checks:
-	- verify expected-vs-actual behavior is explicit
-	- verify regression coverage exists for the fixed path and adjacent edge case
-	- verify fix addresses root cause rather than only symptom masking
+  - verify expected-vs-actual behavior is explicit
+  - verify regression coverage exists for the fixed path and adjacent edge case
+  - verify fix addresses root cause rather than only symptom masking
 
 ### Package: Workflow / Docs Update
 
@@ -150,9 +150,9 @@ Use when process docs, instructions, templates, or CI guidance are changed.
 
 - Typical files: `instructions/*.md`, `.github/instructions/*.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/`
 - Review checks:
-	- verify wording consistency across canonical and mirrored instruction files
-	- verify examples and commands are actionable in this repository
-	- verify workflow routing authority remains unchanged
+  - verify wording consistency across canonical and mirrored instruction files
+  - verify examples and commands are actionable in this repository
+  - verify workflow routing authority remains unchanged
 
 ### Package: Targeted Review Readiness
 
@@ -160,9 +160,9 @@ Use when validating that a small or medium diff is review-ready.
 
 - Typical files: changed implementation files plus related tests/docs
 - Review checks:
-	- verify change boundary is coherent and complete for the stated intent
-	- verify behavior changes have matching verification evidence
-	- verify reviewer can infer risk, expected behavior, and follow-up scope quickly
+  - verify change boundary is coherent and complete for the stated intent
+  - verify behavior changes have matching verification evidence
+  - verify reviewer can infer risk, expected behavior, and follow-up scope quickly
 
 ## Behavior Expectations For Agents
 
