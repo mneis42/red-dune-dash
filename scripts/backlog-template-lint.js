@@ -178,11 +178,6 @@ function validateDoneBacklogFile(repoRoot, filePath) {
   const content = fs.readFileSync(absolutePath, "utf8");
   const { map: frontmatter, hasFrontmatter } = parseFrontmatter(content);
 
-  // Keep legacy done files compatible, but never allow an explicit open status in done.
-  if (/^status:\s*open\s*$/m.test(content)) {
-    issues.push(`${filePath}: backlog/done entries must not use frontmatter status: open.`);
-  }
-
   if (hasFrontmatter && Object.prototype.hasOwnProperty.call(frontmatter, "status") && frontmatter.status !== "done") {
     issues.push(`${filePath}: backlog/done entries must use frontmatter status: done.`);
   }

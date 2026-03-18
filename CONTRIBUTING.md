@@ -62,7 +62,7 @@ Backlog hygiene guardrails are enforced by `npm run backlog:lint`:
 
 - Duplicate normalized TODO topics inside `backlog/` are rejected.
 - Open-vs-done topic collisions between `backlog/` and `backlog/done/` are rejected.
-- `backlog/done/` entries must not declare `status: open`.
+- If `backlog/done/` frontmatter contains `status`, it must be `done`.
 
 If you do not run a relevant check, say so explicitly in your summary or pull request.
 

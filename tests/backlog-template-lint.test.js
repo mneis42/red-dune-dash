@@ -278,7 +278,27 @@ test("validateDoneBacklogFile rejects status other than done", () => {
 
     const result = validateDoneBacklogFile(root, "backlog/done/20260318-foo.md");
     assert.equal(result.issues.length >= 1, true);
-    assert.equal(result.issues.some((entry) => /status: done|status: open/.test(entry)), true);
+    assert.equal(result.issues.some((entry) => /status: done/.test(entry)), true);
+  });
+});
+
+test("validateDoneBacklogFile ignores status-like lines outside frontmatter", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "backlog/done/20260318-example.md",
+      [
+        "---",
+        "workflow_type: backlog-item",
+        "---",
+        "# TODO: Example",
+        "",
+        "## Notes",
+        "status: open",
+      ].join("\n")
+    );
+
+    const result = validateDoneBacklogFile(root, "backlog/done/20260318-example.md");
+    assert.deepEqual(result.issues, []);
   });
 });
 
