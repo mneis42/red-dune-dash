@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const path = require("node:path");
 
 const {
   parseScope,
@@ -104,7 +105,7 @@ test("resolveTaskAreas infers areas from matches and drops unclassified", () => 
 });
 
 test("detectGuardrailStatus prefers configured hooksPath pre-push hook", () => {
-  const expectedHookPath = normalizePath("/repo/.githooks/pre-push");
+  const expectedHookPath = normalizePath(path.resolve("/repo", ".githooks", "pre-push"));
   const result = detectGuardrailStatus({
     cwd: "/repo/subdir",
     resolveRepoRoot: () => "/repo",
@@ -122,7 +123,7 @@ test("detectGuardrailStatus prefers configured hooksPath pre-push hook", () => {
 });
 
 test("detectGuardrailStatus reports inactive when configured pre-push hook is missing", () => {
-  const expectedHookPath = normalizePath("/repo/.githooks/pre-push");
+  const expectedHookPath = normalizePath(path.resolve("/repo", ".githooks", "pre-push"));
   const result = detectGuardrailStatus({
     cwd: "/repo",
     readHooksPath: () => ".githooks",
@@ -139,7 +140,7 @@ test("detectGuardrailStatus reports inactive when configured pre-push hook is mi
 });
 
 test("detectGuardrailStatus falls back to legacy pre-commit signal without hooksPath", () => {
-  const expectedHookPath = normalizePath("/repo/.git/hooks/pre-commit");
+  const expectedHookPath = normalizePath(path.join("/repo", ".git", "hooks", "pre-commit"));
   const result = detectGuardrailStatus({
     cwd: "/repo",
     readHooksPath: () => null,
