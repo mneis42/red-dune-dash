@@ -251,10 +251,10 @@ test("human output includes advisory policy note and unrelated section", () => {
       unrelatedFiles: [{ filePath: "README.md", areas: ["workflow-docs"], ruleIds: ["workflow-docs"] }],
     },
     guardrail: {
-      signal: "legacy-git-hooks-pre-commit-checked",
+      signal: "core-hooks-path-pre-push-checked",
       active: true,
-      path: ".git/hooks/pre-commit",
-      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+      path: "/repo/.githooks/pre-push",
+      note: "Detected via configured core.hooksPath and pre-push hook. Current-state signal only.",
     },
     policy: {
       advisoryOnly: true,
@@ -311,10 +311,10 @@ test("human output warns when running on main branch", () => {
       unrelatedFiles: [],
     },
     guardrail: {
-      signal: "legacy-git-hooks-pre-commit-checked",
+      signal: "core-hooks-path-pre-push-checked",
       active: false,
-      path: ".git/hooks/pre-commit",
-      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+      path: "/repo/.githooks/pre-push",
+      note: "core.hooksPath is configured but expected pre-push hook is missing. Current-state signal only.",
     },
     policy: {
       advisoryOnly: true,
@@ -429,10 +429,10 @@ test("human output includes mixed change counts and fallback files section", () 
       unrelatedFiles: [{ filePath: "scripts/agent-preflight.js", areas: ["tooling"], ruleIds: ["tooling-scripts-tests"] }],
     },
     guardrail: {
-      signal: "legacy-git-hooks-pre-commit-checked",
+      signal: "core-hooks-path-pre-push-checked",
       active: true,
-      path: ".git/hooks/pre-commit",
-      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+      path: "/repo/.githooks/pre-push",
+      note: "Detected via configured core.hooksPath and pre-push hook. Current-state signal only.",
     },
     policy: {
       advisoryOnly: true,
@@ -494,10 +494,10 @@ test("human output keeps section order deterministic", () => {
       unrelatedFiles: [],
     },
     guardrail: {
-      signal: "legacy-git-hooks-pre-commit-checked",
+      signal: "core-hooks-path-pre-push-checked",
       active: true,
-      path: ".git/hooks/pre-commit",
-      note: "Legacy fallback when core.hooksPath is not configured. Current-state signal only.",
+      path: "/repo/.githooks/pre-push",
+      note: "Detected via configured core.hooksPath and pre-push hook. Current-state signal only.",
     },
     policy: {
       advisoryOnly: true,
