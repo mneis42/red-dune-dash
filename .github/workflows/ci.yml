@@ -87,3 +87,13 @@ jobs:
           else
             npm run agent:advisory -- --files "$CHANGED_FILES"
           fi
+
+  test:
+    needs:
+      - core-verify
+      - advisory-hints
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Compatibility success gate
+        run: echo "Core verification matrix and advisory hints completed successfully."
