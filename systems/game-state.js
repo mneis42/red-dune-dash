@@ -22,7 +22,7 @@
    * Creates the mutable player state for one run.
    *
    * @param {{x:number,y:number}} spawn - Current level spawn point.
-   * @returns {{x:number,y:number,w:number,h:number,vx:number,vy:number,speed:number,maxSpeed:number,jumpPower:number,grounded:boolean,direction:number,lives:number,invincible:number,hurtTimer:number,pendingRespawn:boolean,forceInjuredPose:boolean,respawnVisual:string,checkpointX:number,checkpointY:number,visible:boolean}} Fresh player state.
+   * @returns {{x:number,y:number,w:number,h:number,vx:number,vy:number,speed:number,maxSpeed:number,jumpPower:number,grounded:boolean,jumpsUsed:number,direction:number,lives:number,invincible:number,hurtTimer:number,pendingRespawn:boolean,forceInjuredPose:boolean,respawnVisual:string,checkpointX:number,checkpointY:number,visible:boolean}} Fresh player state.
    */
   function createPlayerState(spawn) {
     return {
@@ -36,6 +36,9 @@
       maxSpeed: 6.2,
       jumpPower: -13.5,
       grounded: false,
+      // Tracks how many jumps have been used in the current airborne sequence.
+      // Reset to 0 on landing. Capped at MAX_JUMPS to prevent triple/infinite jumps.
+      jumpsUsed: 0,
       direction: 1,
       lives: 3,
       invincible: 0,
