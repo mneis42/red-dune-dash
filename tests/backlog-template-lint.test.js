@@ -260,7 +260,7 @@ test("runBacklogTemplateLint checks prioritized and done backlog files", () => {
       ].join("\n")
     );
 
-    write("backlog/done/20260316-foo.md", "---\nstatus: done\n---\n# TODO: ignored\n");
+    write("backlog/done/20260316-foo.md", "---\nstatus: done\n---\n# TODO: done fixture entry\n");
 
     const result = runBacklogTemplateLint({ repoRoot: root });
     assert.equal(result.files.length, 1);
