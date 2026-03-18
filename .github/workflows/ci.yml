@@ -89,6 +89,7 @@ jobs:
           fi
 
   test:
+    name: test (compatibility gate)
     needs:
       - core-verify
       - advisory-hints
@@ -96,4 +97,5 @@ jobs:
 
     steps:
       - name: Compatibility success gate
+        # Keep job id "test" stable for required-check compatibility.
         run: echo "Core verification matrix and advisory hints completed successfully."
