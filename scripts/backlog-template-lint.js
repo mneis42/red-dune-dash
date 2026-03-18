@@ -290,12 +290,12 @@ function runBacklogTemplateLint(options = {}) {
     const key = buildComparableKey(content, filePath, parsedFrontmatter);
 
     let isOpen = false;
-    if (parsedFrontmatter && typeof parsedFrontmatter === "object") {
-      const workflowType = parsedFrontmatter.workflow_type;
+    if (parsedFrontmatter && typeof parsedFrontmatter === "object" && parsedFrontmatter.map) {
+      const workflowType = parsedFrontmatter.map.workflow_type;
       if (workflowType === "backlog-item") {
-        isOpen = parsedFrontmatter.status === "open";
+        isOpen = parsedFrontmatter.map.status === "open";
       } else if (workflowType === "feature-request") {
-        isOpen = parsedFrontmatter.overall_status === "open";
+        isOpen = parsedFrontmatter.map.overall_status === "open";
       }
     }
 
