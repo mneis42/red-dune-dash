@@ -6,6 +6,7 @@ const path = require("node:path");
 const {
   parseFrontmatter,
   validateBacklogFile,
+  validateDoneBacklogFile,
   runBacklogTemplateLint,
 } = require("../scripts/backlog-template-lint.js");
 
@@ -259,11 +260,131 @@ test("runBacklogTemplateLint checks prioritized files only", () => {
       ].join("\n")
     );
 
-    write("backlog/done/20260316-foo.md", "---\nworkflow_type: other\n---\n# ignored\n");
+    write("backlog/done/20260316-foo.md", "---\nstatus: done\n---\n# TODO: ignored\n");
 
     const result = runBacklogTemplateLint({ repoRoot: root });
     assert.equal(result.files.length, 1);
+    assert.equal(result.doneFiles.length, 1);
     assert.deepEqual(result.issues, []);
+  });
+});
+
+test("validateDoneBacklogFile rejects status other than done", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "backlog/done/20260318-foo.md",
+      ["---", "status: open", "---", "# TODO: Example"].join("\n")
+    );
+
+    const result = validateDoneBacklogFile(root, "backlog/done/20260318-foo.md");
+    assert.equal(result.issues.length >= 1, true);
+    assert.equal(result.issues.some((entry) => /status: done|status: open/.test(entry)), true);
+  });
+});
+
+test("runBacklogTemplateLint rejects duplicate normalized titles in backlog", () => {
+  withTempRepo(({ root, write }) => {
+    const body = [
+      "## Goal",
+      "x",
+      "## Scope",
+      "- x",
+      "## Out Of Scope",
+      "- x",
+      "## Acceptance Criteria",
+      "- x",
+      "## Suggested Verification",
+      "- npm run check",
+      "## Notes",
+    ].join("\n\n");
+
+    write(
+      "backlog/12-todo-alpha.md",
+      [
+        "---",
+        "workflow_type: backlog-item",
+        "source: workflow-ideas.md",
+        "priority: 12",
+        "status: open",
+        "planning_model: GPT-5.3-Codex",
+        "execution_model: GPT-5.3-Codex",
+        "created_at: 2026-03-18",
+        "last_updated: 2026-03-18",
+        "---",
+        "",
+        "# TODO: Normalize Rule Names",
+        "",
+        body,
+      ].join("\n")
+    );
+
+    write(
+      "backlog/13-todo-beta.md",
+      [
+        "---",
+        "workflow_type: backlog-item",
+        "source: workflow-ideas.md",
+        "priority: 13",
+        "status: open",
+        "planning_model: GPT-5.3-Codex",
+        "execution_model: GPT-5.3-Codex",
+        "created_at: 2026-03-18",
+        "last_updated: 2026-03-18",
+        "---",
+        "",
+        "# TODO: Normalize-rule names",
+        "",
+        body,
+      ].join("\n")
+    );
+
+    const result = runBacklogTemplateLint({ repoRoot: root });
+    assert.equal(result.issues.some((entry) => entry.includes("Duplicate backlog topic")), true);
+  });
+});
+
+test("runBacklogTemplateLint rejects open-vs-done topic collisions", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "backlog/12-todo-open-item.md",
+      [
+        "---",
+        "workflow_type: backlog-item",
+        "source: workflow-ideas.md",
+        "priority: 12",
+        "status: open",
+        "planning_model: GPT-5.3-Codex",
+        "execution_model: GPT-5.3-Codex",
+        "created_at: 2026-03-18",
+        "last_updated: 2026-03-18",
+        "---",
+        "",
+        "# TODO: Add Guardrails",
+        "",
+        "## Goal",
+        "x",
+        "## Scope",
+        "- x",
+        "## Out Of Scope",
+        "- x",
+        "## Acceptance Criteria",
+        "- x",
+        "## Suggested Verification",
+        "- npm run check",
+        "## Notes",
+      ].join("\n")
+    );
+
+    write(
+      "backlog/done/20260318-120000-add-guardrails.md",
+      ["---", "status: done", "---", "# TODO: Add guardrails"].join("\n")
+    );
+
+    const result = runBacklogTemplateLint({ repoRoot: root });
+    assert.equal(
+      result.issues.some((entry) => entry.includes("Open backlog item duplicates archived topic")),
+      true
+    );
   });
 });
 
