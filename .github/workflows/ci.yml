@@ -90,7 +90,6 @@ jobs:
           fi
 
   test:
-    name: test (compatibility gate)
     if: ${{ always() }}
     needs:
       - core-verify
