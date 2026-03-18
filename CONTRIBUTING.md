@@ -60,6 +60,7 @@ For a unified local-change/postflight summary suitable for commits, PRs, or hand
 
 Backlog hygiene guardrails are enforced by `npm run backlog:lint`:
 
+- Topic comparison uses `# TODO:` for `workflow_type: backlog-item`, `frontmatter.title` for `workflow_type: feature-request`, and filename fallback only when no title is available.
 - Duplicate normalized TODO topics inside prioritized `backlog/<number>-*.md` files are rejected.
 - Open-vs-done topic collisions between prioritized `backlog/<number>-*.md` files and `backlog/done/` are rejected.
 - If `backlog/done/` frontmatter contains `status`, it must be `done`.

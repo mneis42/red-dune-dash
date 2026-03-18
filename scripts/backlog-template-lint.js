@@ -187,13 +187,14 @@ function validateDoneBacklogFile(repoRoot, filePath) {
   const issues = [];
   const absolutePath = path.join(repoRoot, filePath);
   const content = fs.readFileSync(absolutePath, "utf8");
-  const { map: frontmatter, hasFrontmatter } = parseFrontmatter(content);
+  const parsedFrontmatter = parseFrontmatter(content);
+  const { map: frontmatter, hasFrontmatter } = parsedFrontmatter;
 
   if (hasFrontmatter && Object.prototype.hasOwnProperty.call(frontmatter, "status") && frontmatter.status !== "done") {
     issues.push(`${filePath}: backlog/done entries must use frontmatter status: done.`);
   }
 
-  return { issues, content, key: buildComparableKey(content, filePath) };
+  return { issues, content, key: buildComparableKey(content, filePath, parsedFrontmatter) };
 }
 
 function validateBacklogContent(filePath, content, parsedFrontmatter) {
