@@ -3,7 +3,7 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 6
 priority: 2
-status: open
+status: done
 created_at: 2026-03-16
 ---
 

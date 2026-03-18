@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const BACKLOG_DIR = "backlog";
+const BACKLOG_DONE_DIR = "backlog/done";
 const PRIORITIZED_FILE_PATTERN = /^\d+-.+\.md$/;
 const ENHANCED_METADATA_MIN_ITEM_NUMBER = 12;
 
@@ -115,11 +116,91 @@ function listPrioritizedBacklogFiles(repoRoot) {
     .sort();
 }
 
-function validateBacklogFile(repoRoot, filePath) {
+function listDoneBacklogFiles(repoRoot) {
+  const donePath = path.join(repoRoot, BACKLOG_DONE_DIR);
+  if (!fs.existsSync(donePath)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(donePath, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => path.join(BACKLOG_DONE_DIR, entry.name).replaceAll("\\", "/"))
+    .sort();
+}
+
+function extractTodoTitle(content) {
+  const match = String(content || "").match(/^#\s+TODO:\s+(.+)$/m);
+  return match ? match[1].trim() : "";
+}
+
+function normalizeComparableTitle(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeFileStem(filePath) {
+  const stem = path.basename(String(filePath || ""), ".md").toLowerCase();
+  return stem
+    .replace(/^\d{8}-\d{6}-/, "")
+    .replace(/^\d+-todo-/, "")
+    .replace(/^todo-/, "")
+    .replace(/^\d+-/, "");
+}
+
+function buildComparableKey(content, filePath, parsedFrontmatter) {
+  const frontmatterResult = parsedFrontmatter || parseFrontmatter(content);
+  const frontmatter = frontmatterResult.map;
+  const workflowType = frontmatter.workflow_type;
+
+  if (workflowType === "feature-request") {
+    const fromFeatureTitle = normalizeComparableTitle(frontmatter.title);
+    if (fromFeatureTitle) {
+      return fromFeatureTitle;
+    }
+  }
+
+  const title = extractTodoTitle(content);
+  const fromTitle = normalizeComparableTitle(title);
+  if (fromTitle) {
+    return fromTitle;
+  }
+
+  return normalizeComparableTitle(normalizeFileStem(filePath));
+}
+
+function findDuplicateKeys(entries) {
+  const seen = new Map();
+  for (const entry of entries) {
+    if (!seen.has(entry.key)) {
+      seen.set(entry.key, []);
+    }
+    seen.get(entry.key).push(entry);
+  }
+
+  return [...seen.values()].filter((group) => group.length > 1);
+}
+
+function validateDoneBacklogFile(repoRoot, filePath) {
   const issues = [];
   const absolutePath = path.join(repoRoot, filePath);
   const content = fs.readFileSync(absolutePath, "utf8");
-  const { map: frontmatter, hasFrontmatter } = parseFrontmatter(content);
+  const parsedFrontmatter = parseFrontmatter(content);
+  const { map: frontmatter, hasFrontmatter } = parsedFrontmatter;
+
+  if (hasFrontmatter && Object.prototype.hasOwnProperty.call(frontmatter, "status") && frontmatter.status !== "done") {
+    issues.push(`${filePath}: backlog/done entries must use frontmatter status: done.`);
+  }
+
+  return { issues, content, key: buildComparableKey(content, filePath, parsedFrontmatter) };
+}
+
+function validateBacklogContent(filePath, content, parsedFrontmatter) {
+  const issues = [];
+  const frontmatterResult = parsedFrontmatter || parseFrontmatter(content);
+  const { map: frontmatter, hasFrontmatter } = frontmatterResult;
 
   if (!hasFrontmatter) {
     issues.push(`${filePath}: missing YAML frontmatter block.`);
@@ -187,18 +268,81 @@ function validateBacklogFile(repoRoot, filePath) {
   return issues;
 }
 
+function validateBacklogFile(repoRoot, filePath) {
+  const absolutePath = path.join(repoRoot, filePath);
+  const content = fs.readFileSync(absolutePath, "utf8");
+  const parsedFrontmatter = parseFrontmatter(content);
+  return validateBacklogContent(filePath, content, parsedFrontmatter);
+}
+
 function runBacklogTemplateLint(options = {}) {
   const repoRoot = path.resolve(options.repoRoot || process.cwd());
   const files = listPrioritizedBacklogFiles(repoRoot);
+  const doneFiles = listDoneBacklogFiles(repoRoot);
   const issues = [];
+  const openKeys = [];
+  const doneKeys = [];
 
   for (const filePath of files) {
-    issues.push(...validateBacklogFile(repoRoot, filePath));
+    const absolutePath = path.join(repoRoot, filePath);
+    const content = fs.readFileSync(absolutePath, "utf8");
+    const parsedFrontmatter = parseFrontmatter(content);
+    const key = buildComparableKey(content, filePath, parsedFrontmatter);
+
+    let isOpen = false;
+    if (parsedFrontmatter && typeof parsedFrontmatter === "object" && parsedFrontmatter.map) {
+      const workflowType = parsedFrontmatter.map.workflow_type;
+      if (workflowType === "backlog-item") {
+        isOpen = parsedFrontmatter.map.status === "open";
+      } else if (workflowType === "feature-request") {
+        isOpen = parsedFrontmatter.map.overall_status === "open";
+      }
+    }
+
+    openKeys.push({ filePath, key, isOpen });
+    issues.push(...validateBacklogContent(filePath, content, parsedFrontmatter));
+  }
+
+  for (const filePath of doneFiles) {
+    const result = validateDoneBacklogFile(repoRoot, filePath);
+    doneKeys.push({ filePath, key: result.key });
+    issues.push(...result.issues);
+  }
+
+  const openDuplicates = findDuplicateKeys(openKeys);
+  for (const group of openDuplicates) {
+    const filesWithSameKey = group.map((entry) => entry.filePath).sort();
+    issues.push(
+      `Duplicate backlog topic "${group[0].key}" in backlog/: ${filesWithSameKey.join(", ")}.`
+    );
+  }
+
+  const doneByKey = new Map();
+  for (const entry of doneKeys) {
+    if (!doneByKey.has(entry.key)) {
+      doneByKey.set(entry.key, []);
+    }
+    doneByKey.get(entry.key).push(entry.filePath);
+  }
+
+  for (const entry of openKeys) {
+    if (!entry.isOpen) {
+      continue;
+    }
+
+    const donePaths = doneByKey.get(entry.key);
+    if (donePaths && donePaths.length > 0) {
+      const sortedDonePaths = [...donePaths].sort();
+      issues.push(
+        `Open backlog item duplicates archived topic "${entry.key}": ${entry.filePath} (open) vs ${sortedDonePaths.join(", ")} (done).`
+      );
+    }
   }
 
   return {
     repoRoot,
     files,
+    doneFiles,
     issues,
   };
 }
@@ -211,6 +355,7 @@ function formatResult(result) {
   } else {
     lines.push(`backlog-template-lint: checked ${result.files.length} prioritized backlog files.`);
   }
+  lines.push(`backlog-template-lint: checked ${result.doneFiles.length} done backlog files.`);
 
   if (result.issues.length === 0) {
     lines.push("backlog-template-lint: OK");
@@ -237,7 +382,16 @@ if (require.main === module) {
 
 module.exports = {
   parseFrontmatter,
+  listPrioritizedBacklogFiles,
+  listDoneBacklogFiles,
+  extractTodoTitle,
+  normalizeComparableTitle,
+  normalizeFileStem,
+  buildComparableKey,
+  findDuplicateKeys,
+  validateBacklogContent,
   validateBacklogFile,
+  validateDoneBacklogFile,
   runBacklogTemplateLint,
   formatResult,
 };
