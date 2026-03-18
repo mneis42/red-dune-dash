@@ -3,8 +3,9 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 5
 priority: 1
-status: open
+status: done
 created_at: 2026-03-16
+last_updated: 2026-03-18
 ---
 
 # TODO: Structured Run Logs With Explicit Triggers
