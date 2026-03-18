@@ -7,6 +7,8 @@ const {
   buildOpenQuestions,
   buildCopyBlock,
   buildSummaryResult,
+  buildPrePrChecklistOutcome,
+  isFailingCheckStatus,
   formatHumanReadable,
 } = require("../scripts/agent-summary.js");
 
@@ -56,13 +58,25 @@ test("parseArgs supports json, staged, run-checks, files, and rules flags", () =
     rulesPath: "workflow/custom.json",
     runChecks: true,
     includeLogs: false,
+    contractConsumers: null,
+    contractInseparable: false,
     errors: [],
   });
+});
+
+test("parseArgs supports contract consumer options", () => {
+  const options = parseArgs(["--contract-consumers", "3", "--contract-inseparable"]);
+
+  assert.equal(options.contractConsumers, 3);
+  assert.equal(options.contractInseparable, true);
+  assert.deepEqual(options.errors, []);
 });
 
 test("parseArgs supports include-logs flag", () => {
   const options = parseArgs(["--include-logs"]);
   assert.equal(options.includeLogs, true);
+  assert.equal(options.contractConsumers, null);
+  assert.equal(options.contractInseparable, false);
 });
 
 test("parseArgs reports missing values for --files and --rules without consuming next flags", () => {
@@ -128,6 +142,13 @@ test("buildCopyBlock returns concise, copy-ready section", () => {
   const block = buildCopyBlock({
     changedFiles: ["a", "b"],
     advisory: { mergedAreas: ["gameplay"] },
+    prePrChecklist: {
+      splitDecision: {
+        finalDecision: "no-split-default",
+        hardTriggerReasons: [],
+        advisorySplitSignals: [],
+      },
+    },
     affectedDocs: ["README.md"],
     checkOutcomes: [{ command: "npm run check", status: "pass" }],
     risks: ["game-balance"],
@@ -148,6 +169,8 @@ test("buildSummaryResult includes required summary fields", () => {
   assert.ok(Array.isArray(result.affectedDocs));
   assert.ok(Array.isArray(result.userVisibleImpact));
   assert.ok(Array.isArray(result.risks));
+  assert.ok(result.prePrChecklist);
+  assert.equal(typeof result.prePrChecklist.splitDecision.finalDecision, "string");
   assert.ok(Array.isArray(result.openQuestions));
   assert.equal(typeof result.copyBlock, "string");
 });
@@ -168,6 +191,7 @@ test("formatHumanReadable contains expected stable sections", () => {
   const sections = [
     "Agent summary",
     "Checks and outcomes",
+    "Pre-PR checklist outcome",
     "Affected docs / instructions",
     "User-visible impact",
     "Risks",
@@ -178,6 +202,87 @@ test("formatHumanReadable contains expected stable sections", () => {
   for (const section of sections) {
     assert.ok(output.includes(section), `missing section: ${section}`);
   }
+});
+
+test("buildSummaryResult marks split-required for mixed workflow-docs and implementation areas", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["workflow-docs", "tooling"],
+    perFile: [],
+  });
+  advisory.changedFiles = [
+    "CONTRIBUTING.md",
+    "scripts/agent-summary.js",
+    "tests/agent-summary.test.js",
+    "AGENTS.md",
+    "instructions/pre-pr-checklist.md",
+    "README.md",
+  ];
+
+  const result = buildSummaryResult(advisory.changedFiles, advisory, { runChecks: false, contractConsumers: null });
+  assert.equal(result.prePrChecklist.splitDecision.finalDecision, "split-required");
+  assert.equal(
+    result.prePrChecklist.triggerEvaluation.crossScopeMixedWorkflowAndImplementation,
+    true
+  );
+});
+
+test("buildSummaryResult keeps deep-plus-six as advisory split signal", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["pwa"],
+    matchedRules: [{ id: "pwa-offline", area: "pwa" }],
+    perFile: [],
+    riskTags: ["offline"],
+  });
+  advisory.changedFiles = [
+    "service-worker.js",
+    "app-assets.js",
+    "manifest.webmanifest",
+    "README.md",
+    "docs/asset-manifest.md",
+    "version.json",
+  ];
+
+  const result = buildSummaryResult(advisory.changedFiles, advisory, { runChecks: false, contractConsumers: null });
+  assert.equal(result.prePrChecklist.splitDecision.finalDecision, "no-split-with-justification");
+  assert.ok(
+    result.prePrChecklist.splitDecision.advisorySplitSignals.includes(
+      "deep review recommendation with 6+ touched files"
+    )
+  );
+});
+
+test("buildSummaryResult treats error and failed-signal check statuses as failures", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["tooling"],
+    matchedRules: [{ id: "tooling-scripts-tests", area: "tooling" }],
+    perFile: [],
+    recommendedChecks: ["npm run fake-check"],
+  });
+
+  const checkOutcomes = [
+    { command: "npm run fake-check", status: "error", durationMs: 0, exitCode: 1 },
+    { command: "npm run fake-check-2", status: "failed-signal", durationMs: 0, exitCode: null },
+  ];
+
+  const checklist = buildPrePrChecklistOutcome(
+    ["scripts/tool.js"],
+    advisory,
+    checkOutcomes,
+    advisory.merged.riskTags,
+    { runChecks: false }
+  );
+
+  assert.ok(checklist.likelyReviewerObjections.includes("Failing checks must be resolved before merge."));
+  assert.ok(checklist.remainingRisks.includes("failed-checks"));
+});
+
+test("isFailingCheckStatus is true for fail, error, failed-signal", () => {
+  assert.equal(isFailingCheckStatus("fail"), true);
+  assert.equal(isFailingCheckStatus("error"), true);
+  assert.equal(isFailingCheckStatus("failed-signal"), true);
+  assert.equal(isFailingCheckStatus("pass"), false);
+  assert.equal(isFailingCheckStatus("not-run"), false);
+  assert.equal(isFailingCheckStatus("skipped-unsafe"), false);
 });
 
 async function runTests() {

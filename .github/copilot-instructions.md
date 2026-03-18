@@ -4,6 +4,8 @@ For complete project-wide code reviews, follow the canonical instructions in [..
 
 For lightweight reviews of local changes or pull requests, follow [../instructions/change-review.md](../instructions/change-review.md).
 
+For any writing-agent run that is intended to end in a PR-ready handoff, complete the mandatory pre-PR checklist in [../instructions/pre-pr-checklist.md](../instructions/pre-pr-checklist.md) before ending the run.
+
 These instructions are intentionally shared across coding agents so the required review workflow stays the same regardless of whether the reviewer uses Codex, Copilot, or another agent.
 
 For long-running workflows, do not ask for confirmation between planned steps.

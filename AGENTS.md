@@ -6,6 +6,8 @@ For lightweight reviews of uncommitted changes, staged diffs, small change sets,
 
 For new feature ideas and feature requests, follow the planning-and-delivery workflow in [instructions/feature-request.md](instructions/feature-request.md).
 
+For any writing-agent run that is intended to end in a PR-ready handoff, complete the mandatory pre-PR checklist in [instructions/pre-pr-checklist.md](instructions/pre-pr-checklist.md) before ending the run.
+
 For prioritized idea files created directly under `backlog/` (for example `backlog/1-todo-*.md`), use either `templates/todo-backlog-item-template.md` (`workflow_type: backlog-item`) or `templates/todo-feature-request-template.md` (`workflow_type: feature-request`) and keep the file structure compatible with the selected template.
 For new prioritized backlog-item files, always include `planning_model`, `execution_model`, `created_at`, and `last_updated` metadata in frontmatter.
 

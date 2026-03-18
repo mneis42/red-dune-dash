@@ -24,6 +24,7 @@ This project is intentionally used as an AI-agent delivery experiment. Contribut
 3. Prefer updating the documented workflow instead of inventing a parallel one.
 4. Run `npm run setup` after cloning to enable the repository-local Git hooks.
 5. Make the smallest change that solves the problem cleanly.
+6. For PR-ready writing-agent runs, complete [instructions/pre-pr-checklist.md](instructions/pre-pr-checklist.md) before handoff.
 
 ## Branch And PR Workflow
 
@@ -57,6 +58,7 @@ You can also run `npm run test:simulation` or `npm run test:service-worker` when
 For advisory, non-blocking change hints based on touched file paths, run `npm run agent:advisory`.
 
 For a unified local-change/postflight summary suitable for commits, PRs, or handoffs, run `npm run agent:summary`.
+For PR-ready writing-agent runs, include pre-PR checklist outcomes in this same summary flow instead of creating a parallel format.
 
 Backlog hygiene guardrails are enforced by `npm run backlog:lint`:
 
