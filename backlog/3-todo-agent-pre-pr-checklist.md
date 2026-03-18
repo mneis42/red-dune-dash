@@ -1,7 +1,7 @@
 ---
 workflow_type: backlog-item
 source: agent-review-friction
-priority: P1
+priority: 1
 status: open
 planning_model: GPT-5.4 Thinking
 execution_model: GPT-5.4 Thinking
