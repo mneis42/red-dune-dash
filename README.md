@@ -124,6 +124,18 @@ If you want the command to execute recommended checks and include real outcomes,
 npm run agent:summary -- --run-checks
 ```
 
+To turn a selected backlog item into a lightweight execution brief with a branch suggestion, run:
+
+```powershell
+npm run backlog:branch -- --file backlog/<path-to-backlog-item>.md
+```
+
+For machine-readable output, add `--json`:
+
+```powershell
+npm run backlog:branch -- --file backlog/<path-to-backlog-item>.md --json
+```
+
 The GitHub Actions workflows also run the same syntax and test steps before deployment.
 
 ## Branch Workflow
