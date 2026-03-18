@@ -126,6 +126,7 @@ test("detectGuardrailStatus reports inactive when configured pre-push hook is mi
   const expectedHookPath = normalizePath(path.resolve("/repo", ".githooks", "pre-push"));
   const result = detectGuardrailStatus({
     cwd: "/repo",
+    resolveRepoRoot: () => "/repo",
     readHooksPath: () => ".githooks",
     existsSync: () => false,
   });
@@ -143,6 +144,7 @@ test("detectGuardrailStatus falls back to legacy pre-commit signal without hooks
   const expectedHookPath = normalizePath(path.join("/repo", ".git", "hooks", "pre-commit"));
   const result = detectGuardrailStatus({
     cwd: "/repo",
+    resolveRepoRoot: () => "/repo",
     readHooksPath: () => null,
     existsSync: (candidatePath) => normalizePath(candidatePath) === expectedHookPath,
   });
