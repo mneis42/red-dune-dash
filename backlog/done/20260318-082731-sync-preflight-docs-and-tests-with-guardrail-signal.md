@@ -2,11 +2,11 @@
 workflow_type: backlog-item
 source: pr-6-comments
 priority: 17
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-17
-last_updated: 2026-03-17
+last_updated: 2026-03-18
 ---
 
 # TODO: Sync Preflight Docs And Tests With Guardrail Signal
