@@ -333,14 +333,15 @@ function evaluateSplitDecision(changedFiles, advisoryResult, options) {
   const broadContractAffectsThreePlusConsumers = consumers !== null ? consumers >= 3 : null;
 
   const hardTriggerReasons = [];
+  const advisorySplitSignals = [];
   if (crossScopeMixedWorkflowAndImplementation) {
     hardTriggerReasons.push("cross-scope mix: workflow-docs + implementation area");
   }
   if (deepReviewWithSixPlusFiles) {
-    hardTriggerReasons.push("deep review recommendation with 6+ touched files");
+    advisorySplitSignals.push("deep review recommendation with 6+ touched files");
   }
   if (broadContractAffectsThreePlusConsumers === true && !options.contractInseparable) {
-    hardTriggerReasons.push("broad contract change affects 3+ consumer files");
+    advisorySplitSignals.push("broad contract change affects 3+ consumer files");
   }
 
   let thresholdDecision = "no-split-default";
@@ -367,6 +368,7 @@ function evaluateSplitDecision(changedFiles, advisoryResult, options) {
     splitRequiredByHardTrigger,
     splitRequiredByThreshold,
     hardTriggerReasons,
+    advisorySplitSignals,
     triggerEvaluation: {
       crossScopeMixedWorkflowAndImplementation,
       deepReviewWithSixPlusFiles,
@@ -387,12 +389,17 @@ function evaluateSplitDecision(changedFiles, advisoryResult, options) {
 function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes, risks, options) {
   const split = evaluateSplitDecision(changedFiles, advisoryResult, options);
   const skippedChecks = checkOutcomes.filter((entry) => entry.status === "not-run" || entry.status === "skipped-unsafe");
-  const failedChecks = checkOutcomes.filter((entry) => entry.status === "fail");
+  const failedChecks = checkOutcomes.filter(
+    (entry) => entry.status === "fail" || entry.status === "error" || entry.status === "failed-signal"
+  );
   const fallbackFiles = advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
 
   const likelyReviewerObjections = [];
   if (split.finalDecision === "split-required") {
     likelyReviewerObjections.push("PR may be considered too broad; split or document explicit exception.");
+  }
+  if (split.advisorySplitSignals.length > 0) {
+    likelyReviewerObjections.push("Advisory split signals are active; consider splitting or document rationale.");
   }
   if (failedChecks.length > 0) {
     likelyReviewerObjections.push("Failing checks must be resolved before merge.");
@@ -419,6 +426,7 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
       thresholdDecision: split.thresholdDecision,
       finalDecision: split.finalDecision,
       hardTriggerReasons: split.hardTriggerReasons,
+      advisorySplitSignals: split.advisorySplitSignals,
       thresholds: split.thresholds,
       exceptionPath: split.exceptionPath,
     },
@@ -438,13 +446,18 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
 }
 
 function buildCopyBlock(result) {
+  const hardTriggerReasons = result.prePrChecklist.splitDecision.hardTriggerReasons || [];
+  const advisorySplitSignals = result.prePrChecklist.splitDecision.advisorySplitSignals || [];
   const lines = [];
   lines.push("Summary");
   lines.push(`- changed_files: ${result.changedFiles.length}`);
   lines.push(`- matched_areas: ${result.advisory.mergedAreas.join(", ") || "none"}`);
   lines.push(`- pre_pr_split_decision: ${result.prePrChecklist.splitDecision.finalDecision}`);
-  if (result.prePrChecklist.splitDecision.hardTriggerReasons.length > 0) {
-    lines.push(`- pre_pr_split_reasons: ${result.prePrChecklist.splitDecision.hardTriggerReasons.join("; ")}`);
+  if (hardTriggerReasons.length > 0) {
+    lines.push(`- pre_pr_split_reasons: ${hardTriggerReasons.join("; ")}`);
+  }
+  if (advisorySplitSignals.length > 0) {
+    lines.push(`- pre_pr_split_advisory_signals: ${advisorySplitSignals.join("; ")}`);
   }
   lines.push(`- docs_to_review: ${result.affectedDocs.join(", ") || "none"}`);
 
@@ -498,6 +511,8 @@ function buildSummaryResult(changedFiles, advisoryResult, options) {
 }
 
 function formatHumanReadable(result, options) {
+  const hardTriggerReasons = result.prePrChecklist.splitDecision.hardTriggerReasons || [];
+  const advisorySplitSignals = result.prePrChecklist.splitDecision.advisorySplitSignals || [];
   const lines = [];
   lines.push("Agent summary");
   lines.push("=============");
@@ -533,8 +548,11 @@ function formatHumanReadable(result, options) {
   lines.push(`- touched files: ${result.prePrChecklist.touchedFileCount}`);
   lines.push(`- matched areas: ${result.prePrChecklist.matchedAreas.join(", ") || "none"}`);
   lines.push(`- split decision: ${result.prePrChecklist.splitDecision.finalDecision}`);
-  if (result.prePrChecklist.splitDecision.hardTriggerReasons.length > 0) {
-    result.prePrChecklist.splitDecision.hardTriggerReasons.forEach((entry) => lines.push(`- split trigger: ${entry}`));
+  if (hardTriggerReasons.length > 0) {
+    hardTriggerReasons.forEach((entry) => lines.push(`- split trigger: ${entry}`));
+  }
+  if (advisorySplitSignals.length > 0) {
+    advisorySplitSignals.forEach((entry) => lines.push(`- split advisory: ${entry}`));
   }
   lines.push(`- skipped-check justification required: ${result.prePrChecklist.verification.skippedCheckJustificationRequired ? "yes" : "no"}`);
   lines.push(`- likely reviewer objections: ${result.prePrChecklist.likelyReviewerObjections.join("; ") || "none"}`);

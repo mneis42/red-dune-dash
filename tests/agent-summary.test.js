@@ -7,6 +7,7 @@ const {
   buildOpenQuestions,
   buildCopyBlock,
   buildSummaryResult,
+  buildPrePrChecklistOutcome,
   formatHumanReadable,
 } = require("../scripts/agent-summary.js");
 
@@ -144,6 +145,7 @@ test("buildCopyBlock returns concise, copy-ready section", () => {
       splitDecision: {
         finalDecision: "no-split-default",
         hardTriggerReasons: [],
+        advisorySplitSignals: [],
       },
     },
     affectedDocs: ["README.md"],
@@ -221,6 +223,56 @@ test("buildSummaryResult marks split-required for mixed workflow-docs and implem
     result.prePrChecklist.triggerEvaluation.crossScopeMixedWorkflowAndImplementation,
     true
   );
+});
+
+test("buildSummaryResult keeps deep-plus-six as advisory split signal", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["pwa"],
+    matchedRules: [{ id: "pwa-offline", area: "pwa" }],
+    perFile: [],
+    riskTags: ["offline"],
+  });
+  advisory.changedFiles = [
+    "service-worker.js",
+    "app-assets.js",
+    "manifest.webmanifest",
+    "README.md",
+    "docs/asset-manifest.md",
+    "version.json",
+  ];
+
+  const result = buildSummaryResult(advisory.changedFiles, advisory, { runChecks: false, contractConsumers: null });
+  assert.equal(result.prePrChecklist.splitDecision.finalDecision, "no-split-with-justification");
+  assert.ok(
+    result.prePrChecklist.splitDecision.advisorySplitSignals.includes(
+      "deep review recommendation with 6+ touched files"
+    )
+  );
+});
+
+test("buildSummaryResult treats error and failed-signal check statuses as failures", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["tooling"],
+    matchedRules: [{ id: "tooling-scripts-tests", area: "tooling" }],
+    perFile: [],
+    recommendedChecks: ["npm run fake-check"],
+  });
+
+  const checkOutcomes = [
+    { command: "npm run fake-check", status: "error", durationMs: 0, exitCode: 1 },
+    { command: "npm run fake-check-2", status: "failed-signal", durationMs: 0, exitCode: null },
+  ];
+
+  const checklist = buildPrePrChecklistOutcome(
+    ["scripts/tool.js"],
+    advisory,
+    checkOutcomes,
+    advisory.merged.riskTags,
+    { runChecks: false }
+  );
+
+  assert.ok(checklist.likelyReviewerObjections.includes("Failing checks must be resolved before merge."));
+  assert.ok(checklist.remainingRisks.includes("failed-checks"));
 });
 
 async function runTests() {

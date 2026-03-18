@@ -25,6 +25,7 @@ const ISSUE_SEVERITY_BY_CODE = {
   "missing-agents-file": "high",
   "missing-canonical-reference": "high",
   "missing-pre-pr-checklist-reference": "high",
+  "missing-required-checklist-reference-file": "high",
   "missing-link-target": "medium",
   "missing-anchor": "medium",
   "invalid-anchor-target": "medium",
@@ -297,7 +298,7 @@ function lintPrePrChecklistReferences(repoRoot, byPath) {
     if (!source) {
       issues.push(
         createIssue(
-          "missing-link-target",
+          "missing-required-checklist-reference-file",
           sourcePath,
           1,
           `Required checklist reference file is missing: ${sourcePath}`

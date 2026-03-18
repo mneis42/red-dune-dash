@@ -38,24 +38,26 @@ Catch predictable review objections early and keep change sets small, verifiable
 
 5. Hard split triggers (take precedence over file-count thresholds)
    - Cross-scope trigger: if one PR-ready change set mixes `workflow-docs` with any implementation area (`gameplay`, `pwa`, `ui-shell`, `tooling`), split is required unless a short explicit exception is documented in handoff.
-   - Deep-plus-six trigger: if review depth is `deep` and touched files are `6+`, split is required unless a short explicit exception is documented in handoff.
-   - Broad-contract trigger: if a contract change affects `3+` consumer files, split is required unless the change is inseparable and a short explicit exception is documented in handoff.
 
-6. Relevant tests/checks review
+6. Advisory split signals (guidance, not hard policy)
+   - Deep-plus-six signal: if review depth is `deep` and touched files are `6+`, consider splitting or document why the combined diff is still reviewable.
+   - Broad-contract signal: if a contract change affects `3+` consumer files, consider splitting or document why the combined diff is still inseparable and reviewable.
+
+7. Relevant tests/checks review
    - Run checks relevant to touched areas.
    - Record each check as `pass`, `fail`, `not-run`, or `skipped-unsafe`.
 
-7. Skipped-check justification
+8. Skipped-check justification
    - For every `not-run` or `skipped-unsafe` check, provide a short justification.
 
-8. Docs/instruction impact review
+9. Docs/instruction impact review
    - State whether docs or instruction updates were required.
    - List updated docs/instructions or state why none were needed.
 
-9. Likely reviewer objections self-review
+10. Likely reviewer objections self-review
    - List likely objections and whether each is resolved, accepted-risk, or deferred.
 
-10. Remaining risks
+11. Remaining risks
    - List residual risks explicitly, or state `none`.
 
 ## Handoff Output Requirements

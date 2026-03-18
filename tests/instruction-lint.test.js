@@ -218,12 +218,43 @@ test("runInstructionLint reports missing mandatory pre-PR checklist references",
   });
 });
 
+test("runInstructionLint reports missing required checklist-reference files with high severity", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "AGENTS.md",
+      [
+        "# Agent Instructions",
+        "",
+        "- [Full](instructions/full-code-review.md)",
+        "- [Change](instructions/change-review.md)",
+        "- [Feature](instructions/feature-request.md)",
+        "- [Bug](instructions/bug-report.md)",
+        "- [Pre-PR](instructions/pre-pr-checklist.md)",
+      ].join("\n")
+    );
+
+    write("README.md", "# Readme\n");
+    write("instructions/full-code-review.md", "# Full\n");
+    write("instructions/change-review.md", "# Change\n");
+    write("instructions/feature-request.md", "# Feature\n\nSee [Checklist](pre-pr-checklist.md).\n");
+    write("instructions/bug-report.md", "# Bug\n\nSee [Checklist](pre-pr-checklist.md).\n");
+    write("instructions/pre-pr-checklist.md", "# Checklist\n");
+    write(".github/copilot-instructions.md", "# Copilot\n\nSee [Checklist](../instructions/pre-pr-checklist.md).\n");
+
+    const result = runInstructionLint({ repoRoot: root });
+    const finding = result.issues.find((issue) => issue.code === "missing-required-checklist-reference-file");
+    assert.ok(finding);
+    assert.equal(finding.severity, "high");
+  });
+});
+
 test("all known issue codes have explicit severity mapping", () => {
   const requiredCodes = [
     "missing-canonical-file",
     "missing-agents-file",
     "missing-canonical-reference",
     "missing-pre-pr-checklist-reference",
+    "missing-required-checklist-reference-file",
     "missing-link-target",
     "missing-anchor",
     "invalid-anchor-target",
