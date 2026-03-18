@@ -2,7 +2,7 @@
 workflow_type: backlog-item
 source: agent-review-friction
 priority: 1
-status: open
+status: done
 planning_model: GPT-5.4 Thinking
 execution_model: GPT-5.4 Thinking
 created_at: 2026-03-18
@@ -87,7 +87,7 @@ Reduce review churn in agent-authored pull requests by adding one canonical pre-
 ### P1 - Create the canonical pre-PR checklist document
 
 Execution model: GPT-5.4 Thinking  
-Status: open
+Status: done
 
 Objective
 
@@ -134,11 +134,12 @@ Done criteria
 
 Verification performed
 
-- Not yet.
+- Manual consistency review completed against `AGENTS.md` and `CONTRIBUTING.md`.
+- `npm run instruction:lint` passed.
 
 Remaining risk / follow-up
 
-- The checklist may still be treated as advisory until instruction files explicitly require it.
+- Low residual risk: checklist quality still depends on concise human-readable handoff notes.
 
 File references
 
@@ -149,7 +150,7 @@ File references
 ### P1 - Integrate the checklist into writing-agent instructions
 
 Execution model: GPT-5.4 Thinking  
-Status: open
+Status: done
 
 Objective
 
@@ -184,11 +185,12 @@ Done criteria
 
 Verification performed
 
-- Not yet.
+- Updated canonical and mirrored entry points: `AGENTS.md`, `.github/copilot-instructions.md`, `instructions/feature-request.md`, `instructions/bug-report.md`, and `CONTRIBUTING.md`.
+- `npm run instruction:lint` passed with zero issues.
 
 Remaining risk / follow-up
 
-- Mirrored instruction locations may need updates as well.
+- No immediate follow-up required; lint now enforces required checklist references in key workflow entry files.
 
 File references
 
@@ -199,7 +201,7 @@ File references
 ### P2 - Extend the existing handoff summary with checklist outcomes
 
 Execution model: GPT-5.4 Thinking  
-Status: open
+Status: done
 
 Objective
 
@@ -239,11 +241,12 @@ Done criteria
 
 Verification performed
 
-- Not yet.
+- `npm run test:summary` passed.
+- `npm run agent:summary -- --json` output confirms `prePrChecklist` outcome fields in the existing summary flow.
 
 Remaining risk / follow-up
 
-- Keep the summary concise so extra checklist fields do not reduce readability.
+- Monitor summary readability after several PRs; adjust wording if signals become noisy.
 
 File references
 
@@ -254,7 +257,7 @@ File references
 ### P2 - Add lightweight validation
 
 Execution model: GPT-5.4 Thinking  
-Status: open
+Status: done
 
 Objective
 
@@ -287,11 +290,13 @@ Done criteria
 
 Verification performed
 
-- Not yet.
+- Added checklist-reference enforcement to `scripts/instruction-lint.js`.
+- Added/updated tests in `tests/instruction-lint.test.js`.
+- `npm run test:instruction-lint` passed.
 
 Remaining risk / follow-up
 
-- Some checklist quality dimensions may remain human-judgment based.
+- Human judgment remains required for nuanced split exceptions and reviewer-objection quality.
 
 File references
 
@@ -303,7 +308,7 @@ File references
 ### P3 - Add one concise example
 
 Execution model: GPT-5.4 Thinking  
-Status: open
+Status: done
 
 Objective
 
@@ -333,11 +338,12 @@ Done criteria
 
 Verification performed
 
-- Not yet.
+- Added concise example section in `instructions/pre-pr-checklist.md`.
+- Manual review confirms the example is short and directly actionable.
 
 Remaining risk / follow-up
 
-- Can be deferred if the checklist is already clear enough.
+- No further follow-up required for initial rollout.
 
 File references
 

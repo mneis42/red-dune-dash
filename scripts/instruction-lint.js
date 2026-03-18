@@ -8,6 +8,15 @@ const CANONICAL_INSTRUCTION_PATHS = [
   "instructions/bug-report.md",
 ];
 
+const PRE_PR_CHECKLIST_PATH = "instructions/pre-pr-checklist.md";
+const PRE_PR_CHECKLIST_REQUIRED_REFERENCE_PATHS = [
+  "AGENTS.md",
+  "CONTRIBUTING.md",
+  "instructions/feature-request.md",
+  "instructions/bug-report.md",
+  ".github/copilot-instructions.md",
+];
+
 const DEFAULT_ROOT_MARKDOWN_FILES = ["AGENTS.md", "README.md", "CONTRIBUTING.md"];
 const DEFAULT_SCAN_DIRECTORIES = ["instructions", ".github"];
 
@@ -15,6 +24,7 @@ const ISSUE_SEVERITY_BY_CODE = {
   "missing-canonical-file": "high",
   "missing-agents-file": "high",
   "missing-canonical-reference": "high",
+  "missing-pre-pr-checklist-reference": "high",
   "missing-link-target": "medium",
   "missing-anchor": "medium",
   "invalid-anchor-target": "medium",
@@ -266,6 +276,61 @@ function lintCanonicalAgentReferences(repoRoot, byPath) {
   return issues;
 }
 
+function lintPrePrChecklistReferences(repoRoot, byPath) {
+  const issues = [];
+  const checklistAbsolutePath = path.join(repoRoot, PRE_PR_CHECKLIST_PATH);
+
+  if (!fs.existsSync(checklistAbsolutePath)) {
+    issues.push(
+      createIssue(
+        "missing-canonical-file",
+        PRE_PR_CHECKLIST_REQUIRED_REFERENCE_PATHS[0],
+        1,
+        `Canonical instruction file is missing: ${PRE_PR_CHECKLIST_PATH}`
+      )
+    );
+    return issues;
+  }
+
+  for (const sourcePath of PRE_PR_CHECKLIST_REQUIRED_REFERENCE_PATHS) {
+    const source = byPath.get(sourcePath);
+    if (!source) {
+      issues.push(
+        createIssue(
+          "missing-link-target",
+          sourcePath,
+          1,
+          `Required checklist reference file is missing: ${sourcePath}`
+        )
+      );
+      continue;
+    }
+
+    const hasReference = source.links.some((entry) => {
+      if (isExternalTarget(entry.href)) {
+        return false;
+      }
+      const target = splitLinkTarget(entry.href);
+      const cleanTarget = safeDecodeURIComponent(target.linkPath).trim();
+      const resolvedTargetPath = toPosix(path.normalize(path.join(path.dirname(sourcePath), cleanTarget)));
+      return resolvedTargetPath === PRE_PR_CHECKLIST_PATH;
+    });
+
+    if (!hasReference) {
+      issues.push(
+        createIssue(
+          "missing-pre-pr-checklist-reference",
+          sourcePath,
+          1,
+          `${sourcePath} does not reference mandatory checklist path: ${PRE_PR_CHECKLIST_PATH}`
+        )
+      );
+    }
+  }
+
+  return issues;
+}
+
 function lintInstructionLinks(repoRoot, files) {
   const issues = [];
   const byPath = new Map();
@@ -281,6 +346,7 @@ function lintInstructionLinks(repoRoot, files) {
   }
 
   issues.push(...lintCanonicalAgentReferences(repoRoot, byPath));
+  issues.push(...lintPrePrChecklistReferences(repoRoot, byPath));
 
   for (const sourcePath of files) {
     const sourceEntry = byPath.get(sourcePath);

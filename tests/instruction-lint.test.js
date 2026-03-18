@@ -55,16 +55,27 @@ test("runInstructionLint succeeds for valid canonical references and anchors", (
         "- [Change](instructions/change-review.md)",
         "- [Feature](instructions/feature-request.md)",
         "- [Bug](instructions/bug-report.md)",
+        "- [Pre-PR](instructions/pre-pr-checklist.md)",
       ].join("\n")
     );
 
     write("README.md", "# Readme\n\nSee [Guide](instructions/feature-request.md#goal).\n");
-    write("CONTRIBUTING.md", "# Contributing\n");
+    write("CONTRIBUTING.md", "# Contributing\n\nSee [Checklist](instructions/pre-pr-checklist.md).\n");
     write("instructions/full-code-review.md", "# Full Code Review Instructions\n\n## Goal\n");
     write("instructions/change-review.md", "# Change Review Instructions\n\n## Goal\n");
-    write("instructions/feature-request.md", "# Feature Request Instructions\n\n## Goal\n");
-    write("instructions/bug-report.md", "# Bug Report Instructions\n\n## Goal\n");
-    write(".github/copilot-instructions.md", "# Copilot\n\nSee [Feature](../instructions/feature-request.md#goal).\n");
+    write(
+      "instructions/feature-request.md",
+      "# Feature Request Instructions\n\n## Goal\n\nSee [Checklist](pre-pr-checklist.md).\n"
+    );
+    write(
+      "instructions/bug-report.md",
+      "# Bug Report Instructions\n\n## Goal\n\nSee [Checklist](pre-pr-checklist.md).\n"
+    );
+    write("instructions/pre-pr-checklist.md", "# Pre-PR Checklist\n\n## Purpose\n");
+    write(
+      ".github/copilot-instructions.md",
+      "# Copilot\n\nSee [Feature](../instructions/feature-request.md#goal).\nSee [Checklist](../instructions/pre-pr-checklist.md).\n"
+    );
 
     const result = runInstructionLint({ repoRoot: root });
     assert.equal(result.issues.length, 0);
@@ -177,11 +188,42 @@ test("runInstructionLint returns severity counts", () => {
   });
 });
 
+test("runInstructionLint reports missing mandatory pre-PR checklist references", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "AGENTS.md",
+      [
+        "# Agent Instructions",
+        "",
+        "- [Full](instructions/full-code-review.md)",
+        "- [Change](instructions/change-review.md)",
+        "- [Feature](instructions/feature-request.md)",
+        "- [Bug](instructions/bug-report.md)",
+      ].join("\n")
+    );
+
+    write("README.md", "# Readme\n");
+    write("CONTRIBUTING.md", "# Contributing\n");
+    write("instructions/full-code-review.md", "# Full\n");
+    write("instructions/change-review.md", "# Change\n");
+    write("instructions/feature-request.md", "# Feature\n");
+    write("instructions/bug-report.md", "# Bug\n");
+    write("instructions/pre-pr-checklist.md", "# Checklist\n");
+    write(".github/copilot-instructions.md", "# Copilot\n");
+
+    const result = runInstructionLint({ repoRoot: root });
+    const finding = result.issues.find((issue) => issue.code === "missing-pre-pr-checklist-reference");
+    assert.ok(finding);
+    assert.equal(finding.severity, "high");
+  });
+});
+
 test("all known issue codes have explicit severity mapping", () => {
   const requiredCodes = [
     "missing-canonical-file",
     "missing-agents-file",
     "missing-canonical-reference",
+    "missing-pre-pr-checklist-reference",
     "missing-link-target",
     "missing-anchor",
     "invalid-anchor-target",
