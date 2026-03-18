@@ -287,7 +287,19 @@ function runBacklogTemplateLint(options = {}) {
     const absolutePath = path.join(repoRoot, filePath);
     const content = fs.readFileSync(absolutePath, "utf8");
     const parsedFrontmatter = parseFrontmatter(content);
-    openKeys.push({ filePath, key: buildComparableKey(content, filePath, parsedFrontmatter) });
+    const key = buildComparableKey(content, filePath, parsedFrontmatter);
+
+    let isOpen = false;
+    if (parsedFrontmatter && typeof parsedFrontmatter === "object") {
+      const workflowType = parsedFrontmatter.workflow_type;
+      if (workflowType === "backlog-item") {
+        isOpen = parsedFrontmatter.status === "open";
+      } else if (workflowType === "feature-request") {
+        isOpen = parsedFrontmatter.overall_status === "open";
+      }
+    }
+
+    openKeys.push({ filePath, key, isOpen });
     issues.push(...validateBacklogContent(filePath, content, parsedFrontmatter));
   }
 
@@ -314,6 +326,10 @@ function runBacklogTemplateLint(options = {}) {
   }
 
   for (const entry of openKeys) {
+    if (!entry.isOpen) {
+      continue;
+    }
+
     const donePaths = doneByKey.get(entry.key);
     if (donePaths && donePaths.length > 0) {
       const sortedDonePaths = [...donePaths].sort();
