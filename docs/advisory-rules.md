@@ -23,6 +23,7 @@ This rule source is advisory only.
 
 - Rules: workflow/advisory-rules.json
 - JSON schema reference: workflow/advisory-rules.schema.json
+- Schema ID strategy: `workflow/advisory-rules.schema.json` intentionally omits `$id` to avoid publishing a misleading local-only canonical URI.
 - Local matcher and validator: scripts/advisory-rules.js
 - Local CLI summary command: scripts/agent-advisory.js
 
