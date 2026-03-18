@@ -58,6 +58,12 @@ For advisory, non-blocking change hints based on touched file paths, run `npm ru
 
 For a unified local-change/postflight summary suitable for commits, PRs, or handoffs, run `npm run agent:summary`.
 
+Backlog hygiene guardrails are enforced by `npm run backlog:lint`:
+
+- Duplicate normalized TODO topics inside `backlog/` are rejected.
+- Open-vs-done topic collisions between `backlog/` and `backlog/done/` are rejected.
+- `backlog/done/` entries must not declare `status: open`.
+
 If you do not run a relevant check, say so explicitly in your summary or pull request.
 
 The CI workflow runs the same core verification categories on Linux, macOS, and Windows:
