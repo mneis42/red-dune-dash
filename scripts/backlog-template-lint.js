@@ -150,8 +150,9 @@ function normalizeFileStem(filePath) {
     .replace(/^\d+-/, "");
 }
 
-function buildComparableKey(content, filePath) {
-  const { map: frontmatter } = parseFrontmatter(content);
+function buildComparableKey(content, filePath, parsedFrontmatter) {
+  const frontmatterResult = parsedFrontmatter || parseFrontmatter(content);
+  const frontmatter = frontmatterResult.map;
   const workflowType = frontmatter.workflow_type;
 
   if (workflowType === "feature-request") {
@@ -195,9 +196,10 @@ function validateDoneBacklogFile(repoRoot, filePath) {
   return { issues, content, key: buildComparableKey(content, filePath) };
 }
 
-function validateBacklogContent(filePath, content) {
+function validateBacklogContent(filePath, content, parsedFrontmatter) {
   const issues = [];
-  const { map: frontmatter, hasFrontmatter } = parseFrontmatter(content);
+  const frontmatterResult = parsedFrontmatter || parseFrontmatter(content);
+  const { map: frontmatter, hasFrontmatter } = frontmatterResult;
 
   if (!hasFrontmatter) {
     issues.push(`${filePath}: missing YAML frontmatter block.`);
@@ -268,7 +270,8 @@ function validateBacklogContent(filePath, content) {
 function validateBacklogFile(repoRoot, filePath) {
   const absolutePath = path.join(repoRoot, filePath);
   const content = fs.readFileSync(absolutePath, "utf8");
-  return validateBacklogContent(filePath, content);
+  const parsedFrontmatter = parseFrontmatter(content);
+  return validateBacklogContent(filePath, content, parsedFrontmatter);
 }
 
 function runBacklogTemplateLint(options = {}) {
@@ -282,8 +285,9 @@ function runBacklogTemplateLint(options = {}) {
   for (const filePath of files) {
     const absolutePath = path.join(repoRoot, filePath);
     const content = fs.readFileSync(absolutePath, "utf8");
-    openKeys.push({ filePath, key: buildComparableKey(content, filePath) });
-    issues.push(...validateBacklogContent(filePath, content));
+    const parsedFrontmatter = parseFrontmatter(content);
+    openKeys.push({ filePath, key: buildComparableKey(content, filePath, parsedFrontmatter) });
+    issues.push(...validateBacklogContent(filePath, content, parsedFrontmatter));
   }
 
   for (const filePath of doneFiles) {
