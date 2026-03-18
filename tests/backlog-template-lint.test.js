@@ -460,6 +460,123 @@ test("runBacklogTemplateLint reports all matching done paths for open-vs-done co
   });
 });
 
+test("runBacklogTemplateLint rejects duplicate feature-request titles in prioritized backlog files", () => {
+  withTempRepo(({ root, write }) => {
+    const featureBody = [
+      "## Feature Summary",
+      "- Summary: x",
+      "## Verification Baseline",
+      "- Tests: pass",
+      "## Assumptions And Open Questions",
+      "- x",
+      "## Decision Gate",
+      "- Developer decision: implement-now",
+      "## TODO Index",
+      "- [ ] P1 - x",
+      "## Documentation Follow-ups",
+      "- none",
+    ].join("\n\n");
+
+    write(
+      "backlog/12-todo-feature-alpha.md",
+      [
+        "---",
+        "workflow_type: feature-request",
+        "title: Consolidate Backlog Rule Docs",
+        "overall_status: open",
+        "planning_model: GPT-5.3-Codex",
+        "branch: feature/alpha",
+        "created_at: 2026-03-18",
+        "last_updated: 2026-03-18",
+        "---",
+        "",
+        "# Feature Request TODO",
+        "",
+        featureBody,
+      ].join("\n")
+    );
+
+    write(
+      "backlog/13-todo-feature-beta.md",
+      [
+        "---",
+        "workflow_type: feature-request",
+        "title: Consolidate backlog-rule docs",
+        "overall_status: open",
+        "planning_model: GPT-5.3-Codex",
+        "branch: feature/beta",
+        "created_at: 2026-03-18",
+        "last_updated: 2026-03-18",
+        "---",
+        "",
+        "# Feature Request TODO",
+        "",
+        featureBody,
+      ].join("\n")
+    );
+
+    const result = runBacklogTemplateLint({ repoRoot: root });
+    assert.equal(result.issues.some((entry) => entry.includes("Duplicate backlog topic")), true);
+  });
+});
+
+test("runBacklogTemplateLint rejects open-vs-done collisions for feature-request titles", () => {
+  withTempRepo(({ root, write }) => {
+    const featureBody = [
+      "## Feature Summary",
+      "- Summary: x",
+      "## Verification Baseline",
+      "- Tests: pass",
+      "## Assumptions And Open Questions",
+      "- x",
+      "## Decision Gate",
+      "- Developer decision: implement-now",
+      "## TODO Index",
+      "- [ ] P1 - x",
+      "## Documentation Follow-ups",
+      "- none",
+    ].join("\n\n");
+
+    write(
+      "backlog/12-todo-feature-open.md",
+      [
+        "---",
+        "workflow_type: feature-request",
+        "title: Add Deterministic Backlog Guardrail Audit",
+        "overall_status: open",
+        "planning_model: GPT-5.3-Codex",
+        "branch: feature/open",
+        "created_at: 2026-03-18",
+        "last_updated: 2026-03-18",
+        "---",
+        "",
+        "# Feature Request TODO",
+        "",
+        featureBody,
+      ].join("\n")
+    );
+
+    write(
+      "backlog/done/20260318-120000-feature-done.md",
+      [
+        "---",
+        "workflow_type: feature-request",
+        "title: Add deterministic backlog-guardrail audit",
+        "status: done",
+        "---",
+        "",
+        "# Feature Request TODO",
+      ].join("\n")
+    );
+
+    const result = runBacklogTemplateLint({ repoRoot: root });
+    assert.equal(
+      result.issues.some((entry) => entry.includes("Open backlog item duplicates archived topic")),
+      true
+    );
+  });
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {

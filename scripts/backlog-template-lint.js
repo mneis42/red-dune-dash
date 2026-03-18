@@ -151,6 +151,16 @@ function normalizeFileStem(filePath) {
 }
 
 function buildComparableKey(content, filePath) {
+  const { map: frontmatter } = parseFrontmatter(content);
+  const workflowType = frontmatter.workflow_type;
+
+  if (workflowType === "feature-request") {
+    const fromFeatureTitle = normalizeComparableTitle(frontmatter.title);
+    if (fromFeatureTitle) {
+      return fromFeatureTitle;
+    }
+  }
+
   const title = extractTodoTitle(content);
   const fromTitle = normalizeComparableTitle(title);
   if (fromTitle) {
