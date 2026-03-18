@@ -104,11 +104,12 @@ test("resolveTaskAreas infers areas from matches and drops unclassified", () => 
 });
 
 test("detectGuardrailStatus prefers configured hooksPath pre-push hook", () => {
+  const expectedHookPath = normalizePath("/repo/.githooks/pre-push");
   const result = detectGuardrailStatus({
     cwd: "/repo/subdir",
     resolveRepoRoot: () => "/repo",
     readHooksPath: () => ".githooks",
-    existsSync: (candidatePath) => normalizePath(candidatePath).endsWith("/.githooks/pre-push"),
+    existsSync: (candidatePath) => normalizePath(candidatePath) === expectedHookPath,
   });
 
   assert.equal(result.signal, "core-hooks-path-pre-push-checked");
@@ -117,10 +118,11 @@ test("detectGuardrailStatus prefers configured hooksPath pre-push hook", () => {
     result.note,
     "Detected via configured core.hooksPath and pre-push hook. Current-state signal only."
   );
-  assert.ok(normalizePath(result.path).endsWith("/.githooks/pre-push"));
+  assert.equal(normalizePath(result.path), expectedHookPath);
 });
 
 test("detectGuardrailStatus reports inactive when configured pre-push hook is missing", () => {
+  const expectedHookPath = normalizePath("/repo/.githooks/pre-push");
   const result = detectGuardrailStatus({
     cwd: "/repo",
     readHooksPath: () => ".githooks",
@@ -133,14 +135,15 @@ test("detectGuardrailStatus reports inactive when configured pre-push hook is mi
     result.note,
     "core.hooksPath is configured but expected pre-push hook is missing. Current-state signal only."
   );
-  assert.ok(normalizePath(result.path).endsWith("/.githooks/pre-push"));
+  assert.equal(normalizePath(result.path), expectedHookPath);
 });
 
 test("detectGuardrailStatus falls back to legacy pre-commit signal without hooksPath", () => {
+  const expectedHookPath = normalizePath("/repo/.git/hooks/pre-commit");
   const result = detectGuardrailStatus({
     cwd: "/repo",
     readHooksPath: () => null,
-    existsSync: (candidatePath) => normalizePath(candidatePath).endsWith("/.git/hooks/pre-commit"),
+    existsSync: (candidatePath) => normalizePath(candidatePath) === expectedHookPath,
   });
 
   assert.equal(result.signal, "legacy-git-hooks-pre-commit-checked");
@@ -149,7 +152,7 @@ test("detectGuardrailStatus falls back to legacy pre-commit signal without hooks
     result.note,
     "Legacy fallback when core.hooksPath is not configured. Current-state signal only."
   );
-  assert.ok(normalizePath(result.path).endsWith("/.git/hooks/pre-commit"));
+  assert.equal(normalizePath(result.path), expectedHookPath);
 });
 
 test("classifyRelatedChanges marks files outside task areas as unrelated", () => {
