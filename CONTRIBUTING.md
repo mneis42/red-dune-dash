@@ -60,6 +60,15 @@ For a unified local-change/postflight summary suitable for commits, PRs, or hand
 
 If you do not run a relevant check, say so explicitly in your summary or pull request.
 
+The CI workflow runs the same core verification categories on Linux, macOS, and Windows:
+
+- `npm run check`
+- `npm test`
+- `npm run instruction:lint`
+- `npm run backlog:lint`
+
+Deploy-only behavior remains Linux-only, and advisory change hints stay non-blocking on Linux.
+
 ## Reviews
 
 - If you are performing a complete repository review, follow `AGENTS.md`.

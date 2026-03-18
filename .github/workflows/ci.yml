@@ -9,8 +9,16 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  core-verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Check out repository
@@ -29,8 +37,28 @@ jobs:
       - name: Run test suite
         run: npm test
 
+      - name: Lint instruction links and headings
+        run: npm run instruction:lint
+
+      - name: Lint backlog templates
+        run: npm run backlog:lint
+
+  advisory-hints:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+
       - name: Advisory change hints (non-blocking)
-        continue-on-error: true
         run: |
           EVENT_NAME="${{ github.event_name }}"
           BASE_SHA=""
@@ -58,4 +86,21 @@ jobs:
             npm run agent:advisory
           else
             npm run agent:advisory -- --files "$CHANGED_FILES"
+          fi
+
+  test:
+    if: ${{ always() }}
+    needs:
+      - core-verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Compatibility success gate
+        # Keep job id "test" stable for required-check compatibility.
+        run: |
+          if [ "${{ needs.core-verify.result }}" = "success" ]; then
+            echo "Core verification matrix completed successfully."
+          else
+            echo "Core verification matrix result: ${{ needs.core-verify.result }}"
+            exit 1
           fi

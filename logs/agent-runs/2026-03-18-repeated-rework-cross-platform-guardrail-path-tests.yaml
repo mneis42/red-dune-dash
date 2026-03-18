@@ -1,0 +1,19 @@
+date: 2026-03-18
+task_type: change-review
+short_goal: Stabilize cross-platform CI matrix and keep required-check compatibility
+changed_files:
+  - tests/agent-preflight.test.js
+  - .github/workflows/ci.yml
+checks:
+  - name: npm run test:preflight
+    outcome: fail
+  - name: Continuous Integration / core-verify (windows-latest)
+    outcome: fail
+  - name: npm run test:preflight
+    outcome: pass
+  - name: npm test
+    outcome: pass
+friction_category: repeated-rework
+human_correction_needed: true
+missing_or_misleading_guardrail: Local verification did not enforce Windows-equivalent path-resolution semantics before push, so a previously seen path expectation mistake reoccurred.
+improvement_proposal: Add a pre-push guardrail that runs the preflight test with simulated Windows path semantics and blocks push when path-sensitive assertions depend on Unix-only expectations.
