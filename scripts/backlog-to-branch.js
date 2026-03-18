@@ -96,9 +96,38 @@ function toRepoRelativePath(repoRoot, filePath) {
   return path.relative(repoRoot, absolute).replaceAll("\\", "/");
 }
 
-function readBacklogItem(repoRoot, filePath) {
-  const relativePath = toRepoRelativePath(repoRoot, filePath);
+function resolveBacklogItemPath(repoRoot, filePath) {
+  const rawPath = String(filePath || "").trim();
+  if (!rawPath) {
+    throw new Error("Backlog item path is required.");
+  }
+
+  if (path.isAbsolute(rawPath)) {
+    throw new Error("Backlog item path must be relative to the repository root.");
+  }
+
+  const relativePath = toRepoRelativePath(repoRoot, rawPath);
+  if (!relativePath || relativePath.startsWith("../") || relativePath.includes("/../") || relativePath === "..") {
+    throw new Error("Backlog item path must stay inside the repository.");
+  }
+
+  if (!relativePath.startsWith("backlog/")) {
+    throw new Error("Backlog item path must point to a file under backlog/.");
+  }
+
+  if (!relativePath.endsWith(".md")) {
+    throw new Error("Backlog item path must reference a markdown file (.md).");
+  }
+
   const absolutePath = path.resolve(repoRoot, relativePath);
+  return {
+    relativePath,
+    absolutePath,
+  };
+}
+
+function readBacklogItem(repoRoot, filePath) {
+  const { relativePath, absolutePath } = resolveBacklogItemPath(repoRoot, filePath);
 
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`Backlog item not found: ${relativePath}`);
@@ -116,9 +145,18 @@ function readBacklogItem(repoRoot, filePath) {
 function findSection(content, heading) {
   const text = String(content || "");
   const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`^##\\s+${escapedHeading}\\s*$([\\s\\S]*?)(?=^##\\s+|\\Z)`, "m");
-  const match = text.match(regex);
-  return match ? match[1].trim() : "";
+  const headingRegex = new RegExp(`^##\\s+${escapedHeading}\\s*$`, "m");
+  const headingMatch = headingRegex.exec(text);
+  if (!headingMatch || typeof headingMatch.index !== "number") {
+    return "";
+  }
+
+  const sectionStart = headingMatch.index + headingMatch[0].length;
+  const rest = text.slice(sectionStart);
+  const nextHeadingMatch = /\n##\s+/.exec(rest);
+  const sectionText = nextHeadingMatch ? rest.slice(0, nextHeadingMatch.index) : rest;
+
+  return sectionText.trim();
 }
 
 function extractBulletLines(text) {
@@ -205,18 +243,23 @@ function collectRepositoryFiles(repoRoot) {
   function walk(currentDir) {
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name.startsWith(".")) {
-        continue;
-      }
-
       const absolute = path.join(currentDir, entry.name);
       const relative = path.relative(repoRoot, absolute).replaceAll("\\", "/");
 
       if (entry.isDirectory()) {
-        if (ignoredDirs.has(entry.name) || entry.name === "backlog" || relative.startsWith("backlog/")) {
+        if (
+          ignoredDirs.has(entry.name) ||
+          entry.name === "backlog" ||
+          relative.startsWith("backlog/") ||
+          (entry.name.startsWith(".") && entry.name !== ".github")
+        ) {
           continue;
         }
         walk(absolute);
+        continue;
+      }
+
+      if (entry.name.startsWith(".")) {
         continue;
       }
 
@@ -359,6 +402,7 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
+  resolveBacklogItemPath,
   findSection,
   extractBulletLines,
   extractTodoTitle,

@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 
 const {
   parseArgs,
+  resolveBacklogItemPath,
   findSection,
   extractBulletLines,
   suggestBranchName,
@@ -30,9 +31,20 @@ test("parseArgs reports missing required file option", () => {
   assert.ok(options.errors.includes("Missing required option --file <path-to-backlog-item>."));
 });
 
+test("resolveBacklogItemPath rejects paths outside backlog", () => {
+  const repoRoot = process.cwd();
+  assert.throws(() => resolveBacklogItemPath(repoRoot, "../README.md"), /inside the repository/);
+  assert.throws(() => resolveBacklogItemPath(repoRoot, "README.md"), /under backlog/);
+});
+
 test("findSection isolates heading content", () => {
   const content = ["## Goal", "one line", "", "## Scope", "- first", "- second", "", "## Notes", "- done"].join("\n");
   assert.equal(findSection(content, "Scope"), "- first\n- second");
+});
+
+test("findSection supports extracting the final section", () => {
+  const content = ["## Goal", "one line", "", "## Notes", "- done", "- next"].join("\n");
+  assert.equal(findSection(content, "Notes"), "- done\n- next");
 });
 
 test("extractBulletLines supports markdown bullets and numbered list items", () => {
