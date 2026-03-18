@@ -5,6 +5,7 @@
   "description": "Browser-first endless runner and AI-agent workflow experiment.",
   "scripts": {
     "backlog:lint": "node scripts/backlog-template-lint.js",
+    "backlog:branch": "node scripts/backlog-to-branch.js",
     "check": "node scripts/check-syntax.js",
     "instruction:lint": "node scripts/instruction-lint.js",
     "setup": "node scripts/setup-hooks.js",
@@ -14,8 +15,9 @@
     "agent:preflight": "node scripts/agent-preflight.js",
     "agent:preflight:json": "node scripts/agent-preflight.js --json",
     "agent:summary": "node scripts/agent-summary.js",
-    "test": "npm run test:simulation && npm run test:service-worker && npm run test:advisory && npm run test:preflight && npm run test:summary && npm run test:instruction-lint && npm run test:backlog-lint",
+    "test": "npm run test:simulation && npm run test:service-worker && npm run test:advisory && npm run test:preflight && npm run test:summary && npm run test:instruction-lint && npm run test:backlog-lint && npm run test:backlog-branch",
     "test:advisory": "node tests/advisory-rules.test.js && node tests/agent-advisory.test.js",
+    "test:backlog-branch": "node tests/backlog-to-branch.test.js",
     "test:backlog-lint": "node tests/backlog-template-lint.test.js",
     "test:instruction-lint": "node tests/instruction-lint.test.js",
     "test:preflight": "node tests/agent-preflight.test.js",
