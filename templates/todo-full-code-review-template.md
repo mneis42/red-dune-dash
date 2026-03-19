@@ -2,7 +2,7 @@
 workflow_type: full-code-review
 title: <review-title>
 overall_status: <open|in-progress|blocked|done>
-planning_model: <exact-model-name>
+planning_model: <exact-model-name-or-runtime-model-hidden>
 branch: <branch-name-from-origin-main>
 created_at: <YYYY-MM-DD>
 last_updated: <YYYY-MM-DD>
@@ -10,7 +10,7 @@ last_updated: <YYYY-MM-DD>
 
 # Full Code Review TODO
 
-Model note: If the exact model name is not visible in runtime, ask the developer for the model name and wait for the answer. Do not write fallback values.
+Model note: If the exact model name is not visible in runtime, write runtime-model-hidden and add a short note that the runtime did not expose an exact model identifier.
 
 ## Scope
 
@@ -35,7 +35,7 @@ Model note: If the exact model name is not visible in runtime, ask the developer
 
 ### <P0|P1|P2|P3> - <Title>
 
-Execution model: <exact-model-name>
+Execution model: <exact-model-name-or-runtime-model-hidden>
 Status: <open|in-progress|blocked|done>
 
 Objective
