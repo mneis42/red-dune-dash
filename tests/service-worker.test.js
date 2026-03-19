@@ -1,25 +1,17 @@
 const assert = require("node:assert/strict");
 
-// Minimal SW-like globals so service-worker.js can run without browser APIs.
+// Make self an alias for globalThis for manifest propagation correctness
 const listeners = {};
 const fakeCaches = new Map();
 const fetchCalls = [];
-
-globalThis.self = {
-  addEventListener(type, listener) {
-    listeners[type] = listener;
-  },
-  skipWaiting() {},
-  clients: {
-    claim() {},
-  },
-  registration: {
-    scope: "https://example.com/red-dune-dash/",
-  },
-  location: {
-    origin: "https://example.com",
-  },
+globalThis.self = globalThis;
+self.addEventListener = function(type, listener) {
+  listeners[type] = listener;
 };
+self.skipWaiting = function() {};
+self.clients = { claim() {} };
+self.registration = { scope: "https://example.com/red-dune-dash/" };
+self.location = { origin: "https://example.com" };
 
 globalThis.caches = {
   async open(name) {
@@ -52,12 +44,12 @@ globalThis.caches = {
 globalThis.fetch = async (request, options) => {
   fetchCalls.push({ request, options });
   return {
-  status: 200,
-  type: "basic",
-  url: typeof request === "string" ? request : request.url,
-  clone() {
-    return this;
-  },
+    status: 200,
+    type: "basic",
+    url: typeof request === "string" ? request : request.url,
+    clone() {
+      return this;
+    },
   };
 };
 
@@ -142,7 +134,19 @@ test("service worker exposes fetch listener for same-origin GET requests", () =>
   assert.equal(postRequest.responds.length, 0);
 });
 
-test("service worker applies network-first to root and project-subpath core requests", async () => {
+
+function reloadServiceWorkerWithScope(scopeUrl) {
+  // Remove cached modules to allow re-import with new scope
+  delete require.cache[require.resolve("../service-worker.js")];
+  listeners["fetch"] = undefined;
+  listeners["install"] = undefined;
+  listeners["activate"] = undefined;
+  self.registration.scope = scopeUrl;
+  require("../service-worker.js");
+}
+
+test("service worker applies network-first to core requests (root scope)", async () => {
+  reloadServiceWorkerWithScope("https://example.com/");
   const fetchListener = listeners["fetch"];
   assert.ok(typeof fetchListener === "function");
 
@@ -152,13 +156,23 @@ test("service worker applies network-first to root and project-subpath core requ
   fetchListener(rootVersionRequest.event);
   await rootVersionRequest.responds[0];
 
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].options?.cache, "no-store");
+});
+
+test("service worker applies network-first to core requests (project subpath scope)", async () => {
+  reloadServiceWorkerWithScope("https://example.com/red-dune-dash/");
+  const fetchListener = listeners["fetch"];
+  assert.ok(typeof fetchListener === "function");
+
+  fetchCalls.length = 0;
+
   const subpathVersionRequest = createEvent("https://example.com/red-dune-dash/version.json");
   fetchListener(subpathVersionRequest.event);
   await subpathVersionRequest.responds[0];
 
-  assert.equal(fetchCalls.length >= 2, true);
+  assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].options?.cache, "no-store");
-  assert.equal(fetchCalls[1].options?.cache, "no-store");
 });
 
 test("service worker keeps non-core same-origin assets on stale-while-revalidate", async () => {
