@@ -74,6 +74,7 @@ The CI workflow runs the same core verification categories on Linux, macOS, and 
 - `npm run check`
 - `npm test`
 - `npm run instruction:lint`
+- `npm run docs:language:lint`
 - `npm run backlog:lint`
 
 Deploy-only behavior remains Linux-only, and advisory change hints stay non-blocking on Linux.

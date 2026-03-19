@@ -1,140 +1,140 @@
 # Respawn Fairness
 
-Dieses Dokument beschreibt die aktuellen Respawn-, Schadens- und Resume-Garantien von `Red Dune Dash`.
+This document describes current respawn, damage, and resume fairness guarantees in `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-Ein Treffer soll spuerbar sein, aber moeglichst nicht in unfaire Todesketten oder Kontrollverlust muenden.
+Damage should be meaningful, but should avoid unfair death chains or player-control collapse.
 
-Das Spiel arbeitet deshalb mit mehreren Schutzebenen:
+The game uses layered protections:
 
-- sichere Checkpoints
-- sichere Hurt-Posen
-- kurze Unverwundbarkeit
-- Countdown vor dem eigentlichen Respawn
-- definierte Resume-Regeln nach Pausen oder App-Wechseln
+- safe checkpoints
+- safe hurt poses
+- short invulnerability windows
+- countdown before actual respawn
+- explicit resume fairness rules after pause or app context switches
 
-## Checkpoint-Modell
+## Checkpoint Model
 
-Checkpoints sind keine frei gesetzten Marker, sondern abgeleitete sichere Spielerpositionen.
+Checkpoints are not arbitrary markers. They are derived safe player positions.
 
-Aktuelle Regeln:
+Current rules:
 
-- Checkpoints werden nur auf `ground`-Plattformen aktualisiert
-- der Spieler muss dafuer klar vor dem bisherigen Checkpoint liegen
-- die Zielposition wird ueber `getSafeCheckpointX(...)` bestimmt
-- Hazards auf derselben Lauf-Lane blockieren den Checkpoint-Bereich
+- checkpoints are updated only on `ground` platforms
+- player must be clearly ahead of the current checkpoint
+- target position is selected via `getSafeCheckpointX(...)`
+- hazards on the same player lane block checkpoint ranges
 
-Ziel:
+Goal:
 
-- kein Respawn direkt auf einem Hazard
-- kein hektisches Springen des Checkpoints bei kleinen Bewegungen
+- no respawn directly on hazards
+- no jittery checkpoint repositioning from tiny movements
 
-## Hurt-Posen statt Sofort-Respawn
+## Hurt Poses Instead Of Instant Respawn
 
-Nicht jeder Schaden setzt den Spieler sofort zum Checkpoint zurueck.
+Not all damage teleports the player directly to checkpoint.
 
-Bei sichtbaren Trefferzustanden arbeitet das Spiel mit:
+For visible hit states, the game uses:
 
 - `hurtTimer`
 - `pendingRespawn`
 - `forceInjuredPose`
 - `respawnVisual`
 
-Das ermoeglicht:
+This enables:
 
-- ein klares Treffer-Feedback
-- kurze Lesbarkeit des Fehlers
-- danach einen kontrollierten Respawn statt eines harten Teleports im selben Moment
+- clear hit feedback
+- short readability window for mistakes
+- controlled respawn after feedback instead of same-frame hard teleport
 
-## Sichere Hurt-Position
+## Safe Hurt Position
 
-Wenn der Treffer eine sichtbare Hurt-Pose verwenden soll, wird die Position nicht blind uebernommen.
+When visible hurt pose is used, position is not accepted blindly.
 
-Stattdessen gilt:
+Instead:
 
-- `moveToSafeInjuredPose(...)` sucht zuerst tragenden Boden
-- `getSafePlatformPoseX(...)` schneidet Hazards und lebende Bugs aus
-- wenn keine sinnvolle Plattform gefunden wird, faellt das System auf den letzten Checkpoint zurueck
+- `moveToSafeInjuredPose(...)` first searches for supporting floor
+- `getSafePlatformPoseX(...)` removes hazard and living-bug intervals
+- if no meaningful platform is found, system falls back to last checkpoint
 
-Wichtig:
+Important behavior:
 
-- das Spiel versucht die Pose moeglichst nahe am Impact-Punkt zu halten
-- Sicherheit ist dabei wichtiger als exakte optische Originalposition
+- pose tries to stay near impact point
+- safety has priority over visual exactness
 
-## Schadensarten
+## Damage Types
 
-### Sturz in den Krater
+### Crater Fall
 
-- kostet ein Leben
-- nutzt die Aufmerksamkeitstafel statt einer eingefrorenen Bodenpose
-- fuehrt nach dem Countdown zum Checkpoint zurueck
+- costs one life
+- uses countdown notice instead of frozen ground pose
+- returns to checkpoint after countdown
 
-### Hazard-Treffer
+### Hazard Hit
 
-- kostet ein Leben
-- nutzt eine sichere Hurt-Pose
-- vermeidet direkte Folge-Treffer auf derselben Laufspur
+- costs one life
+- uses safe hurt pose
+- avoids immediate follow-up hits on same run lane
 
-### Bug-Treffer
+### Bug Hit
 
-- kostet ein Leben
-- nutzt ebenfalls eine sichere Hurt-Pose
-- fallende Bugs und laufende Bugs teilen dieselbe Grundidee, auch wenn das Feedback leicht anders ist
+- costs one life
+- also uses safe hurt pose
+- falling bugs and running bugs share same fairness model with slight feedback variation
 
-### Bug-Stomp
+### Bug Stomp
 
-- ist explizit kein Schaden
-- loest den Bug
-- gibt einen Bounce nach oben und Score
+- explicitly not damage
+- resolves bug
+- grants upward bounce and score
 
-## Unverwundbarkeit und Respawn-Timing
+## Invulnerability And Respawn Timing
 
-Nach Schaden bekommt der Spieler temporaere Unverwundbarkeit:
+After damage, player receives temporary invulnerability:
 
-- laenger bei sichtbarem Hurt-State
-- kuerzer bei direktem Reset ohne volle Hurt-Phase
+- longer for visible hurt-state flows
+- shorter for direct-reset flows without full hurt phase
 
-Zusaetzlich gilt:
+Additional behavior:
 
-- waehrend `hurtTimer > 0` pausiert die eigentliche aktive Bewegungssimulation
-- der eigentliche Respawn auf den Checkpoint passiert erst nach Ablauf des Countdowns
+- while `hurtTimer > 0`, active movement simulation is paused
+- actual checkpoint respawn happens only after countdown expires
 
-Das verhindert, dass Spieler in derselben Sekunde mehrfach getroffen werden oder waehrend des Feedbacks schon wieder aktiv laufen muessen.
+This prevents multi-hit chains in the same moment and avoids forcing active movement during hit feedback.
 
-## Pause- und Resume-Fairness
+## Pause And Resume Fairness
 
-Das Spiel unterscheidet bewusst mehrere Pausegruende:
+The game explicitly distinguishes pause reasons:
 
 - `manual`
 - `portrait`
 - `background`
 
-Aktuelle Regeln:
+Current rules:
 
-- manuelle Pause darf direkt fortgesetzt werden
-- Background-Resume bekommt einen Sicherheits-Countdown
-- nach Rueckkehr aus Portrait in Landscape wird ebenfalls mit Countdown fortgesetzt
-- waehrend Resume-Countdown oder Hurt-Countdown ist die aktive Simulation blockiert
+- manual pause may resume directly
+- background resume uses a safety countdown
+- portrait-to-landscape resume also uses countdown
+- active simulation is blocked during resume and hurt countdowns
 
-Ziel:
+Goal:
 
-- App-Wechsel oder Drehung sollen nicht zu unfairen Soforttreffern fuehren
-- der Spieler bekommt nach dem Resume ein kleines Reaktionsfenster
+- app switches and rotation changes should not cause unfair instant hits
+- player receives a small reaction window after resume
 
-## Erweiterungspunkte
+## Extension Points
 
-Kuenftige Features wie `refactoring`, neue Backlog-Gefahren oder komplexere Boss-/Event-Phasen sollten dieselben Grundprinzipien respektieren:
+Future features such as `refactoring`, new backlog hazards, or more complex boss/event phases should keep the same principles:
 
-- Trefferfeedback darf lesbar sein
-- Respawns sollen aus sicheren Positionen kommen
-- Resume-Situationen brauchen ein bewusstes Reaktionsfenster
-- neue Fairness-Regeln sollten bevorzugt an Placement- oder Respawn-Helfer andocken statt direkt in allen Schadenszweigen dupliziert zu werden
+- hit feedback should remain readable
+- respawns should originate from safe positions
+- resume contexts need explicit reaction windows
+- new fairness rules should attach to placement or respawn helpers rather than being duplicated across every damage branch
 
-## Invarianten
+## Invariants
 
-- Checkpoints bewegen sich nur vorwaerts auf sichere Ground-Positionen
-- sichtbare Hurt-Posen landen nicht absichtlich in Hazards oder lebenden Bugs, wenn eine sichere Alternative existiert
-- Countdown-Phasen blockieren aktive Bewegung und geben dem Spieler Reaktionszeit
-- Background- und Portrait-Resume muessen spielerisch fairer behandelt werden als eine bewusste manuelle Pause
-- Schadensfeedback und sichere Platzierung sind getrennte Anliegen: Optik darf variieren, Sicherheitslogik soll konsistent bleiben
+- checkpoints move forward only to safe ground positions
+- visible hurt poses do not intentionally place players into hazards or living bugs when a safe alternative exists
+- countdown phases block active movement and provide reaction time
+- background and portrait resume must be handled more conservatively than intentional manual pause
+- damage feedback and safety placement are separate concerns: visuals may vary, safety logic should stay consistent

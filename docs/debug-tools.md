@@ -1,79 +1,79 @@
 # Debug Tools
 
-Dieses Dokument beschreibt die aktuellen Debug- und Balancing-Werkzeuge von `Red Dune Dash`.
+This document describes current debug and balancing tools for `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-Komplexe Spielsituationen sollen gezielt reproduzierbar sein, ohne dass man jedes Mal einen langen Run bis zur passenden Event- oder Ressourcenlage spielen muss.
+Complex gameplay situations should be reproducible on demand without requiring long manual runs to reach specific event or resource states.
 
-## Aktivierung
+## Activation
 
-Die Debug-Konfiguration wird ueber Query-Parameter aktiviert.
+Debug configuration is enabled through query parameters.
 
-Beispiel:
+Example:
 
 ```text
 ?debug=1&debugEvent=big-order&debugPickup=score-boost&debugBacklog=5
 ```
 
-Sobald mindestens ein Debug-Override gesetzt ist, wird der Debug-Modus automatisch aktiv.
+If at least one debug override is provided, debug mode activates automatically.
 
-## Verfuegbare Query-Parameter
+## Available Query Parameters
 
 - `debug=1`
-  Schaltet den Debug-Modus explizit ein.
+  Explicitly enables debug mode.
 - `debugPanel=0|1`
-  Blendet das Debug-Panel standardmaessig aus oder ein.
+  Hides or shows the debug panel by default.
 - `debugEvent=<type>`
-  Erzwingt einen bestimmten Special-Event-Typ fuer manuelle Event-Starts, z. B. `big-order`.
+  Forces a specific special event type for manual event starts, for example `big-order`.
 - `debugEventDelayMs=<number>`
-  Erzwingt die Event-Wartezeit in Millisekunden.
+  Forces event wait time in milliseconds.
 - `debugPickup=<type>`
-  Erzwingt fuer automatische Waehrungs-Pickups nach Moeglichkeit einen bestimmten Pickup-Typ.
+  Forces a specific pickup type for automatic currency-related pickups where possible.
 - `debugPickupSpawnMultiplier=<number>`
-  Skaliert pickup-bezogene Spawn-Chancen.
+  Scales pickup-related spawn chances.
 - `debugIncomeSpawnMultiplier=<number>`
-  Skaliert die Spawn-Wahrscheinlichkeit von Einkommen-/Monetenquellen.
+  Scales spawn probability for income and coin sources.
 - `debugBugSpawnMultiplier=<number>`
-  Skaliert bug-bezogene Spawn-Chancen und direkte Event-Spawn-Versuche.
+  Scales bug-related spawn chances and direct event spawn attempts.
 - `debugRocketSpawnMultiplier=<number>`
-  Skaliert die Raketen-Spawnrate.
+  Scales rocket spawn rate.
 - `debugBacklog=<number>`
-  Prefill fuer Backlog-Records beim Start eines neuen Runs.
+  Prefills backlog records when starting a new run.
 - `debugCurrencyCents=<number>`
-  Startwert fuer Moneten.
+  Start value for coin currency.
 - `debugActionScore=<number>`
-  Startwert fuer Aktionspunkte.
+  Start value for action score.
 - `debugProgressScore=<number>`
-  Startwert fuer Fortschrittspunkte.
+  Start value for progress score.
 - `debugLives=<number>`
-  Startwert fuer Leben.
+  Start value for lives.
 
 ## In-Game Hotkeys
 
 - `F3`
-  Debug-Panel ein- oder ausblenden.
+  Toggle debug panel visibility.
 - `F6`
-  Den aktuellen Special Event Debug-Schritt ausfuehren:
+  Execute the current special-event debug step:
   `idle -> announce -> active -> complete`.
 - `F7`
-  Den konfigurierten Debug-Pickup in die aktuelle Szene spawnen.
+  Spawn the configured debug pickup into the current scene.
 - `F8`
-  Einen weiteren Backlog-Record anlegen.
+  Add one additional backlog record.
 
-## Sichtbares Debug-Panel
+## Visible Debug Panel
 
-Wenn Debug aktiv ist, zeigt das Panel unter anderem:
+When debug mode is active, the panel includes:
 
-- Event-Konfiguration und aktuelle Event-Phase
-- Spawn-Multiplikatoren
-- erzwungenen Pickup-Typ
-- Startwerte fuer Ressourcen und Backlog
-- aktuelle Weltgroessen wie Pickups, Bugs und Raketen
-- aktuelle Run-Werte wie Moneten, offene Bugs, Score und Balance
+- event configuration and current event phase
+- spawn multipliers
+- forced pickup type
+- configured start values for resources and backlog
+- current world counts for pickups, bugs, and rockets
+- current run values for currency, open bugs, score, and balance
 
-## Highscore-Regel
+## Highscore Rule
 
-Debug-Runs speichern keinen Highscore in `localStorage`.
+Debug runs do not persist highscores to `localStorage`.
 
-Das verhindert, dass Balancing- oder Content-Tests den normalen Spielfortschritt verfaelschen.
+This prevents balancing or content tests from polluting normal progression highscores.

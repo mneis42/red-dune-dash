@@ -1,124 +1,124 @@
 # Run Model
 
-Dieses Dokument definiert das aktuelle Score-, Ressourcen- und Fortschrittsmodell von `Red Dune Dash`.
+This document defines the current score, resource, and progression model of `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-Das Modell trennt bewusst zwischen:
+The model intentionally separates:
 
-- Spielfigur-Zustand
-- Ressourcen des aktuellen Runs
-- Fortschritt des aktuellen Runs
-- Bug-Zustand des aktuellen Runs
-- Score als Auswertung mehrerer Systeme
+- player state
+- current-run resources
+- current-run progression
+- current-run bug state
+- score as a synthesis of multiple systems
 
-Diese Trennung ist wichtig, damit kuenftige Features wie neue Gem-Arten, Bug-Backlog, Reaktivierungen alter Bugs oder Event-Typen wie `refactoring` nicht als Sonderfaelle direkt im Player-State landen.
+This separation is important so future features such as new gem families, bug backlog mechanics, bug reactivation, or event types like `refactoring` do not become special cases in player state.
 
-## Aktuelle Zustandsbereiche
+## Current State Areas
 
 ### Player
 
-`player` beschreibt nur den unmittelbaren Laufzustand der Figur:
+`player` represents immediate character-run state only:
 
-- Position
-- Bewegung
-- Bodenkontakt
-- Blickrichtung
-- Leben
-- Hurt-/Respawn-Zustaende
-- Sichtbarkeit
+- position
+- movement
+- ground contact
+- facing direction
+- lives
+- hurt and respawn state
+- visibility
 
-Nicht mehr Teil von `player` sind:
+No longer part of `player`:
 
-- Moneten
-- Aktionspunkte
-- Fortschrittspunkte
-- maximale erreichte Distanz
+- coin currency
+- action score
+- progress score
+- farthest reached distance
 
 ### Run State
 
-`runState` beschreibt den wirtschaftlichen und progressionsbezogenen Zustand des aktuellen Runs:
+`runState` represents economy and progression of the current run:
 
 - `currencyCents`
 - `actionScore`
 - `progressScore`
 - `farthestX`
 
-Bedeutung:
+Meaning:
 
-- `currencyCents`: direkte Geld-Ressource des Runs
-- `actionScore`: Punkte aus konkreten Aktionen wie Gem-Sammeln, Bug-Besiegen oder Raketen
-- `progressScore`: gespeicherte Fortschrittspunkte aus Distanz und Balance
-- `farthestX`: maximale im Run erreichte X-Position
+- `currencyCents`: direct run currency
+- `actionScore`: points from concrete actions like collecting gems, defeating bugs, or collecting rockets
+- `progressScore`: stored progression points from distance and balance
+- `farthestX`: maximum X position reached in the current run
 
-## Score-Modell
+## Score Model
 
-Der Gesamtscore ist:
+Total score:
 
 `totalScore = actionScore + progressScore`
 
-### Aktionspunkte
+### Action Score
 
-Aktionspunkte werden direkt durch einzelne Aktionen vergeben:
+Action score is granted directly by discrete actions:
 
-- Gem einsammeln
-- Bug besiegen
-- Rakete einsammeln
+- collect gem
+- defeat bug
+- collect rocket
 
-Diese Punkte sind additiv und dauerhaft.
+These points are additive and persistent within the run.
 
-### Fortschrittspunkte
+### Progress Score
 
-Fortschrittspunkte basieren auf:
+Progress score depends on:
 
-- maximal erreichter Distanz im Run
-- aktuellem Balance-Faktor
+- farthest distance reached in the run
+- current balance factor
 
-Wichtige Regel:
+Key rule:
 
-- Fortschrittspunkte sind monoton
+- progress score is monotonic
 
-Das bedeutet:
+Meaning:
 
-- spaetere Balance-Schwankungen duerfen bereits verdiente Fortschrittspunkte nicht wieder verringern
-- die Anzeige fuer Fortschritt soll sich fuer den Spieler wie echter Fortschritt anfuehlen
+- later balance fluctuations must not reduce already earned progress points
+- progression display should feel like true progression to players
 
-Technisch wird deshalb nicht einfach jedes Frame ein dynamischer Distanzwert neu angezeigt, sondern ein `progressScore` gespeichert und nur nach oben synchronisiert.
+Implementation consequence: the game stores `progressScore` and only syncs upward, instead of re-rendering a fully dynamic per-frame distance score.
 
-## Ressourcenmodell
+## Resource Model
 
-### Moneten
+### Coin Currency
 
-Moneten sind aktuell die direkte Einkommens-Ressource des Runs.
+Coin currency is currently the direct economy resource for the run.
 
-Heute wirken sie auf:
+It currently influences:
 
-- HUD-Anzeige
-- Euro-pro-Stunde-Wert
-- Balance-Faktor
+- HUD display
+- EUR-per-hour metric
+- balance factor
 
-Wichtig fuer spaeter:
+Future-facing semantics:
 
-- Moneten sind nicht synonym zu "alle Gems"
-- kuenftige Pickup-Typen duerfen andere Wirkungen haben, ohne diese Ressource umzudeuten
+- coin currency is not synonymous with "all gems"
+- future pickup types may have other effects without redefining this resource
 
-Beispiele fuer spaetere getrennte Ressourcen:
+Examples of future separate resource channels:
 
 - `currency`
 - `backlog-revival`
 - `score-boost`
 - `event-trigger`
 
-### Leben
+### Lives
 
-Leben bleiben bewusst beim `player`, weil sie in erster Linie eine unmittelbare Ueberlebensressource der Spielfigur sind, keine wirtschaftliche Run-Waehrung.
+Lives intentionally remain in `player` because they are immediate survival state, not economic run currency.
 
-## Bug-Modell
+## Bug Model
 
-Die fachliche Aufschluesselung der Bug-Status ist zusaetzlich in [bug-lifecycle.md](./bug-lifecycle.md) beschrieben.
-Der Lebenszyklus und die Haken fuer Sonderevents sind zusaetzlich in [event-model.md](./event-model.md) beschrieben.
+Detailed bug status semantics are documented in [bug-lifecycle.md](./bug-lifecycle.md).
+Lifecycle hooks for special events are documented in [event-model.md](./event-model.md).
 
-Der aktuelle Run fuehrt ein Bug-Ledger mit folgenden Bedeutungen:
+Current run bug-ledger meanings:
 
 - `spawnedInRun`
 - `resolvedInRun`
@@ -128,62 +128,62 @@ Der aktuelle Run fuehrt ein Bug-Ledger mit folgenden Bedeutungen:
 - `backlog`
 - `reactivatedInRun`
 
-Derzeit gilt:
+Current behavior:
 
 - `openInRun = activeInWorld + missedInRun + backlog + reactivatedInRun`
-- `backlog` ist im regulären Spiel normalerweise `0`, kann im Debug-Modus aber vorbefuellt oder per Hotkey erhoeht werden
-- `reactivatedInRun` bleibt im Normalfall `0`, kann aber durch vorbereitete Debug-/Pickup-Pfade steigen
+- `backlog` is normally `0` in regular gameplay, but can be prefilled or incremented in debug mode
+- `reactivatedInRun` is usually `0`, but can increase via prepared debug or pickup paths
 
-Wichtige semantische Entscheidung:
+Important semantic decision:
 
-- "Offene Bugs" im aktuellen HUD meinen derzeit offene Bugs dieses Runs
-- sie meinen noch nicht einen historischen, spielsystemischen Backlog ueber verpasste alte Bugs
+- current HUD "Open Bugs" means unresolved bugs in the current run
+- it does not yet represent a historical backlog across older runs
 
-Das ist eine bewusste Zwischenstufe. Ein echter Backlog wird spaeter als eigenes Fachsystem ergaenzt und nicht aus Welt-Entities rekonstruiert.
+This is an intentional intermediate stage. A true backlog should later exist as a dedicated system, not reconstructed from world entities.
 
-## Balance-Faktor
+## Balance Factor
 
-Der Balance-Faktor entsteht aktuell aus zwei Seiten:
+The balance factor currently combines:
 
-- Bug-Druck
-- Einkommens-Momentum
+- bug pressure
+- income momentum
 
-Die Balance beeinflusst heute:
+Balance currently affects:
 
-- Fortschrittspunkte
-- Spawn-Chancen fuer Einkommensquellen
+- progress score
+- spawn chances for income sources
 
-Wichtig:
+Important semantics:
 
-- Balance ist ein Modifikator
-- Balance ist keine eigene Ressource
-- Balance darf Fortschritt schwerer oder lukrativer machen, soll aber bereits verdiente Fortschrittspunkte nicht rueckwirkend vernichten
+- balance is a modifier
+- balance is not a standalone resource
+- balance may make progression harder or more lucrative, but must not retroactively destroy already earned progress points
 
-## Erweiterungspunkte
+## Extension Points
 
-### Backlog-Gems
+### Backlog Gems
 
-Ein Pickup, das alte Bugs zurueckholt, soll spaeter nicht einfach offene Welt-Bugs respawnen lassen. Stattdessen soll es mit einem echten Backlog-System arbeiten, das zustaendliche Bugs verwaltet.
+A pickup that revives old bugs should not respawn open world bugs directly. It should use a dedicated backlog system that tracks eligible bugs.
 
-### Refactoring-Events
+### Refactoring Events
 
-Ein `refactoring`-Event ist fachlich kein normales Spawn-Event, sondern eher ein Modus mit:
+A `refactoring` event is not a standard spawn event. It is closer to a high-risk mode with:
 
-- hohem Risiko
-- wenig oder keinem direkten Einkommen
-- staerkerem Einfluss auf Bug-Zustaende
-- moeglichem Bonus auf Fortschrittspunkte oder Bug-Aufraeumung
+- higher risk
+- low or zero direct income
+- stronger impact on bug state
+- potential bonus tied to progress points or bug cleanup
 
-### Weitere Ressourcen
+### Additional Resources
 
-Neue Pickup-Typen sollten ueber das Ressourcenmodell anbindbar sein, ohne den Player-State oder die Geld-Ressource zu ueberladen.
+New pickup types should attach through the resource model without overloading player state or coin currency semantics.
 
-## Invarianten
+## Invariants
 
-Solange dieses Modell gilt, sollten folgende Aussagen immer wahr bleiben:
+While this model applies, these statements should remain true:
 
-- `player` enthaelt keine wirtschaftlichen oder scorebezogenen Run-Werte
-- `progressScore` sinkt nie
-- `totalScore` sinkt nie
-- "Offene Bugs" im HUD meinen den aktuellen Run, nicht den spaeteren Backlog
-- Backlog bleibt ein eigenes System und wird nicht aus besiegten oder entfernten Welt-Entities abgeleitet
+- `player` contains no economic or score-related run values
+- `progressScore` never decreases
+- `totalScore` never decreases
+- HUD "Open Bugs" refers to the current run, not a future backlog
+- backlog remains a dedicated system and is not derived from defeated or removed world entities

@@ -1,56 +1,56 @@
 # Asset Manifest
 
-Dieses Dokument beschreibt die gemeinsame Asset-Quelle fuer App, Spiel und Service Worker in `Red Dune Dash`.
+This document describes the shared asset source for app shell, gameplay runtime, and service worker behavior in `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-Die PWA- und Offline-Assets sollen nicht mehr an mehreren Stellen getrennt gepflegt werden. Stattdessen gibt es eine zentrale Manifest-Datei, aus der sowohl das Spiel als auch der Service Worker lesen.
+PWA and offline assets should no longer be maintained in multiple disconnected places. Instead, a single manifest file is used by both the game and the service worker.
 
-Dadurch werden zwei Probleme geloest:
+This removes two recurring failure modes:
 
-- neue Sprite- oder UI-Assets werden nicht mehr leicht im Offline-Cache vergessen
-- App und Service Worker driften nicht mehr auseinander
+- new sprite or UI assets being forgotten in offline caching
+- drift between app runtime asset usage and service-worker cache definitions
 
-## Zentrale Quelle
+## Single Source Of Truth
 
-`app-assets.js` ist die gemeinsame Quelle fuer:
+`app-assets.js` is the shared source for:
 
-- `spriteSources` des Spiels
-- App-Shell-Assets
-- PWA-Icon-Assets
-- die vollstaendige Offline-Cache-Liste
-- die `network-first`-Pfade des Service Workers
+- game `spriteSources`
+- app-shell assets
+- PWA icon assets
+- the full offline precache list
+- service-worker `network-first` routes
 
-## Aktuelle Nutzung
+## Current Usage
 
 ### `game-endless.js`
 
-Das Spiel liest seine `spriteSources` aus dem zentralen Manifest. Damit fuehrt ein neues Sprite nicht mehr automatisch zu zwei manuellen Aenderungen.
+The game reads `spriteSources` from the central manifest. A new sprite no longer requires parallel manual edits in multiple files.
 
 ### `service-worker.js`
 
-Der Service Worker importiert `app-assets.js` und nutzt dieselbe Asset-Liste fuer:
+The service worker imports `app-assets.js` and uses the same asset lists for:
 
-- Cache-Name
-- Precache-Liste
-- `network-first`-Routing fuer Kern-Dateien
+- cache naming
+- precache entries
+- `network-first` routing for core files
 
 ### `index.html`
 
-`app-assets.js` wird vor `game-endless.js` geladen, damit die Sprite-Quellen beim Spielstart bereits verfuegbar sind.
+`app-assets.js` is loaded before `game-endless.js` so sprite definitions are available at game startup.
 
-## Design-Regeln fuer neue Assets
+## Design Rules For New Assets
 
-Wenn ein neues Asset offline relevant ist, sollte es ueber das zentrale Manifest sichtbar werden:
+If a new asset is relevant for offline behavior, it should be registered through the central manifest:
 
-- neue Spiel-Sprites ueber `spriteSources`
-- neue Shell-Dateien oder feste UI-Ressourcen ueber `appShellAssets`
-- neue PWA-Icons ueber `pwaIconAssets`
+- new gameplay sprites via `spriteSources`
+- shell files or fixed UI resources via `appShellAssets`
+- new PWA icons via `pwaIconAssets`
 
-Nicht gewuenscht ist, dieselbe Datei direkt an mehreren Stellen getrennt nachzutragen.
+Avoid registering the same file independently in multiple locations.
 
-## Invarianten
+## Invariants
 
-- Service Worker und Spiel nutzen dieselbe Sprite-Quelle
-- alle zentral registrierten Assets landen in der Offline-Cache-Liste
-- Kern-Dateien der App sind im Service Worker explizit als `network-first` modelliert
+- service worker and game consume the same sprite source
+- centrally registered assets are represented in the offline cache list
+- app core files remain explicitly modeled as `network-first` in the service worker

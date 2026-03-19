@@ -1,132 +1,134 @@
 # Generator Rules
 
-Dieses Dokument beschreibt die aktuellen Regeln und Invarianten des Weltgenerators von `Red Dune Dash`.
+This document describes current world-generator rules and invariants for `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-Der Generator soll drei Dinge gleichzeitig leisten:
+The generator must satisfy three goals simultaneously:
 
-- die Welt endlos und ohne sichtbare Luecken vorausbauen
-- optionale Inhalte wie Plattformen, Pickups, Bugs und Hazards hinzufuegen
-- dabei keine unfairen oder unspielbaren Layouts erzeugen
+- build the world forward endlessly without visible gaps
+- add optional content such as platforms, pickups, bugs, and hazards
+- avoid unfair or unplayable layouts
 
-Wichtig ist ausserdem, dass fehlgeschlagene optionale Inhalte den Weltfortschritt nie blockieren duerfen.
+Additionally, failed optional content generation must never block core world progression.
 
-## Grundablauf
+## Core Flow
 
-Die Generierung laeuft aktuell in drei Ebenen:
+Generation currently runs across three levels:
 
 ### `initLevel()`
 
-Seedet den Startbereich des Runs mit:
+Seeds the beginning of the run with:
 
-- einer festen Anfangssequenz aus Ground-Plattformen
-- einem ersten Pickup
-- einem ersten Bug
-- bereits vorgezogen generierten weiteren Chunks
+- a fixed opening sequence of ground platforms
+- an initial pickup
+- an initial bug
+- additional pre-generated chunks ahead
 
 ### `generateUntil(targetX)`
 
-Ruft `generateChunk()` so lange auf, bis die Welt weit genug vor dem Kamera-/Spielerbereich reicht.
+Calls `generateChunk()` repeatedly until the world extends far enough ahead of player and camera space.
 
 ### `generateChunk()`
 
-Erzeugt genau einen neuen Basis-Chunk:
+Builds exactly one new base chunk:
 
-1. Luecke zum letzten Chunk bestimmen
-2. neue Ground-Plattform erzeugen
-3. optionale Ground-Dekoration pruefen
-4. optionale Plate- oder Bonus-Plattformen pruefen
-5. am Ende `level.nextChunkX` und `level.lastGroundY` fortschreiben
+1. compute gap to previous chunk
+2. create new ground platform
+3. evaluate optional ground decoration
+4. evaluate optional plate or bonus platforms
+5. finally advance `level.nextChunkX` and `level.lastGroundY`
 
-## Transaktionale optionale Inhalte
+## Transactional Optional Content
 
-Optionale Chunk-Bestandteile wie hohe Zusatzplattformen duerfen fehlschlagen.
+Optional chunk features (for example elevated bonus platforms) may fail.
 
-Damit dabei kein halbfertiger Zustand stehenbleibt, arbeitet der Generator mit einem kleinen Rollback-Modell:
+To avoid leaving partial state behind, the generator uses a small rollback model:
 
 - `createChunkFeatureSnapshot()`
 - `commitChunkFeatureAttempt(...)`
 - `restoreChunkFeatureSnapshot(...)`
 
-Zurueckgerollt werden dabei unter anderem:
+Rollback includes, among other things:
 
-- hinzugefuegte Plattformen
-- temporaer veraenderte Hazards
-- neu hinzugekommene Pickups
-- neu hinzugekommene Bugs
-- neue Bug-Lifecycle-Ids
+- added platforms
+- temporarily changed hazards
+- newly added pickups
+- newly added bugs
+- newly allocated bug-lifecycle IDs
 
-Das bedeutet:
+This ensures:
 
-- ein fehlgeschlagener Bonus-Aufbau darf den Chunk "einfach schlichter" machen
-- der Chunk bleibt trotzdem gueltig
-- die Weltfortschreibung passiert weiterhin genau einmal
+- failed optional features can simply produce a simpler chunk
+- the chunk remains valid
+- world progression still advances exactly once
 
-## Aktuelle Fairness-Regeln
+## Current Fairness Rules
 
-### Ground-Chunks
+### Ground Chunks
 
-- Ground-Y variiert nur in einem begrenzten Bereich zwischen `world.floorYMin` und `world.floorYMax`
-- Chunk-Breite und Lueckenbreite bleiben in kontrollierten Zufallsintervallen
-- Ground-Hazards erscheinen nur auf ausreichend breiten Segmenten und mit seitlichem Sicherheitsabstand
+- ground Y varies only within bounded range `world.floorYMin` to `world.floorYMax`
+- chunk width and gap width stay inside controlled random intervals
+- ground hazards appear only on sufficiently wide segments with side safety margins
 
-### Erhoehte Plattformen
+### Elevated Platforms
 
-Optionale Plate- und Bonus-Plattformen muessen mehrere Pruefungen bestehen:
+Optional plate and bonus platforms must pass multiple checks:
 
-- keine Plattform-Ueberlappung
-- genug Unterlauf-Freiraum
-- bei zu grosser Hoehe ggf. Hilfsplattform ueber `ensureStepPlatform(...)`
-- mindestens ein plausibler Zugang ueber `hasReachableApproach(...)`
+- no platform overlap
+- enough underpass clearance
+- helper platform via `ensureStepPlatform(...)` when needed for high placements
+- at least one plausible approach via `hasReachableApproach(...)`
 
-Wenn eine zu hohe Plattform ohne Hilfsstufe unspielbar waere, wird sie nicht behalten.
+If a high platform would be unplayable without support, it is not kept.
 
-### Hazard-Korrekturen
+### Hazard Corrections
 
-In einzelnen Faellen entfernt der Generator Hazards wieder unter einem kritischen Bereich, wenn sonst ein noetiger Zugang unspielbar waere.
+In specific cases, hazards are removed under critical areas when otherwise required traversal would become unplayable.
 
-Das ist bewusst kein allgemeiner "Cheat", sondern eine Fairness-Korrektur fuer Konflikte zwischen:
+This is intentionally a fairness correction for conflicts between:
 
-- hoher Plattform
-- noetiger Laufspur
-- bereits gesetztem Ground-Hazard
+- high platform placement
+- required approach lane
+- already placed ground hazard
 
-### Pickups und Bugs
+It is not intended as a global bypass rule.
 
-Die eigentliche Platzierung von Pickups und Bugs auf Plattformen nutzt gemeinsame Helfer:
+### Pickups And Bugs
 
-- Pickup-Typen ueber das Pickup-System
-- Safe-Zones ueber das Placement-System
+Detailed pickup and bug placement on platforms uses shared helpers:
 
-Dadurch entscheidet der Generator nicht selbst im Detail, wo ein Pickup exakt stehen darf.
+- pickup typing through the pickup system
+- safe zones through the placement system
 
-## Event- und Debug-Einfluss
+This keeps exact placement semantics outside direct chunk-construction logic.
 
-Der Generator liest seine dekorativen Wahrscheinlichkeiten nicht mehr nur aus hart codierten Werten, sondern ueber:
+## Event And Debug Influence
+
+Decorative probabilities are no longer read only from hard-coded values. The generator now also considers:
 
 - `specialEventSystem.getChunkGenerationRules()`
-- Debug-Multiplikatoren fuer pickup- und bugbezogene Spawn-Chancen
+- debug multipliers for pickup and bug spawn chance families
 
-Wichtig:
+Important semantics:
 
-- Events und Debug duerfen Dichte und Risiko aendern
-- sie sollen aber nicht die grundlegenden Traversal-Regeln des Chunks aufheben
+- events and debug options may change density and risk
+- they should not invalidate core traversal constraints
 
-## Erweiterungspunkte
+## Extension Points
 
-Kuenftige Features wie `refactoring`, neue Plattformtypen oder neue Pickup-Familien sollten bevorzugt so andocken:
+Future features such as `refactoring`, new platform types, or new pickup families should attach via:
 
-- neue Chunk-Regelwerte ueber Event-Definitionen
-- neue Spawn-Entscheidungen ueber Pickup- und Placement-System
-- neue Traversal-Pruefungen ueber benennbare Helfer statt Direktlogik in `generateChunk()`
+- new chunk rule values exposed through event definitions
+- new spawn decisions through pickup and placement systems
+- new traversal checks through named helpers instead of inline logic in `generateChunk()`
 
-Nicht gewuenscht ist, neue Feature-Typen direkt als weitere verstreute `if`-Bloecke in denselben Ablauf zu schichten.
+Avoid stacking new feature types as additional scattered branch blocks in the same generation flow.
 
-## Invarianten
+## Invariants
 
-- jeder Chunk schreibt `level.nextChunkX` und `level.lastGroundY` genau einmal fort
-- optionale Inhalte duerfen fehlschlagen, ohne die Weltfortschreibung zu blockieren
-- fehlgeschlagene optionale Inhalte hinterlassen keine halbfertigen Weltobjekte
-- Traversal-Fairness ist wichtiger als maximale Dekorationsdichte
-- Platzierungsdetails fuer Pickups und sichere Posen sollen in gemeinsamen Systemen bleiben, nicht im Generator dupliziert werden
+- each chunk advances `level.nextChunkX` and `level.lastGroundY` exactly once
+- optional content may fail without blocking world progression
+- failed optional attempts leave no partial world objects behind
+- traversal fairness has priority over maximum decoration density
+- pickup placement and safe-pose details stay in shared systems, not duplicated in generator code

@@ -1,45 +1,45 @@
 # Event Model
 
-Dieses Dokument beschreibt das aktuelle Special-Event-System von `Red Dune Dash` und die vorgesehenen Erweiterungspunkte fuer spaetere Event-Typen wie `refactoring`.
+This document describes the current special-event system in `Red Dune Dash` and planned extension points for future event types such as `refactoring`.
 
-## Ziel
+## Goal
 
-Events sollen nicht mehr als verstreute Sonderfaelle in Scheduler, Generator, HUD und Spawn-Code leben. Stattdessen bekommt jeder Event-Typ eine gemeinsame Definition mit klaren Verantwortlichkeiten.
+Events should no longer exist as scattered special cases across scheduler, generator, HUD, and spawn code. Instead, each event type should have a shared definition with explicit responsibilities.
 
-Damit wird festgelegt:
+This defines:
 
-- wann ein Event angekuendigt wird
-- wie lange Vorwarnung und Aktivphase dauern
-- welchen Runtime-State das Event waehrend seiner Phasen braucht
-- welche Gameplay-Effekte aktiv sind
-- welche UI-Texte gezeigt werden
-- wie ein Event sauber abgeschlossen wird
+- when an event is announced
+- how long warning and active phases last
+- which runtime state the event needs across phases
+- which gameplay effects are active
+- which UI messages are shown
+- how the event ends cleanly
 
-## Aktuelle Struktur
+## Current Structure
 
-Das Laufzeitmodell besteht aus zwei Ebenen:
+The runtime model currently has two layers:
 
-### Globaler Event-State
+### Global Event State
 
-`specialEventState` haelt nur noch den gemeinsamen Ablaufzustand:
+`specialEventState` stores only the shared lifecycle state:
 
 - `type`
 - `phase`
 - `timer`
 - `runtime`
 
-Bedeutung:
+Meaning:
 
-- `type`: aktueller Event-Typ oder `null`
-- `phase`: `idle`, `announce` oder `active`
-- `timer`: Restzeit der aktuellen Phase
-- `runtime`: phaenspezifischer, mutierbarer Zustand des aktuellen Events
+- `type`: current event type or `null`
+- `phase`: `idle`, `announce`, or `active`
+- `timer`: remaining time in current phase
+- `runtime`: phase-specific mutable state for the active event
 
-### Event-Definitionen
+### Event Definitions
 
-`SPECIAL_EVENT_DEFINITIONS` beschreibt pro Event-Typ die fachlichen Unterschiede.
+`SPECIAL_EVENT_DEFINITIONS` describes per-event behavioral differences.
 
-Aktuell nutzt jede Definition dieselben Hook-Arten:
+Each definition currently uses shared hook categories:
 
 - `title`
 - `announcementTitle`
@@ -49,90 +49,90 @@ Aktuell nutzt jede Definition dieselben Hook-Arten:
 - `createRuntime(phase)`
 - `updateActive(delta, state)`
 
-Optional kann eine Definition ausserdem spezielle Regelbereiche liefern, zum Beispiel:
+Optionally, a definition may provide specialized rule sections, for example:
 
 - `chunkGeneration`
 - `rocketSpawnMultiplier`
 - `rocketSpawnPhases`
-- ein Scheduler-Hook fuer gewichtete Event-Auswahl
-- spaeter auch Erfolgs-/Fehlschlag-Hooks oder Reward-Profile
+- scheduler hook for weighted event selection
+- future success/failure hooks or reward profiles
 
-## Aktuelle Event-Typen
+## Current Event Types
 
 ### `bug-wave`
 
-Die Bugwelle ist ein Druck-Event:
+Bug wave is a pressure event:
 
-- beschleunigt Raketen bereits in Vorwarnung und Aktivphase
-- spawnet waehrend der Aktivphase fallende und laufende Bugs
-- nutzt dafuer einen eigenen Runtime-State fuer Spawn-Timer
-- kann pro Spawn mit 50% Chance einen historischen ungelosten Bug statt eines komplett neuen Bugs einsetzen
-- darf dafuer Lifecycle-Eintraege aus `missed`, `backlog` und `reactivated` wiederverwenden
-- zeigt reaktivierte Bugs nicht gesondert an, behaelt intern aber deren Lifecycle-Identitaet bei
+- accelerates rockets in warning and active phases
+- spawns falling and running bugs during active phase
+- uses dedicated runtime spawn timers
+- can, with 50% chance per spawn, reactivate a historically unresolved bug instead of creating a fully new one
+- may reuse lifecycle entries from `missed`, `backlog`, and `reactivated`
+- does not show reactivated bugs separately in UI, but preserves lifecycle identity internally
 
 ### `big-order`
 
-Der Großauftrag ist ein Ertrags-Event:
+Big order is an income event:
 
-- vergroessert die Chunk-Dekoration fuer Moneten und Bugs
-- spawnet zusaetzliche sichtbare Moneten waehrend der Aktivphase
-- darf fuer zusaetzliche Euro-Spawns die normale, eher konservative Platzierungsdichte lockern, damit der Event-Effekt sichtbar bleibt
-- laesst bei zusaetzlichen sichtbaren Euro-Spawns mit 30% Chance eine groessere 1-EUR-Variante erscheinen
-- ein eingesammelter 1-EUR-Bonus kann mit 50% Chance einen telegraphierten Bug auf derselben Plattform entstehen lassen
-- bringt seine eigenen Spawn-Timer im Runtime-State mit
+- increases chunk decoration for coin and bug content
+- spawns additional visible coin sources during active phase
+- may relax conservative placement density for additional EUR spawns so event impact is visible
+- allows a larger 1-EUR variant with 30% chance for additional visible EUR spawns
+- collecting a 1-EUR bonus may, with 50% chance, create a telegraphed bug on the same platform
+- carries dedicated spawn timers in runtime state
 
-## Gemeinsamer Ablauf
+## Shared Lifecycle
 
-Der Scheduler arbeitet fuer alle Events gleich:
+Scheduler lifecycle is shared for all events:
 
 1. `idle`
-2. zufaellige Wartezeit laeuft herunter
+2. random wait timer runs down
 3. `announce`
-4. Event-spezifische Vorwarnung wird angezeigt
+4. event-specific warning message is shown
 5. `active`
-6. Event-spezifische `updateActive`-Logik laeuft
-7. Abschlussmeldung
-8. zurueck nach `idle`
+6. event-specific `updateActive` logic runs
+7. completion message
+8. return to `idle`
 
-Fuer die aktuellen Live-Events gilt zusaetzlich:
+Additional rules for current live events:
 
-- die Wartezeit zwischen zwei Events liegt produktiv zwischen 2 und 5 Minuten
-- die Typ-Auswahl ist nicht mehr rein gleichverteilt
-- bei vielen offenen Bugs (`active-world`, `missed`, `backlog`, `reactivated`) bekommt `bug-wave` ein hoeheres Gewicht als `big-order`
-- Debug-Overrides fuer Delay oder Event-Typ haben weiterhin Vorrang
+- production wait time between events is currently between 2 and 5 minutes
+- type selection is no longer strictly uniform
+- when many open bugs exist (`active-world`, `missed`, `backlog`, `reactivated`), `bug-wave` receives higher selection weight than `big-order`
+- debug overrides for delay or event type still take priority
 
-Wichtig:
+Important behavior:
 
-- Phasenwechsel initialisieren `runtime` immer neu
-- UI liest nur noch ein gemeinsames Event-View-Model
-- Generator und Spawn-System fragen gemeinsame Event-Helfer statt einzelner Typ-Sonderfaelle ab
+- phase transitions always reinitialize `runtime`
+- UI consumes one shared event view model
+- generator and spawn systems query shared event helpers instead of type-specific special-case branches
 
-## Erweiterungspunkte fuer spaetere Events
+## Extension Points For Future Events
 
-Ein kuenftiges `refactoring`-Event sollte moeglichst in derselben Struktur beschrieben werden, zum Beispiel mit:
+A future `refactoring` event should fit the same structure, for example with:
 
-- eigenem `title` und `announcementTitle`
-- eigener `activeDuration`
-- eigenem `runtime` fuer schwere Plattform- oder Timing-Phasen
-- Hooks fuer Bug-Lifecycle-Effekte
-- Reward-Profil, das eher Fortschritt als Moneten belohnt
+- dedicated `title` and `announcementTitle`
+- dedicated `activeDuration`
+- dedicated `runtime` for heavier platform or timing phases
+- bug-lifecycle effect hooks
+- reward profile that favors progression over direct currency
 
-Fuer solche Events sollten neue Effekte bevorzugt an gemeinsame Schnittstellen andocken:
+New event effects should prefer shared integration points:
 
-- Chunk-Generierung
-- Spawn-Multiplikatoren
-- Bug-Lifecycle-Aktionen
-- Score-/Fortschrittsmodifikatoren
-- HUD-/Statustexte
+- chunk generation
+- spawn multipliers
+- bug lifecycle actions
+- score and progression modifiers
+- HUD and status text output
 
-Nicht gewuenscht ist, neue Events wieder ueber mehrere neue `if (eventType === ...)`-Verzweigungen im Hauptcode zu verteilen.
+Avoid reintroducing event logic through scattered `if (eventType === ...)` branches in core orchestration.
 
-## Invarianten
+## Invariants
 
-Solange dieses Modell gilt, sollten folgende Aussagen wahr bleiben:
+While this model applies, these statements should remain true:
 
-- Phasenwechsel laufen immer ueber gemeinsame Helfer
-- Event-spezifischer Runtime-State lebt nur in `specialEventState.runtime`
-- UI, Generator und Spawn-System lesen Event-Effekte ueber gemeinsame Zugriffspunkte
-- neue Events duerfen bestehende Events nicht durch Copy-Paste ganzer Ablaufbloecke erweitern
-- Event-Typen duerfen unterschiedliche Regeln haben, aber denselben Lebenszyklus teilen
+- phase transitions always go through shared helpers
+- event-specific runtime state lives only in `specialEventState.runtime`
+- UI, generator, and spawn systems read event effects through shared access points
+- new events must not extend behavior by copying full lifecycle blocks
+- event types may differ in rules, but should share one lifecycle contract

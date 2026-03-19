@@ -1,74 +1,74 @@
 # Pickup Model
 
-Dieses Dokument beschreibt das aktuelle Pickup-System von `Red Dune Dash`.
+This document describes the current pickup system in `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-Pickups sollen nicht mehr nur "sichtbare Gems mit Geld-Effekt" sein. Stattdessen bekommt jeder Pickup-Typ eine eigene fachliche Definition mit:
+Pickups should not only be "visible gems with currency effect". Each pickup type should have an explicit gameplay definition with:
 
-- Spawnregeln
-- Telegraphing
-- Render-Metadaten
-- Gameplay-Effekt
-- HUD-Ziel fuer Fly-to-Feedback
+- spawn rules
+- telegraphing
+- render metadata
+- gameplay effect
+- HUD target for fly-to feedback
 
-## Aktuelle Struktur
+## Current Structure
 
-Die Pickup-Logik liegt in `systems/pickup-system.js`.
+Pickup logic lives in `systems/pickup-system.js`.
 
-Das System stellt zwei Ebenen bereit:
+The system exposes two layers:
 
-- `createPickupDefinitions(config)` fuer die inhaltlichen Typdefinitionen eines Runs
-- `createPickupSystem(definitions)` fuer die Runtime-Helfer zum Erzeugen, Platzieren, Rendern und Anwenden
+- `createPickupDefinitions(config)` for run-specific type definitions
+- `createPickupSystem(definitions)` for runtime helpers that spawn, place, render, and apply effects
 
-## Aktuelle Pickup-Typen
+## Current Pickup Types
 
 ### `currency`
 
-- darf auf Plattformen spawnen
-- nutzt sichere Pickup-Zonen
-- bringt Moneten und Aktionspunkte
-- sendet HUD-Feedback an Moneten und Score
+- can spawn on platforms
+- uses safe pickup zones
+- grants coin currency and action score
+- sends HUD feedback to currency and score
 
 ### `extra-life`
 
-- wird aktuell ueber Raketen eingesammelt
-- erhoeht `player.lives`
-- bringt zusaetzliche Aktionspunkte
-- ist als eigener Pickup-Effekt modelliert statt als Sonderfall im Kollisionscode
+- currently collected through rockets
+- increases `player.lives`
+- grants additional action score
+- is modeled as a dedicated pickup effect, not as a collision-loop special case
 
-### Vorbereitete Erweiterungspunkte
+### Prepared Extension Slots
 
-Diese Typen sind bereits als Definitionsplaetze vorbereitet, auch wenn ihre Spawnlogik aktuell noch deaktiviert ist:
+The following definition slots are already prepared, even though their spawn logic is currently disabled:
 
 - `backlog-revival`
 - `score-boost`
 - `temporary-shield`
 - `event-trigger`
 
-## Wichtige Trennung
+## Important Separation
 
-Ein Pickup-Entity ist absichtlich nur ein leichtes Runtime-Objekt. Der fachliche Effekt steckt in seiner Typdefinition und nicht im Weltobjekt selbst.
+A pickup entity is intentionally a lightweight runtime object. Gameplay meaning and effect live in its type definition, not in the entity itself.
 
-Das bedeutet:
+This means:
 
-- Kollisionen sammeln nur "Pickup X vom Typ Y" ein
-- der eigentliche Effekt wird ueber `pickupSystem.applyEffect(...)` ausgefuehrt
-- neue Pickup-Typen brauchen keinen neuen Sonderfall direkt in der Kollisionsschleife
+- collisions only collect "pickup X of type Y"
+- the gameplay effect is applied through `pickupSystem.applyEffect(...)`
+- new pickup types do not require collision-loop special cases
 
-## Anschluss fuer spaetere Features
+## Future Feature Integration
 
-### Backlog-Pickups
+### Backlog Pickups
 
-Ein spaeteres Pickup, das alte Bugs zurueckholt, sollte den Bug-Lebenszyklus ansprechen und nicht einfach alte Welt-Entities wieder sichtbar machen.
+A future pickup that revives old bugs should interact with the bug lifecycle model instead of resurrecting old world entities directly.
 
-### Refactoring- oder Event-Pickups
+### Refactoring Or Event Pickups
 
-Ein Event-ausloesendes Pickup sollte nicht Rendering oder Generator direkt manipulieren, sondern ueber klar benannte Hooks ins Event-System wirken.
+An event-triggering pickup should not mutate rendering or generator logic directly. It should use explicit hooks into the event system.
 
-## Invarianten
+## Invariants
 
-- `level.pickups` enthaelt nur aktive Runtime-Entities im aktuellen Run
-- Pickup-Typen definieren ihren Effekt selbst
-- Spawnregeln und Effekte duerfen sich zwischen Pickup-Typen unterscheiden
-- neue Pickup-Arten sollen ohne Kopie der bisherigen `currency`-Logik hinzufuegbar sein
+- `level.pickups` contains only active runtime entities in the current run
+- pickup types define their own effects
+- spawn rules and effects may differ per pickup type
+- new pickup families should be addable without copying current `currency` logic
