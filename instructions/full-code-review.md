@@ -58,7 +58,7 @@ This file must be understandable on its own and must serve as the actionable bac
 
 ### Requirements for `todo.md`
 
-- Record planning model metadata for the review backlog. If the runtime exposes the exact model name, write that exact name. If not, ask the developer for the model name and wait for clarification instead of recording a fallback value.
+- Record planning model metadata for the review backlog. If the runtime exposes the exact model name, write that exact name. If not, record `runtime-model-hidden` and add a short note that the runtime did not expose an exact model identifier.
 - Use clear TODO items with explicit priorities.
 - Explain each issue well enough that it is still understandable later.
 - Make the backlog incremental so items can be solved one by one.
@@ -79,7 +79,7 @@ Use these priorities consistently:
 
 Each TODO should contain:
 
-- execution model metadata for the agent or model that completed the TODO. If the exact model name is unavailable, ask the developer for clarification instead of recording a fallback or guessing.
+- execution model metadata for the agent or model that completed the TODO. If the exact model name is unavailable, record `runtime-model-hidden` and note that the runtime did not expose an exact model identifier.
 - priority
 - concise title
 - problem description
@@ -136,7 +136,7 @@ Do not push unless the developer explicitly asks for it.
 - Evaluate the project against the full review scope listed above.
 - Produce a fresh root-level `todo.md` containing the complete prioritized result.
 - Record the current baseline status of relevant checks in `todo.md`, such as tests, build, linting, type checks, and pipeline health, including what passes, what fails, what is missing, and what could not be run.
-- Record which model produced the initial review backlog. If the exact model name is not exposed by the runtime, ask the developer for it instead of inventing a fallback.
+- Record which model produced the initial review backlog. If the exact model name is not exposed by the runtime, use `runtime-model-hidden` and note that the runtime did not expose an exact model identifier.
 
 ### 2. Create a local commit for the review backlog
 
@@ -161,7 +161,7 @@ Rules:
 - Implement the fix completely enough that the item can genuinely be considered done.
 - Verify the change with appropriate checks before committing.
 - Update `todo.md` so the current status remains accurate and understandable.
-- Record which model executed each completed TODO. If the runtime does not expose the exact model name, ask the developer for clarification and use that answer consistently.
+- Record which model executed each completed TODO. If the runtime does not expose the exact model name, use `runtime-model-hidden` and note that the runtime did not expose an exact model identifier.
 - If new problems are discovered while implementing a TODO, add them to `todo.md` with the correct priority instead of silently folding them into an unrelated item.
 - Reprioritize the remaining TODOs when newly discovered issues are more urgent than the current backlog order.
 - Create a new local git commit after finishing each TODO.

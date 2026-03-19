@@ -2,11 +2,11 @@
 workflow_type: backlog-item
 source: review-findings-2026-03-18
 priority: 3
-status: open
+status: done
 planning_model: GPT-5.4
-execution_model: GPT-5.4
+execution_model: GPT-5.3-Codex
 created_at: 2026-03-18
-last_updated: 2026-03-18
+last_updated: 2026-03-19
 ---
 
 # TODO: Unblock Full Code Review Workflow When Model Name Is Hidden
@@ -43,3 +43,5 @@ Make the canonical full-review workflow executable even in runtimes that do not 
 
 - This addresses a workflow blocker, not a product feature gap.
 - Prefer one canonical fallback rule rather than duplicating exceptions across multiple instruction files.
+- Implemented by defining `runtime-model-hidden` as the canonical non-blocking fallback in `instructions/full-code-review.md`.
+- Updated `templates/todo-full-code-review-template.md` so generated review backlogs follow the same fallback without waiting for manual clarification.
