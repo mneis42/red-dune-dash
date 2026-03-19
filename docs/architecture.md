@@ -1,145 +1,145 @@
 # Architecture
 
-Dieses Dokument beschreibt den aktuellen Systemschnitt von `Red Dune Dash`.
+This document describes the current system split in `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-`game-endless.js` ist nicht mehr die einzige Heimat aller Spielregeln. Zentrale Fachsysteme liegen jetzt in eigenen Dateien und werden vom Hauptfile nur noch verdrahtet und genutzt.
+`game-endless.js` is no longer the only location for gameplay rules. Core domain systems now live in dedicated files and are consumed by the main file through orchestration.
 
-Das reduziert Kopplung fuer kuenftige Features wie:
+This reduces coupling for future features such as:
 
-- neue Pickup-Typen
-- neue Event-Arten
-- Backlog-Mechaniken
-- weitere Spawn- und Fairness-Regeln
+- new pickup types
+- new event types
+- backlog mechanics
+- additional spawn and fairness rules
 
-## Aktuelle Systeme
+## Current Systems
 
 ### `systems/game-state.js`
 
-Zustaendig fuer die Grundstruktur der Run-State-Objekte:
+Responsible for the base shape of run-state objects:
 
 - `level`
 - `player`
 - `runState`
 
-Nutzen:
+Benefit:
 
-- Startzustand und Reset-Struktur liegen nicht mehr als anonyme Literale im Hauptfile
-- State-Grenzen sind expliziter
+- startup and reset structures no longer live only as anonymous literals in the main file
+- state boundaries are explicit
 
 ### `systems/bug-lifecycle-system.js`
 
-Zustaendig fuer den fachlichen Bug-Lebenszyklus:
+Responsible for domain bug lifecycle behavior:
 
-- Statuswerte
-- Lifecycle-Ledger
-- Reset
-- Registrierung
-- Statuswechsel
-- aggregierte Counts
+- status values
+- lifecycle ledger
+- reset
+- registration
+- status transitions
+- aggregate counters
 
-Nutzen:
+Benefit:
 
-- Bug-Historie ist ein eigenes System
-- HUD, Cleanup und kuenftige Backlog-Effekte greifen auf dieselbe Quelle zu
+- bug history is a dedicated system
+- HUD, cleanup, and future backlog effects use the same source
 
 ### `systems/placement-system.js`
 
-Zustaendig fuer Safe-Zones und Platzierungsregeln:
+Responsible for safe zones and placement rules:
 
-- Plattform-Placement-Range
-- Blocker-Intervalle
-- Hazard-/Bug-Lane-Pruefungen
-- Safe-Zones
-- Auswahl der naechsten sicheren X-Position
+- platform placement ranges
+- blocked intervals
+- hazard and bug lane checks
+- safe zones
+- nearest valid safe X-position selection
 
-Nutzen:
+Benefit:
 
-- Platzierungslogik fuer Pickups, Checkpoints und Hurt-Posen lebt nicht mehr als verteilte Mathematik im Hauptfile
+- placement logic for pickups, checkpoints, and hurt poses no longer exists as scattered math in the main file
 
 ### `systems/pickup-system.js`
 
-Zustaendig fuer typisierte Pickups und ihre fachlichen Regeln:
+Responsible for typed pickups and their domain rules:
 
-- Pickup-Typen
-- Pickup-Definitionen
-- Plattform-Spawnregeln
-- Telegraphing-Dauern
-- Render-Metadaten
-- Pickup-Effekte
+- pickup types
+- pickup definitions
+- platform spawn rules
+- telegraphing durations
+- render metadata
+- pickup effects
 
-Nutzen:
+Benefit:
 
-- Pickups sind nicht mehr implizit "Euro-Symbole"
-- neue Pickup-Arten koennen ueber Definitionen und Effekthooks hinzukommen
-- Kollisionscode im Hauptfile muss den fachlichen Effekt nicht selbst kennen
+- pickups are not implicitly "coin symbols"
+- new pickup families can be introduced through definitions and effect hooks
+- collision code does not need to know domain effect internals
 
 ### `systems/debug-tools.js`
 
-Zustaendig fuer die Entwicklungs- und Balancing-Konfiguration:
+Responsible for development and balancing configuration:
 
-- Query-Parameter fuer Debug-Runs
-- Spawn-Multiplikatoren
-- Startwerte fuer Ressourcen und Backlog
-- Hilfsfunktionen fuer Spawn-Chancen und Delays
+- query-parameter debug runs
+- spawn multipliers
+- start values for resources and backlog
+- helper functions for spawn probability and delay handling
 
-Nutzen:
+Benefit:
 
-- Debug-Einstellungen bleiben aus der eigentlichen Spiellogik herausloesbar
-- Balancing-Tools sind zentral dokumentierbar und testbar
-- kuenftige Debug-Shortcuts oder Content-Werkzeuge koennen auf derselben Konfiguration aufbauen
+- debug settings stay separable from gameplay logic
+- balancing tools are centrally documented and testable
+- future debug shortcuts and content tools can reuse the same configuration model
 
 ### `systems/simulation-core.js`
 
-Zustaendig fuer browserfreie Kernregeln und deterministische Balancing-Logik:
+Responsible for browser-free core rules and deterministic balancing logic:
 
-- Score- und Fortschrittsregeln
-- Balance-Multiplikatoren
-- Einkommens-Spawn-Regeln
-- deterministische Zufallshelfer
+- score and progression rules
+- balance multipliers
+- income spawn rules
+- deterministic random helpers
 
-Nutzen:
+Benefit:
 
-- zentrale Regeln sind ohne Canvas und DOM pruefbar
-- Balancing-Aenderungen koennen ueber Node-Tests abgesichert werden
+- core rules are testable without canvas or DOM
+- balancing changes can be protected by Node-based tests
 
 ### `systems/special-event-system.js`
 
-Zustaendig fuer Event-Lebenszyklus und Event-Definitionen:
+Responsible for event lifecycle and event definitions:
 
-- Phasenmodell
-- Scheduler
-- Event-Definitionen
-- Runtime-State
-- Statusmeldungen
-- Event-Effekte fuer Chunk-Regeln und Spawn-Multiplikatoren
+- phase model
+- scheduler
+- event definitions
+- runtime state
+- status messages
+- event effects for chunk rules and spawn multipliers
 
-Nutzen:
+Benefit:
 
-- Events sind als eigenes Fachsystem modelliert
-- `game-endless.js` konsumiert eine Event-API statt Event-Regeln selbst zu definieren
+- events are modeled as a dedicated system
+- `game-endless.js` consumes an event API instead of defining event behavior inline
 
-## Rolle von `game-endless.js`
+## Role Of `game-endless.js`
 
-`game-endless.js` bleibt aktuell die Orchestrierungsdatei fuer:
+`game-endless.js` remains the orchestration layer for:
 
-- Browser- und Canvas-Setup
-- Eingabe
-- Welt-Simulation
-- Generator-Ablauf
-- Rendering
-- HUD-Zeichnung
-- PWA-UI-Verhalten
+- browser and canvas setup
+- input handling
+- world simulation
+- generation flow
+- rendering
+- HUD drawing
+- PWA UI behavior
 
-Wichtig ist aber:
+Important direction:
 
-- zentrale Fachlogik liegt nicht mehr nur dort
-- neue Features koennen gezielt in benennbaren Systemen landen
+- central domain rules no longer live only here
+- new features can be placed into explicit named systems
 
-## Zentrale Referenzdokumente
+## Core Reference Documents
 
-Die wichtigsten fachlichen und architektonischen Entscheidungen sind aktuell in folgenden Dokumenten festgehalten:
+The most relevant domain and architecture decisions are currently documented in:
 
 - `docs/run-model.md`
 - `docs/bug-lifecycle.md`
@@ -152,21 +152,21 @@ Die wichtigsten fachlichen und architektonischen Entscheidungen sind aktuell in 
 - `docs/debug-tools.md`
 - `docs/asset-manifest.md`
 
-Damit gilt:
+Therefore:
 
-- `architecture.md` beschreibt vor allem den Systemschnitt
-- die einzelnen Fachdokumente beschreiben Regeln, Invarianten und Erweiterungspunkte pro Themenbereich
+- `architecture.md` focuses primarily on system boundaries
+- each domain-specific doc defines rules, invariants, and extension points for its scope
 
-## Systemgrenzen fuer kommende Arbeiten
+## System Boundaries For Upcoming Work
 
-Die naechsten groesseren Kandidaten fuer weitere Schnitte sind:
+Likely next candidates for additional separation:
 
-- Rendering-/HUD-System
-- Input-System
-- PWA-/Install-/Update-System
+- rendering and HUD system
+- input system
+- PWA install and update system
 
-## Invarianten
+## Invariants
 
-- Fachliche Regeln sollen bevorzugt in benennbaren Systemdateien landen
-- `game-endless.js` soll Orchestrierung eher zusammenfuehren als Regeldefinitionen zu duplizieren
-- neue Spielmechaniken sollen zuerst einem bestehenden System zugeordnet oder als neues System eingefuehrt werden
+- domain rules should prefer named system files
+- `game-endless.js` should orchestrate rather than duplicate rule definitions
+- new gameplay mechanics should first map to an existing system or introduce a new explicit system

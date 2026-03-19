@@ -40,6 +40,9 @@ jobs:
       - name: Lint instruction links and headings
         run: npm run instruction:lint
 
+      - name: Lint technical docs language policy
+        run: npm run docs:language:lint
+
       - name: Lint backlog templates
         run: npm run backlog:lint
 

@@ -93,6 +93,12 @@ To run the full local verification flow:
 npm run verify
 ```
 
+To enforce the technical documentation language policy directly:
+
+```powershell
+npm run docs:language:lint
+```
+
 If you want to run the suites individually, you can also use:
 
 ```powershell
@@ -143,6 +149,7 @@ Core workflow verification in CI now runs as an OS matrix on Linux, macOS, and W
 - `npm run check`
 - `npm test`
 - `npm run instruction:lint`
+- `npm run docs:language:lint`
 - `npm run backlog:lint`
 
 Deployment remains Linux-only by design, and the advisory hint step is kept as a non-blocking Linux job.

@@ -1,19 +1,19 @@
 # Bug Lifecycle
 
-Dieses Dokument definiert den aktuellen Bug-Lebenszyklus im Spiel und die Uebergangspunkte fuer spaetere Backlog- und Reaktivierungsmechaniken.
+This document defines the current bug lifecycle model and transition points for future backlog and reactivation mechanics.
 
-## Ziel
+## Goal
 
-Bugs sollen nicht nur als Welt-Entities oder als zwei lose Counter existieren. Stattdessen gibt es ein eigenes Lebenszyklusmodell, das fachlich zwischen verschiedenen Zustanden unterscheiden kann.
+Bugs should not exist only as temporary world entities or as two loose counters. The game keeps an explicit lifecycle model that can distinguish meaningful state transitions.
 
-Das ist wichtig fuer:
+This matters for:
 
-- HUD-Semantik
-- Score- und Balance-Regeln
-- spaetere Backlog-Mechaniken
-- kuenftige Event-Effekte wie `refactoring`
+- HUD semantics
+- scoring and balance rules
+- future backlog mechanics
+- future event effects such as `refactoring`
 
-## Aktuelle Statuswerte
+## Current Status Values
 
 - `active-world`
 - `missed`
@@ -21,55 +21,55 @@ Das ist wichtig fuer:
 - `resolved`
 - `reactivated`
 
-## Bedeutung der Statuswerte
+## Meaning Of Each Status
 
 ### `active-world`
 
-Der Bug existiert aktuell als aktive Welt-Entity und kann:
+The bug currently exists as an active world entity and can:
 
-- den Spieler treffen
-- besiegt werden
-- spaeter aus der Welt fallen oder hinter dem Kamera-Cutoff verschwinden
+- hit the player
+- be defeated
+- later leave the active world area and be removed by cleanup
 
 ### `missed`
 
-Der Bug wurde im Run erzeugt, aber nicht geloest und ist nicht mehr als aktive Welt-Entity vorhanden.
+The bug was spawned during the run but was not resolved and is no longer present as an active world entity.
 
-Heute entsteht dieser Status vor allem dann, wenn ein lebender Bug den aktiven Weltbereich verlaesst und durch Cleanup entfernt wird.
+Today this mostly happens when a living bug leaves the active world range and cleanup removes the entity.
 
 ### `backlog`
 
-Reservierter Zukunftsstatus fuer Bugs, die explizit in einen spielsystemischen Backlog ueberfuehrt wurden.
+Reserved future status for bugs that are explicitly moved into a gameplay backlog system.
 
-Aktuell ist dieser Status technisch vorbereitet, aber noch nicht Teil des laufenden Gameplays.
+The status is technically prepared but not yet part of normal gameplay.
 
 ### `resolved`
 
-Der Bug wurde im Run erfolgreich geloest, typischerweise durch Besiegen.
+The bug was successfully resolved during the run, typically by defeating it.
 
 ### `reactivated`
 
-Reservierter Zukunftsstatus fuer Bugs, die aus dem Backlog oder aus einer anderen Historie wieder aktiv gemacht wurden.
+Reserved future status for bugs made active again from backlog or other historical state.
 
-Aktuell ist dieser Status technisch vorbereitet, aber noch nicht Teil des laufenden Gameplays.
+The status is technically prepared but not yet part of normal gameplay.
 
-## Aktuelle Uebergaenge
+## Current Transitions
 
-Heute sind folgende Uebergaenge aktiv:
+Currently active transitions:
 
-- Spawn -> `active-world`
+- spawn -> `active-world`
 - `active-world` -> `resolved`
 - `active-world` -> `missed`
 
-Heute noch nicht aktiv, aber vorgesehen:
+Planned but not yet active:
 
 - `missed` -> `backlog`
 - `backlog` -> `reactivated`
 - `reactivated` -> `resolved`
 
-## Aktuelles Ledger
+## Current Ledger
 
-Das Spiel berechnet aus dem Lebenszyklus ein Bug-Ledger mit:
+The game derives a bug ledger from lifecycle data with:
 
 - `spawnedInRun`
 - `resolvedInRun`
@@ -79,29 +79,29 @@ Das Spiel berechnet aus dem Lebenszyklus ein Bug-Ledger mit:
 - `backlog`
 - `reactivatedInRun`
 
-Wichtig:
+Important semantics:
 
-- `openInRun` meint alle im Run noch ungelosten Bugs
-- `openInRun` ist nicht nur "aktuell sichtbare Gegner"
-- `openInRun` ist auch nicht automatisch dasselbe wie ein spaeterer Backlog
+- `openInRun` means unresolved bugs in the current run
+- `openInRun` is not only "currently visible enemies"
+- `openInRun` is not automatically the same as a future long-term backlog
 
-## Design-Regeln fuer kuenftige Features
+## Design Rules For Future Features
 
-### Backlog-Gems
+### Backlog Gems
 
-Ein spaeteres Gem, das alte Bugs zurueckholt, sollte nicht direkt tote oder entfernte Welt-Entities wiederbeleben. Stattdessen sollte es auf Bug-Records mit Status `backlog` oder `missed` arbeiten.
+A future gem that revives old bugs should not resurrect removed world entities directly. It should operate on bug records with status `backlog` or `missed`.
 
-### Refactoring-Events
+### Refactoring Events
 
-Ein `refactoring`-Event sollte bevorzugt auf Bug-Status arbeiten und nicht auf die aktuell sichtbare Welt beschraenkt sein. Damit kann ein solches Event spaeter glaubwuerdig mehrere alte Bugs auf einmal bereinigen.
+A `refactoring` event should primarily operate on lifecycle status, not only on currently visible world entities. This enables credible cleanup of multiple historical bugs.
 
-### HUD-Semantik
+### HUD Semantics
 
-Solange kein echtes Backlog-Gameplay aktiv ist, meint "Offene Bugs" im HUD weiterhin offene Bugs des aktuellen Runs. Wenn spaeter ein eigener Backlog sichtbar wird, sollte er bewusst getrennt angezeigt werden.
+Until dedicated backlog gameplay exists, "Open Bugs" in the HUD refers to unresolved bugs in the current run. If a dedicated backlog is introduced later, it should be shown separately and explicitly.
 
-## Invarianten
+## Invariants
 
-- Jeder Welt-Bug bekommt einen stabilen Lifecycle-Eintrag.
-- Welt-Entities sind nicht die Quelle der Wahrheit fuer die Bug-Historie.
-- Cleanup darf Welt-Bugs entfernen, ohne den fachlichen Bug-Zustand zu verlieren.
-- `resolved` und `missed` bleiben im Ledger erhalten, auch wenn keine Entity mehr existiert.
+- every world bug receives a stable lifecycle entry
+- world entities are not the source of truth for bug history
+- cleanup may remove world entities without losing lifecycle state
+- `resolved` and `missed` remain in the ledger even after entities are gone

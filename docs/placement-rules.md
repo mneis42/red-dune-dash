@@ -1,110 +1,110 @@
 # Placement Rules
 
-Dieses Dokument beschreibt die aktuellen Fairness- und Sicherheitsregeln fuer Platzierung, Kollision und sichere Spielerpositionen in `Red Dune Dash`.
+This document describes current fairness and safety rules for placement, collisions, and safe player positions in `Red Dune Dash`.
 
-## Ziel
+## Goal
 
-Mehrere Systeme brauchen dieselbe Grundidee:
+Multiple systems need the same core model:
 
-- Pickups sollen sichtbar und fair erreichbar platziert werden.
-- Checkpoints sollen keine Todes-Schleifen erzeugen.
-- Hurt- und Respawn-Posen sollen nicht direkt in Hazards oder lebende Bugs gesetzt werden.
+- pickups should spawn in visible, fair, reachable positions
+- checkpoints should not create death loops
+- hurt and respawn poses should not place players directly inside hazards or living bugs
 
-Statt diese Mathematik mehrfach leicht unterschiedlich im Code zu verteilen, arbeitet das Spiel jetzt mit gemeinsamen horizontalen Safe-Zones auf Plattformen.
+Instead of duplicating similar placement math across systems, the game uses shared horizontal platform safe zones.
 
-## Grundmodell
+## Core Model
 
-Jede Platzierungsregel arbeitet in drei Schritten:
+Each placement rule follows three steps:
 
-1. nutzbare Plattform-Range bestimmen
-2. Blocker-Intervalle davon abziehen
-3. die naechste gueltige Zielposition innerhalb der uebrigen Safe-Zones waehlen
+1. determine usable platform range
+2. subtract blocked intervals
+3. choose the nearest valid target position in the remaining safe zones
 
-Wichtige Begriffe:
+Key terms:
 
-- `Placement Range`: horizontaler Bereich auf einer Plattform nach Edge-Padding
-- `Blocked Interval`: Bereich, der wegen Hazard, Bug oder anderer Fairness-Regel gesperrt ist
-- `Safe Zone`: verbleibender gueltiger Bereich nach Abzug aller Blocker
+- `Placement Range`: horizontal platform range after edge padding
+- `Blocked Interval`: excluded range caused by hazard, bug, or another fairness rule
+- `Safe Zone`: remaining valid range after all blocked intervals are removed
 
-## Aktuelle Garantien
+## Current Guarantees
 
-### Collectibles auf Plattformen
+### Collectibles On Platforms
 
-Gems werden als punktfoermige Platzierungen behandelt:
+Gems are treated as point placements:
 
-- sie bekommen seitliches Edge-Padding zur Plattformkante
-- eingelassene Hazards auf derselben Plattform-Lane schneiden Safe-Zones aus
-- wenn keine ausreichend breite Safe-Zone mehr bleibt, wird kein Gem platziert
+- side edge padding is applied
+- embedded hazards on the same platform lane carve safe zones
+- if no sufficiently wide safe zone remains, no gem is placed
 
-Wichtige Folge:
+Important consequence:
 
-- ein Hazard auf der Plattform macht die Platzierung nicht automatisch unmoeglich
-- nur die tatsaechlich blockierten Teilbereiche werden ausgeschnitten
+- a hazard on a platform does not automatically block all placement
+- only actually blocked sub-ranges are removed
 
-### Checkpoints auf Ground-Plattformen
+### Checkpoints On Ground Platforms
 
-Checkpoints werden als sichere Spielerpositionen behandelt:
+Checkpoints are treated as safe player positions:
 
-- die Spielerbreite wird in die Safe-Zone-Berechnung einbezogen
-- Floor-Hazards auf derselben Lauf-Lane sperren die entsprechenden Intervalle
-- die bevorzugte Position bleibt die aktuelle Spielernaehe, aber nur innerhalb gueltiger Safe-Zones
+- player width is included in safe-zone calculations
+- floor hazards on the same player lane block relevant intervals
+- preferred position remains player-near, but only inside valid safe zones
 
-Ziel:
+Goal:
 
-- kein Respawn direkt auf oder zu nah an Hazards
-- moeglichst wenig "Springen" des Checkpoints zu unnatuerlichen Stellen
+- no respawn directly on or too close to hazards
+- minimal unnatural checkpoint jumps
 
-### Hurt- und Respawn-Posen
+### Hurt And Respawn Poses
 
-Sichere Hurt-Posen bauen auf denselben Plattform-Safe-Zones auf wie Checkpoints, aber mit mehr Blockern:
+Safe hurt poses reuse platform safe-zone logic from checkpoints, but with more blockers:
 
-- Floor-Hazards auf derselben Lauf-Lane
-- lebende Bugs auf derselben Lauf-Lane
+- floor hazards on the same player lane
+- living bugs on the same player lane
 
-Damit gilt:
+Result:
 
-- ein Treffer friert die Figur moeglichst nahe am Impact-Punkt ein
-- gleichzeitig wird verhindert, dass die Pose direkt in einem Folge-Treffer liegt
+- impacts keep the player as close as possible to the hit point
+- follow-up hits at the same location are actively reduced
 
-## Lane-Regeln
+## Lane Rules
 
-Nicht jeder Hazard oder Bug auf dem Bildschirm blockiert jede Platzierung. Es gibt bewusst getrennte Lane-Pruefungen:
+Not every hazard or bug on screen blocks every placement. Lane checks are intentionally separated:
 
-- Pickup-Lane: eingelassene Hazards direkt auf derselben Plattformoberkante
-- Player-Lane: Hazards auf der Laufebene einer Plattform
-- Bug-Lane: lebende Bugs auf derselben Laufebene einer Plattform
+- pickup lane: embedded hazards on the same platform top
+- player lane: hazards on the platform run lane
+- bug lane: living bugs on the platform run lane
 
-Diese Trennung ist wichtig, damit kuenftige Pickup-Typen eigene Regeln bekommen koennen, ohne dieselbe Kollisionsmathematik zu kopieren.
+This separation is important so future pickup types can add lane-specific rules without duplicating collision math.
 
-## Generator-Fairness
+## Generator Fairness
 
-Der Weltgenerator nutzt weiterhin zusaetzliche Fairness-Pruefungen fuer Plattformen:
+World generation still applies additional platform-level fairness checks:
 
-- keine Plattform-Ueberlappung
-- genug Unterlauf-Freiraum
-- mindestens ein plausibler Zugang
-- optionale Inhalte duerfen fehlschlagen, ohne den Chunk ungueltig zu machen
+- no platform overlap
+- enough underpass clearance
+- at least one plausible approach
+- optional content may fail without invalidating the chunk
 
-Diese Regeln ergaenzen die Safe-Zones, ersetzen sie aber nicht.
+These checks complement safe-zone logic; they do not replace it.
 
-## Erweiterungspunkte
+## Extension Points
 
-Neue Pickup-Typen sollten auf demselben Modell aufbauen:
+New pickup families should build on the same model:
 
-- eigener Edge-Padding-Bedarf
-- eigene Mindestbreite fuer Safe-Zones
-- eigene Blocker-Typen
-- eigene Lane-Semantik
+- custom edge-padding needs
+- custom minimum safe-zone width
+- custom blocker types
+- custom lane semantics
 
-Beispiele:
+Examples:
 
-- ein seltenes Event-Item koennte groessere Safe-Zones verlangen
-- ein Backlog-Gem koennte auf Plattformen mit aktivem Bug absichtlich nicht spawnbar sein
-- ein Shield-Pickup koennte naeher an Hazards erlaubt sein als ein Geld-Gem
+- a rare event item may require wider safe zones
+- a backlog gem may intentionally avoid platforms with active bugs
+- a shield pickup may allow tighter hazard proximity than a currency gem
 
-## Invarianten
+## Invariants
 
-- Platzierung arbeitet ueber ausdrueckliche Safe-Zones statt ueber verstreute Sonderfaelle
-- Hazards blockieren nur die Lanes, fuer die sie fachlich relevant sind
-- Checkpoints und Hurt-Posen behandeln die Spielerbreite als Teil der Sicherheitsregel
-- wenn keine sichere Zone existiert, wird die Platzierung ausgelassen statt implizit erzwungen
+- placement relies on explicit safe zones instead of scattered special cases
+- hazards block only the lanes where they are semantically relevant
+- checkpoints and hurt poses include player width as a safety constraint
+- if no safe zone exists, placement is skipped instead of implicitly forced
