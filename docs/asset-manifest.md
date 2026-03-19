@@ -54,3 +54,9 @@ Nicht gewuenscht ist, dieselbe Datei direkt an mehreren Stellen getrennt nachzut
 - Service Worker und Spiel nutzen dieselbe Sprite-Quelle
 - alle zentral registrierten Assets landen in der Offline-Cache-Liste
 - Kern-Dateien der App sind im Service Worker explizit als `network-first` modelliert
+
+## Path-Handling Contract
+
+`networkFirstPaths` stays rooted (for example `/version.json`), while the service worker normalizes incoming same-origin request paths against its active registration scope.
+
+This keeps a single manifest contract valid for both local root hosting (`/`) and GitHub Pages project subpaths (for example `/red-dune-dash/`) without duplicating every path variant.

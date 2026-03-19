@@ -1,9 +1,9 @@
 const assert = require("node:assert/strict");
 
-// Minimal SW-ähnliches Globalobjekt bereitstellen, damit service-worker.js
-// importiert werden kann, ohne echte Browser-APIs zu benötigen.
+// Minimal SW-like globals so service-worker.js can run without browser APIs.
 const listeners = {};
 const fakeCaches = new Map();
+const fetchCalls = [];
 
 globalThis.self = {
   addEventListener(type, listener) {
@@ -12,6 +12,9 @@ globalThis.self = {
   skipWaiting() {},
   clients: {
     claim() {},
+  },
+  registration: {
+    scope: "https://example.com/red-dune-dash/",
   },
   location: {
     origin: "https://example.com",
@@ -46,15 +49,17 @@ globalThis.caches = {
   },
 };
 
-// Dummy fetch, wird in diesen Smoke-Tests nicht als echter Netzwerkpfad verwendet.
-globalThis.fetch = async (request) => ({
+globalThis.fetch = async (request, options) => {
+  fetchCalls.push({ request, options });
+  return {
   status: 200,
   type: "basic",
   url: typeof request === "string" ? request : request.url,
   clone() {
     return this;
   },
-});
+  };
+};
 
 globalThis.importScripts = (...urls) => {
   urls.forEach((url) => {
@@ -76,6 +81,25 @@ const tests = [];
 
 function test(name, fn) {
   tests.push({ name, fn });
+}
+
+function createEvent(url, options = {}) {
+  const { method = "GET", mode = "same-origin" } = options;
+  const responds = [];
+
+  return {
+    responds,
+    event: {
+      request: {
+        method,
+        mode,
+        url,
+      },
+      respondWith(promise) {
+        responds.push(promise);
+      },
+    },
+  };
 }
 
 test("service worker precaches all app shell assets", async () => {
@@ -104,37 +128,51 @@ test("service worker exposes fetch listener for same-origin GET requests", () =>
   const fetchListener = listeners["fetch"];
   assert.ok(typeof fetchListener === "function");
 
-  const requests = [];
-  const responds = [];
-
-  function makeEvent(url, options = {}) {
-    const { method = "GET", mode = "same-origin" } = options;
-    return {
-      request: {
-        method,
-        mode,
-        url,
-      },
-      respondWith(promise) {
-        responds.push(promise);
-      },
-    };
-  }
-
   const coreUrl = "https://example.com/index.html";
-  const coreEvent = makeEvent(coreUrl, { method: "GET", mode: "navigate" });
-  fetchListener(coreEvent);
-  assert.equal(responds.length > 0, true);
+  const navigateRequest = createEvent(coreUrl, { method: "GET", mode: "navigate" });
+  fetchListener(navigateRequest.event);
+  assert.equal(navigateRequest.responds.length > 0, true);
 
-  const otherOriginEvent = makeEvent("https://other.example.com/index.html");
-  responds.length = 0;
-  fetchListener(otherOriginEvent);
-  assert.equal(responds.length, 0);
+  const otherOriginRequest = createEvent("https://other.example.com/index.html");
+  fetchListener(otherOriginRequest.event);
+  assert.equal(otherOriginRequest.responds.length, 0);
 
-  const postEvent = makeEvent(coreUrl, { method: "POST" });
-  responds.length = 0;
-  fetchListener(postEvent);
-  assert.equal(responds.length, 0);
+  const postRequest = createEvent(coreUrl, { method: "POST" });
+  fetchListener(postRequest.event);
+  assert.equal(postRequest.responds.length, 0);
+});
+
+test("service worker applies network-first to root and project-subpath core requests", async () => {
+  const fetchListener = listeners["fetch"];
+  assert.ok(typeof fetchListener === "function");
+
+  fetchCalls.length = 0;
+
+  const rootVersionRequest = createEvent("https://example.com/version.json");
+  fetchListener(rootVersionRequest.event);
+  await rootVersionRequest.responds[0];
+
+  const subpathVersionRequest = createEvent("https://example.com/red-dune-dash/version.json");
+  fetchListener(subpathVersionRequest.event);
+  await subpathVersionRequest.responds[0];
+
+  assert.equal(fetchCalls.length >= 2, true);
+  assert.equal(fetchCalls[0].options?.cache, "no-store");
+  assert.equal(fetchCalls[1].options?.cache, "no-store");
+});
+
+test("service worker keeps non-core same-origin assets on stale-while-revalidate", async () => {
+  const fetchListener = listeners["fetch"];
+  assert.ok(typeof fetchListener === "function");
+
+  fetchCalls.length = 0;
+
+  const assetRequest = createEvent("https://example.com/red-dune-dash/assets/run1.png");
+  fetchListener(assetRequest.event);
+  await assetRequest.responds[0];
+
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].options, undefined);
 });
 
 async function runTests() {
