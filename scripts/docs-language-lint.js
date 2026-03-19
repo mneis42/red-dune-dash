@@ -7,7 +7,7 @@ const EXCLUDED_FILES = new Set(["developer-todos.md", "developer-todos.ms"]);
 const EXCLUDED_DIRECTORIES = ["backlog", "reviews", "logs/agent-runs"];
 
 const GERMAN_MARKER_PATTERN =
-  /\b(?:der|die|das|und|oder|nicht|fuer|ist|sind|soll|sollen|wird|werden|mit|ohne|mehr|wenn|diese|dieses|dieser|diesen|aktuell|spaeter|kuenftig|zusaetzlich|bereits|ueber|fuer|dabei)\b/i;
+  /(?:\b(?:der|die|das|und|oder|nicht|fuer|ist|sind|soll|sollen|wird|werden|mit|ohne|mehr|wenn|diese|dieses|dieser|diesen|aktuell|spaeter|kuenftig|zusaetzlich|bereits|ueber|dabei)\b|[A-Za-zäöüÄÖÜß]*[äöüÄÖÜß][A-Za-zäöüÄÖÜß]*)/i;
 
 function toPosix(value) {
   return String(value || "").replaceAll("\\", "/");

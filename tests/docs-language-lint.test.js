@@ -55,6 +55,20 @@ test("reports German markers in technical docs", () => {
   });
 });
 
+test("reports German umlauts in technical docs", () => {
+  withTempRepo(({ root, write }) => {
+    write("README.md", "# Readme\n\nThis file is English.\n");
+    write("CONTRIBUTING.md", "# Contributing\n\nUse English docs.\n");
+    write("AGENTS.md", "# Agents\n\nUse canonical workflows.\n");
+    write("docs/example.md", "# Überblick\n\nDiese Änderung erklärt die Größe des Systems.\n");
+
+    const result = runDocsLanguageLint({ repoRoot: root });
+    assert.equal(result.findings.length > 0, true);
+    assert.equal(result.findings.some((finding) => finding.filePath === "docs/example.md"), true);
+    assert.equal(result.findings.some((finding) => /[äöüßÄÖÜ]/.test(finding.marker)), true);
+  });
+});
+
 test("ignores excluded developer todo files", () => {
   withTempRepo(({ root, write }) => {
     write("README.md", "# Readme\n\nEnglish only.\n");
