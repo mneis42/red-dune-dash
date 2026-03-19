@@ -24,9 +24,48 @@ const NETWORK_FIRST_PATHS = new Set(
   ]
 );
 
+function getScopePathname() {
+  try {
+    const scope = self.registration?.scope;
+    if (!scope) {
+      return "/";
+    }
+
+    const pathname = new URL(scope, self.location.origin).pathname;
+    if (!pathname || pathname === "/") {
+      return "/";
+    }
+
+    return pathname.endsWith("/") ? pathname : `${pathname}/`;
+  } catch {
+    return "/";
+  }
+}
+
+const APP_SCOPE_PATHNAME = getScopePathname();
+
+function normalizePathnameForScope(pathname) {
+  if (APP_SCOPE_PATHNAME === "/") {
+    return pathname;
+  }
+
+  const scopeWithoutTrailingSlash = APP_SCOPE_PATHNAME.slice(0, -1);
+  if (pathname === scopeWithoutTrailingSlash) {
+    return "/";
+  }
+
+  if (!pathname.startsWith(APP_SCOPE_PATHNAME)) {
+    return pathname;
+  }
+
+  const relativePath = pathname.slice(APP_SCOPE_PATHNAME.length);
+  return relativePath ? `/${relativePath}` : "/";
+}
+
 function isCoreAppRequest(requestUrl) {
   const url = new URL(requestUrl);
-  return NETWORK_FIRST_PATHS.has(url.pathname);
+  const normalizedPathname = normalizePathnameForScope(url.pathname);
+  return NETWORK_FIRST_PATHS.has(normalizedPathname);
 }
 
 async function networkFirst(request) {
