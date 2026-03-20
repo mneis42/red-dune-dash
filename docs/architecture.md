@@ -120,6 +120,22 @@ Benefit:
 - events are modeled as a dedicated system
 - `game-endless.js` consumes an event API instead of defining event behavior inline
 
+### `systems/hud-runtime.js`
+
+Responsible for runtime HUD and in-canvas UI behavior:
+
+- HUD stat formatting and tooltip content
+- HUD hit-testing and tooltip state
+- fly-to-HUD effect lifecycle
+- HUD rendering and touch-control rendering
+- active special-event status badge rendering
+
+Benefit:
+
+- runtime HUD behavior is no longer authored only inside the main orchestrator
+- pickups and future runtime UI work can target a named HUD API instead of open-coding canvas details
+- tooltip, badge, and fly-to-HUD behavior share one explicit ownership boundary
+
 ## Role Of `game-endless.js`
 
 `game-endless.js` remains the orchestration layer for:
@@ -129,7 +145,6 @@ Benefit:
 - world simulation
 - generation flow
 - rendering
-- HUD drawing
 - PWA UI behavior
 
 Important direction:

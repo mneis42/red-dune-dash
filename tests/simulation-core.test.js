@@ -8,6 +8,7 @@ require("../systems/simulation-core.js");
 require("../systems/special-event-system.js");
 require("../systems/generator-helpers.js");
 require("../systems/respawn-helpers.js");
+require("../systems/hud-runtime.js");
 
 const simulationCore = globalThis.RedDuneSimulationCore;
 const bugLifecycle = globalThis.RedDuneBugLifecycle;
@@ -17,6 +18,7 @@ const pickups = globalThis.RedDunePickups;
 const specialEvents = globalThis.RedDuneSpecialEvents;
 const generatorHelpers = globalThis.RedDuneGeneratorHelpers;
 const respawnHelpers = globalThis.RedDuneRespawnHelpers;
+const hudRuntimeSystem = globalThis.RedDuneHudRuntime;
 
 const tests = [];
 
@@ -891,6 +893,102 @@ test("respawn helpers detect hazard center-band hits and correctly exclude inact
   });
   assert.equal(helpersBelow.hitsHazardWithPlayerCenter(hazardBelow), false,
     "active hazard with no vertical overlap should not register a hit");
+});
+
+test("hud runtime builds stats from the run model and resolves tooltip hit targets", () => {
+  const hudRuntime = hudRuntimeSystem.createHudRuntime({
+    scoreConfig: {
+      gemPickup: 30,
+      bugDefeat: 120,
+      rocketPickup: 200,
+    },
+  });
+  const bugLedger = hudRuntime.createBugLedger({
+    activeWorld: 2,
+    missed: 1,
+    backlog: 3,
+    resolved: 4,
+    reactivated: 2,
+    totalKnown: 12,
+  });
+  const runModel = hudRuntime.createRunModel({
+    runState: { currencyCents: 1234 },
+    player: { lives: 5 },
+    euroRatePerHour: 77,
+    bugLedger,
+    scoreBreakdown: { action: 210, progress: 55, total: 265 },
+    balanceMultiplier: 1.125,
+  });
+  const stats = hudRuntime.createHudStats({
+    runModel,
+    worldTimeMs: 125_000,
+    canPersistHighScore: true,
+    highScore: 999,
+  });
+
+  assert.equal(stats[0].value, "8");
+  assert.equal(stats[1].value, "12,34 €");
+  assert.equal(stats[2].tooltip[2], "Spieldauer: 02:05");
+  assert.equal(stats[4].tooltip.at(-1), "Highscore: 999");
+  assert.equal(hudRuntime.getHudStatByKey(stats, "lives").value, "5");
+  assert.equal(hudRuntime.getHudInfoHit(stats, { x: 410, y: 12 }).key, "euroRate");
+});
+
+test("hud runtime manages touch controls, tooltip state, and fly-to-HUD effects", () => {
+  const hudRuntime = hudRuntimeSystem.createHudRuntime();
+  const stats = [
+    {
+      key: "gems",
+      target: { x: 244, y: 42 },
+      hitArea: { x: 192, y: 0, w: 192, h: 44 },
+      tooltip: [],
+    },
+  ];
+
+  assert.equal(hudRuntime.getTouchAction({ x: 94, y: 462 }), "left");
+  assert.equal(hudRuntime.getTouchAction({ x: 232, y: 462 }), "right");
+  assert.equal(hudRuntime.getTouchAction({ x: 850, y: 450 }), "jump");
+  assert.equal(hudRuntime.getTouchAction({ x: 500, y: 300 }), "tap");
+
+  assert.equal(hudRuntime.toggleActiveInfo("gems"), "gems");
+  assert.equal(hudRuntime.getActiveInfoKey(), "gems");
+  assert.equal(hudRuntime.toggleActiveInfo("gems"), null);
+  hudRuntime.toggleActiveInfo("gems");
+  hudRuntime.clearActiveInfo();
+  assert.equal(hudRuntime.getActiveInfoKey(), null);
+
+  assert.equal(
+    hudRuntime.spawnHudEffect(320, 180, "€", "gems", {
+      stats,
+      cameraX: 100,
+    }),
+    true
+  );
+  hudRuntime.updateEffects(450);
+  hudRuntime.updateEffects(500);
+
+  const drawOps = [];
+  hudRuntime.drawEffects({
+    save() {},
+    restore() {},
+    strokeText(text, x, y) {
+      drawOps.push({ type: "stroke", text, x, y });
+    },
+    fillText(text, x, y) {
+      drawOps.push({ type: "fill", text, x, y });
+    },
+    set textAlign(value) {},
+    set textBaseline(value) {},
+    set shadowColor(value) {},
+    set shadowBlur(value) {},
+    set shadowOffsetY(value) {},
+    set globalAlpha(value) {},
+    set fillStyle(value) {},
+    set strokeStyle(value) {},
+    set lineWidth(value) {},
+    set font(value) {},
+  });
+  assert.deepEqual(drawOps, []);
 });
 
 let failed = 0;
