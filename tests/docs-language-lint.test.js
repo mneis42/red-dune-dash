@@ -81,6 +81,19 @@ test("ignores excluded developer todo files", () => {
   });
 });
 
+test("ignores historical backlog archives outside the active docs policy", () => {
+  withTempRepo(({ root, write }) => {
+    write("README.md", "# Readme\n\nEnglish only.\n");
+    write("CONTRIBUTING.md", "# Contributing\n\nEnglish only.\n");
+    write("AGENTS.md", "# Agents\n\nEnglish only.\n");
+    write("backlog/done/20260320-archive.md", "# Archiv\n\nDieses historische Dokument bleibt unveraendert.\n");
+
+    const result = runDocsLanguageLint({ repoRoot: root });
+    assert.equal(result.findings.length, 0);
+    assert.equal(result.scannedFiles, 3);
+  });
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {
