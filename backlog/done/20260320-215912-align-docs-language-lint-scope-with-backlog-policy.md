@@ -2,7 +2,7 @@
 workflow_type: backlog-item
 source: review-findings-2026-03-20
 priority: 1
-status: open
+status: done
 planning_model: GPT-5
 execution_model: GPT-5
 created_at: 2026-03-20
