@@ -1,0 +1,27 @@
+date: 2026-03-20
+task_type: other
+short_goal: Package six new browser-testing backlog todos on a branch and open a PR
+changed_files:
+  - backlog/29-todo-add-stable-browser-test-hooks-for-canvas-runtime.md
+  - backlog/30-todo-add-playwright-smoke-tests-for-core-browser-flows.md
+  - backlog/31-todo-add-local-screenshot-capture-command-for-deterministic-browser-scenes.md
+  - backlog/32-todo-refresh-curated-documentation-screenshots-from-browser-scenes.md
+  - backlog/33-todo-run-browser-smoke-tests-in-ci.md
+  - backlog/34-todo-publish-visual-diff-artifacts-for-pr-review.md
+checks:
+  - name: npm run backlog:lint
+    outcome: pass
+  - name: node tests/backlog-template-lint.test.js
+    outcome: pass
+  - name: npm run agent:summary -- --run-checks
+    outcome: pass
+  - name: git commit -m "Add browser testing backlog todos"
+    outcome: fail
+  - name: git push -u origin chore/backlog-browser-testing-todos
+    outcome: pass
+  - name: gh pr create --base main --head chore/backlog-browser-testing-todos ...
+    outcome: fail
+friction_category: human-rescue
+human_correction_needed: true
+missing_or_misleading_guardrail: The workflow had no upfront hint that a transient .git/index.lock and sandbox-blocked GitHub API access were likely failure points for commit-and-open-PR packaging work.
+improvement_proposal: Add a preflight hint for PR-packaging tasks that warns about stale git lock retries and that gh-based PR creation may require escalated network access outside the sandbox.
