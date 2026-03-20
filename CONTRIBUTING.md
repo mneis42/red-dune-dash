@@ -16,6 +16,7 @@ This project is intentionally used as an AI-agent delivery experiment. Contribut
 - Player-facing UI text should be German unless there is a clear product reason not to.
 - Code, code comments, documentation, instruction files, and commit messages should default to English.
 - When introducing new docs, prefer concise English that is easy for both humans and agents to follow.
+- Historical backlog archives in `backlog/done/` may remain in their original language; do not treat them as retroactive translation work unless a separate task requires it.
 
 ## Before You Change Code
 

@@ -171,4 +171,4 @@ Use when validating that a small or medium diff is review-ready.
 - Keep the review concise, direct, and actionable.
 - Expand the scope only when the changed code makes that necessary.
 - Treat missing tests as a first-class finding when the change meaningfully alters behavior.
-- Respect the repository language conventions: German for player-facing UI, English for code and technical documentation.
+- Respect the repository language conventions: German for player-facing UI, English for code and active technical documentation. Historical backlog archives in `backlog/done/` are allowed to remain in their original language unless the reviewed change explicitly migrates them.

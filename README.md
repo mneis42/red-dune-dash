@@ -29,6 +29,7 @@ This repository is also an experiment in AI-assisted software delivery. The goal
 - Primary audience: German-speaking developers and players
 - UI language: German
 - Preferred language for code, documentation, instruction files, and commit messages: English
+- Historical backlog archives in `backlog/done/` may remain in their original language and are not retroactive translation targets
 
 ## Current Stack
 
@@ -98,6 +99,8 @@ To enforce the technical documentation language policy directly:
 ```powershell
 npm run docs:language:lint
 ```
+
+This check applies to active technical and workflow documentation. Historical backlog archives in `backlog/done/` are intentionally excluded.
 
 If you want to run the suites individually, you can also use:
 

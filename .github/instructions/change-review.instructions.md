@@ -23,4 +23,4 @@ Keep the output high signal:
 For reusable review task-package guidance (Balancing Tweak, PWA / Offline Reliability, Gameplay Bugfix, Workflow / Docs Update, Targeted Review Readiness), follow the canonical section "Task Packages (Canonical Insertion Point)" in `instructions/change-review.md`.
 
 Do not turn a small review into a whole-repository audit unless the blast radius clearly requires it.
-Respect repository language conventions: German for player-facing UI, English for code and technical documentation.
+Respect repository language conventions: German for player-facing UI, English for code and active technical documentation. Historical backlog archives in `backlog/done/` may remain in their original language unless the reviewed change explicitly migrates them.
