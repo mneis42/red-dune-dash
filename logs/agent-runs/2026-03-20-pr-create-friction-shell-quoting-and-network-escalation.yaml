@@ -1,0 +1,23 @@
+date: 2026-03-20
+task_type: other
+short_goal: Create and publish a PR for the docs-language-lint backlog-policy change
+changed_files:
+  - README.md
+  - scripts/docs-language-lint.js
+  - tests/docs-language-lint.test.js
+  - backlog/done/20260320-213113-align-documentation-language-with-repository-policy.md
+checks:
+  - name: npm run verify
+    outcome: pass
+  - name: npm run agent:summary -- --run-checks
+    outcome: pass
+  - name: gh pr create
+    outcome: fail
+  - name: gh pr create (body-file retry)
+    outcome: fail
+  - name: gh pr create (escalated retry)
+    outcome: pass
+friction_category: blind-spot-after-green
+human_correction_needed: true
+missing_or_misleading_guardrail: The run reached a green postflight state, but there was no guardrail to force a file-based PR body for multiline markdown or to escalate the GitHub API call immediately after the first network failure.
+improvement_proposal: Default to body-file based gh PR creation for multiline content and automatically retry with escalated permissions after a sandbox-related GitHub API connection failure.
