@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const {
   parseArgs,
   parseAllowedCheckCommand,
+  detectDefaultBaseRef,
+  getBranchChangedFiles,
   resolveUserImpact,
   buildOpenQuestions,
   buildCopyBlock,
@@ -10,6 +12,7 @@ const {
   buildPrePrChecklistOutcome,
   isFailingCheckStatus,
   formatHumanReadable,
+  getChangedFiles,
 } = require("../scripts/agent-summary.js");
 
 const tests = [];
@@ -40,10 +43,12 @@ function createAdvisoryResult(overrides = {}) {
   };
 }
 
-test("parseArgs supports json, staged, run-checks, files, and rules flags", () => {
+test("parseArgs supports json, staged, base, run-checks, files, and rules flags", () => {
   const options = parseArgs([
     "--json",
     "--staged",
+    "--base",
+    "origin/main",
     "--run-checks",
     "--files",
     "a.js,b.js",
@@ -54,6 +59,7 @@ test("parseArgs supports json, staged, run-checks, files, and rules flags", () =
   assert.deepEqual(options, {
     json: true,
     staged: true,
+    baseRef: "origin/main",
     files: ["a.js", "b.js"],
     rulesPath: "workflow/custom.json",
     runChecks: true,
@@ -62,6 +68,18 @@ test("parseArgs supports json, staged, run-checks, files, and rules flags", () =
     contractInseparable: false,
     errors: [],
   });
+});
+
+test("detectDefaultBaseRef returns null when origin head cannot be resolved", () => {
+  const fakeExec = () => {
+    throw new Error("missing origin head");
+  };
+
+  assert.equal(detectDefaultBaseRef(fakeExec), null);
+});
+
+test("getBranchChangedFiles returns empty array when diff lookup fails", () => {
+  assert.deepEqual(getBranchChangedFiles(null), []);
 });
 
 test("parseArgs supports contract consumer options", () => {
@@ -196,6 +214,36 @@ test("buildSummaryResult reports changed backlog files in backlog sync review", 
     result.prePrChecklist.backlogSyncReview.resultSummary,
     "checked backlog updates in current branch: backlog/2-todo-reconcile-open-backlog-with-actual-implementation-state.md"
   );
+});
+
+test("getChangedFiles falls back to branch diff when working tree is clean", () => {
+  const calls = [];
+  const fakeExec = (_command, args) => {
+    calls.push(args);
+    const joined = args.join(" ");
+    if (joined === "diff --name-only --cached") {
+      return "";
+    }
+    if (joined === "diff --name-only") {
+      return "";
+    }
+    if (joined === "ls-files --others --exclude-standard") {
+      return "";
+    }
+    if (joined === "symbolic-ref --quiet refs/remotes/origin/HEAD") {
+      return "origin/main\n";
+    }
+    if (joined === "diff --name-only origin/main...HEAD") {
+      return "scripts/agent-summary.js\nbacklog/done/example.md\n";
+    }
+    throw new Error(`unexpected git args: ${joined}`);
+  };
+
+  assert.deepEqual(getChangedFiles({ files: null, staged: false, baseRef: null }, fakeExec), [
+    "scripts/agent-summary.js",
+    "backlog/done/example.md",
+  ]);
+  assert.ok(calls.some((args) => args.join(" ") === "diff --name-only origin/main...HEAD"));
 });
 
 test("buildSummaryResult prefers normalized advisory changedFiles output", () => {
