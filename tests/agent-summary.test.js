@@ -143,6 +143,9 @@ test("buildCopyBlock returns concise, copy-ready section", () => {
     changedFiles: ["a", "b"],
     advisory: { mergedAreas: ["gameplay"] },
     prePrChecklist: {
+      backlogSyncReview: {
+        resultSummary: "none affected",
+      },
       splitDecision: {
         finalDecision: "no-split-default",
         hardTriggerReasons: [],
@@ -171,8 +174,28 @@ test("buildSummaryResult includes required summary fields", () => {
   assert.ok(Array.isArray(result.risks));
   assert.ok(result.prePrChecklist);
   assert.equal(typeof result.prePrChecklist.splitDecision.finalDecision, "string");
+  assert.equal(typeof result.prePrChecklist.backlogSyncReview.resultSummary, "string");
   assert.ok(Array.isArray(result.openQuestions));
   assert.equal(typeof result.copyBlock, "string");
+});
+
+test("buildSummaryResult reports changed backlog files in backlog sync review", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["workflow-docs"],
+    matchedRules: [{ id: "repo-docs", area: "workflow-docs" }],
+    perFile: [],
+  });
+
+  const result = buildSummaryResult(
+    ["backlog/2-todo-reconcile-open-backlog-with-actual-implementation-state.md", "AGENTS.md"],
+    advisory,
+    { runChecks: false }
+  );
+
+  assert.equal(
+    result.prePrChecklist.backlogSyncReview.resultSummary,
+    "checked backlog updates in current branch: backlog/2-todo-reconcile-open-backlog-with-actual-implementation-state.md"
+  );
 });
 
 test("buildSummaryResult prefers normalized advisory changedFiles output", () => {

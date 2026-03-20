@@ -395,6 +395,7 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
   const skippedChecks = checkOutcomes.filter((entry) => entry.status === "not-run" || entry.status === "skipped-unsafe");
   const failedChecks = checkOutcomes.filter((entry) => isFailingCheckStatus(entry.status));
   const fallbackFiles = advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
+  const changedBacklogPaths = stableUnique(changedFiles.filter((entry) => entry === "todo.md" || entry.startsWith("backlog/")));
 
   const likelyReviewerObjections = [];
   if (split.finalDecision === "split-required") {
@@ -442,6 +443,13 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
       affectedDocs: stableUnique([...advisoryResult.merged.suggestedDocs, ...advisoryResult.merged.suggestedReading]),
       touchedWorkflowDocs: split.matchedAreas.includes("workflow-docs"),
     },
+    backlogSyncReview: {
+      checkedPaths: changedBacklogPaths,
+      resultSummary:
+        changedBacklogPaths.length > 0
+          ? `checked backlog updates in current branch: ${changedBacklogPaths.join(", ")}`
+          : "none affected",
+    },
     likelyReviewerObjections,
     remainingRisks,
   };
@@ -462,6 +470,7 @@ function buildCopyBlock(result) {
     lines.push(`- pre_pr_split_advisory_signals: ${advisorySplitSignals.join("; ")}`);
   }
   lines.push(`- docs_to_review: ${result.affectedDocs.join(", ") || "none"}`);
+  lines.push(`- backlog_sync_review: ${result.prePrChecklist.backlogSyncReview.resultSummary}`);
 
   const checkSummary = result.checkOutcomes
     .map((entry) => `${entry.command}=${entry.status}`)
@@ -557,6 +566,7 @@ function formatHumanReadable(result, options) {
     advisorySplitSignals.forEach((entry) => lines.push(`- split advisory: ${entry}`));
   }
   lines.push(`- skipped-check justification required: ${result.prePrChecklist.verification.skippedCheckJustificationRequired ? "yes" : "no"}`);
+  lines.push(`- backlog sync review: ${result.prePrChecklist.backlogSyncReview.resultSummary}`);
   lines.push(`- likely reviewer objections: ${result.prePrChecklist.likelyReviewerObjections.join("; ") || "none"}`);
   lines.push(`- remaining risks: ${result.prePrChecklist.remainingRisks.join(", ") || "none"}`);
 

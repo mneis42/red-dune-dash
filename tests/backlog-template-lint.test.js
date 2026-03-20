@@ -48,7 +48,7 @@ test("validateBacklogFile accepts valid backlog-item file", () => {
         "workflow_type: backlog-item",
         "source: workflow-ideas.md",
         "idea_number: 1",
-        "priority: 1",
+        "priority: 12",
         "status: open",
         "planning_model: GPT-5.3-Codex",
         "execution_model: GPT-5.3-Codex",
@@ -181,6 +181,38 @@ test("validateBacklogFile requires enhanced metadata for new prioritized backlog
   });
 });
 
+test("validateBacklogFile rejects mismatched prioritized filename and frontmatter priority", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "backlog/12-todo-priority-mismatch.md",
+      [
+        "---",
+        "workflow_type: backlog-item",
+        "source: workflow-ideas.md",
+        "priority: 9",
+        "status: open",
+        "planning_model: GPT-5.3-Codex",
+        "execution_model: GPT-5.3-Codex",
+        "created_at: 2026-03-17",
+        "last_updated: 2026-03-17",
+        "---",
+        "",
+        "# TODO: Priority mismatch",
+        "",
+        "## Goal",
+        "## Scope",
+        "## Out Of Scope",
+        "## Acceptance Criteria",
+        "## Suggested Verification",
+        "## Notes",
+      ].join("\n")
+    );
+
+    const issues = validateBacklogFile(root, "backlog/12-todo-priority-mismatch.md");
+    assert.equal(issues.some((entry) => entry.includes("must match prioritized filename number 12")), true);
+  });
+});
+
 test("validateBacklogFile accepts valid feature-request backlog file", () => {
   withTempRepo(({ root, write }) => {
     write(
@@ -241,7 +273,7 @@ test("runBacklogTemplateLint checks prioritized and done backlog files", () => {
         "workflow_type: backlog-item",
         "source: workflow-ideas.md",
         "idea_number: 1",
-        "priority: 1",
+        "priority: 12",
         "status: open",
         "planning_model: GPT-5.3-Codex",
         "execution_model: GPT-5.3-Codex",

@@ -9,7 +9,8 @@ For new feature ideas and feature requests, follow the planning-and-delivery wor
 For any writing-agent run that is intended to end in a PR-ready handoff, complete the mandatory pre-PR checklist in [instructions/pre-pr-checklist.md](instructions/pre-pr-checklist.md) before ending the run.
 
 For prioritized idea files created directly under `backlog/` (for example `backlog/1-todo-*.md`), use either `templates/todo-backlog-item-template.md` (`workflow_type: backlog-item`) or `templates/todo-feature-request-template.md` (`workflow_type: feature-request`) and keep the file structure compatible with the selected template.
-For new prioritized backlog-item files, always include `planning_model`, `execution_model`, `created_at`, and `last_updated` metadata in frontmatter.
+For prioritized backlog-item files whose filename starts at `12-` or higher, always include `planning_model`, `execution_model`, `created_at`, and `last_updated` metadata in frontmatter; earlier legacy backlog-item files are currently grandfathered by backlog lint until that policy is migrated explicitly.
+If a branch makes an open prioritized backlog item true, obsolete, or superseded, update or archive that backlog item in the same branch before opening or handing off a PR.
 
 For bug reports and gameplay defects, follow the bug analysis and fix workflow in [instructions/bug-report.md](instructions/bug-report.md).
 

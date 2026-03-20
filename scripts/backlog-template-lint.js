@@ -221,6 +221,16 @@ function validateBacklogContent(filePath, content, parsedFrontmatter) {
     }
 
     const itemNumber = getPrioritizedItemNumber(filePath);
+    const priorityValue = Number.parseInt(frontmatter.priority, 10);
+    if (
+      itemNumber !== null &&
+      Number.isInteger(priorityValue) &&
+      priorityValue !== itemNumber
+    ) {
+      issues.push(
+        `${filePath}: frontmatter priority ${priorityValue} must match prioritized filename number ${itemNumber}.`
+      );
+    }
     const requiresEnhancedMetadata =
       itemNumber !== null && itemNumber >= ENHANCED_METADATA_MIN_ITEM_NUMBER;
 

@@ -2,11 +2,11 @@
 workflow_type: backlog-item
 source: review-findings-2026-03-18
 priority: 2
-status: open
+status: done
 planning_model: GPT-5.4
 execution_model: GPT-5.4
 created_at: 2026-03-18
-last_updated: 2026-03-18
+last_updated: 2026-03-20
 ---
 
 # TODO: Reconcile Open Backlog With Actual Implementation State
@@ -60,3 +60,5 @@ Restore trust in the prioritized backlog by closing, updating, or rewriting item
 - If automation is added, keep false positives low; stale-backlog detection is only useful if maintainers trust it.
 - Prefer one small, trusted guardrail over a broad but noisy backlog-policing system.
 - The initial candidate list above is a starting point for the reconciliation pass, not proof that every listed item should be closed unchanged.
+- Reconciled in this pass: the CI instruction/workflow check item, the advisory-rule CI consumption item, the AGENTS/lint cutoff wording item, and the backlog deduplication guardrails item were archived as done.
+- Selected guardrail: the mandatory pre-PR checklist now includes a backlog sync review, and `npm run agent:summary` reports its result in the handoff output.

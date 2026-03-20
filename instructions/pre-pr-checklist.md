@@ -54,10 +54,15 @@ Catch predictable review objections early and keep change sets small, verifiable
    - State whether docs or instruction updates were required.
    - List updated docs/instructions or state why none were needed.
 
-10. Likely reviewer objections self-review
+10. Backlog sync review
+   - Check whether the branch makes any open prioritized backlog item done, obsolete, or superseded.
+   - If yes, update or archive that backlog item in the same branch before PR handoff.
+   - Record which backlog paths were checked or state `none affected`.
+
+11. Likely reviewer objections self-review
    - List likely objections and whether each is resolved, accepted-risk, or deferred.
 
-11. Remaining risks
+12. Remaining risks
    - List residual risks explicitly, or state `none`.
 
 ## Handoff Output Requirements
@@ -72,6 +77,7 @@ Minimum handoff fields:
 - split decision and trigger reasons
 - checks run and skipped-check justifications
 - docs/instruction impact
+- backlog sync review result
 - likely reviewer objections
 - remaining risks
 
@@ -86,5 +92,6 @@ Task: align one instruction sentence with current hook behavior.
 - checks: `npm run instruction:lint=pass`, `npm run test:preflight=pass`
 - skipped checks: none
 - docs/instruction impact: instruction docs updated in both canonical and mirrored locations
+- backlog sync review: none affected
 - likely reviewer objections: wording mismatch risk resolved
 - remaining risks: none
