@@ -1,0 +1,14 @@
+date: 2026-03-20
+task_type: other
+short_goal: Capture misleading agent wording about gh reviewThreads support and record a clearer fallback guideline
+changed_files:
+  - logs/agent-runs/2026-03-20-gh-reviewthreads-fallback-wording.yaml
+checks:
+  - name: npm run check
+    outcome: pass
+  - name: npm run agent:summary -- --run-checks
+    outcome: pass
+friction_category: human-rescue
+human_correction_needed: true
+missing_or_misleading_guardrail: The agent phrased missing `reviewThreads` support as a general `gh` limitation instead of the narrower `gh pr view --json` field limitation, which can mislead reviewers about available `gh api` fallback paths.
+improvement_proposal: Add a gh fallback wording rule that distinguishes missing `gh pr view --json` fields from broader GitHub API access limits and recommends explicitly naming `gh api` as the supported fallback.

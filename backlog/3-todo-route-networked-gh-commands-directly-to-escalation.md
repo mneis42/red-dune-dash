@@ -21,6 +21,7 @@ Avoid predictable sandbox network failures by sending GitHub CLI actions with li
 - Update workflow helpers or instructions so networked `gh` actions request escalation before the first attempt.
 - Keep purely local or cached `gh` usage in the sandbox when it does not depend on live GitHub API access.
 - Add clear operator-facing guidance explaining why some `gh` commands intentionally skip sandbox-first execution.
+- Clarify fallback guidance when a high-level `gh` surface such as `gh pr view --json` lacks a needed field, so agents explicitly route supported follow-up queries through `gh api` instead of implying a broader GitHub API limitation.
 
 ## Out Of Scope
 
@@ -32,6 +33,7 @@ Avoid predictable sandbox network failures by sending GitHub CLI actions with li
 - Agent workflows do not first attempt known network-dependent `gh` actions in the sandbox when sandbox networking is unavailable.
 - PR creation, commenting, reviews, and similar live GitHub actions request escalation up front.
 - Documentation or helper logic clearly distinguishes local-safe versus network-required `gh` usage.
+- Agent guidance distinguishes missing high-level `gh` subcommand fields from broader GitHub API access limits and names `gh api` explicitly when it is the supported fallback path.
 - Regression coverage or fixture-backed validation exists for the command classification where feasible.
 
 ## Suggested Verification
@@ -43,3 +45,4 @@ Avoid predictable sandbox network failures by sending GitHub CLI actions with li
 ## Notes
 
 - This item follows the 2026-03-20 friction logs where GitHub CLI operations repeatedly failed in the sandbox before succeeding after escalation.
+- It also covers fallback wording clarity for cases where `gh pr view --json` cannot expose data such as review-thread detail even though a supported `gh api` query path still exists.
