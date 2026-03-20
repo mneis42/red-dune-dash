@@ -4,6 +4,7 @@ const path = require("node:path");
 const TARGET_ROOTS = ["docs", "instructions", ".github/instructions"];
 const TARGET_ROOT_FILES = ["README.md", "CONTRIBUTING.md", "AGENTS.md", ".github/copilot-instructions.md"];
 const EXCLUDED_FILES = new Set(["developer-todos.md", "developer-todos.ms"]);
+// Historical archives and operational logs are intentionally outside the active-doc language policy.
 const EXCLUDED_DIRECTORIES = ["backlog", "reviews", "logs/agent-runs"];
 
 const GERMAN_MARKER_PATTERN =
