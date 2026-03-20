@@ -1,0 +1,19 @@
+date: 2026-03-20
+task_type: other
+short_goal: Package the git guardrail backlog item into a local commit
+changed_files:
+  - scripts/agent-git-guard.js
+  - tests/agent-git-guard.test.js
+checks:
+  - name: npm run verify
+    outcome: pass
+  - name: npm run agent:git -- commit -- -m "Add git commit and push guardrails"
+    outcome: fail
+  - name: npm run test:git-guard
+    outcome: fail
+  - name: npm run test:git-guard (after classifier fix)
+    outcome: pass
+friction_category: blind-spot-after-green
+human_correction_needed: false
+missing_or_misleading_guardrail: The initial index.lock retry classifier treated a sandbox permission denial on .git/index.lock creation as transient lock contention and retried instead of surfacing the real escalation need immediately.
+improvement_proposal: Restrict lock retries to genuine contention signals such as File exists or explicit another-git-process messages, and leave permission-denied or sandbox failures as hard errors that prompt escalation.
