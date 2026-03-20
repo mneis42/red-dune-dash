@@ -1,0 +1,13 @@
+date: 2026-03-20
+task_type: change-review
+short_goal: Post a confirmed PR finding from the branch review back to the pull request
+changed_files: []
+checks:
+  - name: gh pr review 42 --request-changes --body ...
+    outcome: fail
+  - name: gh pr comment 42 --body ...
+    outcome: pass
+friction_category: human-rescue-or-redirection
+human_correction_needed: true
+missing_or_misleading_guardrail: The run had no guardrail to prevent shell interpolation of backticks in gh review bodies and no early reminder that a PR author cannot submit a request-changes review on their own pull request.
+improvement_proposal: Default to file-based or single-quoted plain-text bodies for gh review/comment commands that include code formatting, and detect self-authored PRs before choosing a review action so findings are posted as comments when formal change requests are impossible.
