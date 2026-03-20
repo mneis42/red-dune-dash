@@ -210,28 +210,11 @@ function getCurrentBranch(exec = execFileSync) {
 }
 
 function parsePushTarget(pushArgs, exec = execFileSync) {
-  const upstream = tryRunGit(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], exec);
-  if (upstream) {
-    const slashIndex = upstream.indexOf("/");
-    if (slashIndex > 0) {
-      const remote = upstream.slice(0, slashIndex);
-      const branch = upstream.slice(slashIndex + 1);
-      return {
-        remote,
-        branch,
-        source: "upstream",
-        remoteRef: `${remote}/${branch}`,
-        trackingRef: `refs/remotes/${remote}/${branch}`,
-      };
-    }
-  }
-
   const positional = [];
   for (let index = 0; index < pushArgs.length; index += 1) {
     const value = String(pushArgs[index]);
 
     if (value === "-u" || value === "--set-upstream") {
-      index += 1;
       continue;
     }
 
@@ -240,6 +223,24 @@ function parsePushTarget(pushArgs, exec = execFileSync) {
     }
 
     positional.push(value);
+  }
+
+  if (positional.length === 0) {
+    const upstream = tryRunGit(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], exec);
+    if (upstream) {
+      const slashIndex = upstream.indexOf("/");
+      if (slashIndex > 0) {
+        const remote = upstream.slice(0, slashIndex);
+        const branch = upstream.slice(slashIndex + 1);
+        return {
+          remote,
+          branch,
+          source: "upstream",
+          remoteRef: `${remote}/${branch}`,
+          trackingRef: `refs/remotes/${remote}/${branch}`,
+        };
+      }
+    }
   }
 
   const remote = positional[0] || "origin";

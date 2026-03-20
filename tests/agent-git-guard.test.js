@@ -148,8 +148,8 @@ test("runCommitWithRecovery does not retry non-lock commit failures", () => {
   assert.match(result.message, /git commit failed/);
 });
 
-test("parsePushTarget prefers upstream when available", () => {
-  const result = parsePushTarget(["-u", "origin", "feature"], (_command, args) => {
+test("parsePushTarget falls back to upstream when push args do not name a target", () => {
+  const result = parsePushTarget([], (_command, args) => {
     if (args.join(" ") === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
       return "origin/feature\n";
     }
@@ -158,6 +158,22 @@ test("parsePushTarget prefers upstream when available", () => {
 
   assert.equal(result.remoteRef, "origin/feature");
   assert.equal(result.source, "upstream");
+});
+
+test("parsePushTarget keeps origin when push uses -u origin HEAD", () => {
+  const result = parsePushTarget(["-u", "origin", "HEAD"], (_command, args) => {
+    const joined = args.join(" ");
+    if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      throw new Error("no upstream");
+    }
+    if (joined === "branch --show-current") {
+      return "feature/test\n";
+    }
+    throw new Error(`unexpected git args: ${joined}`);
+  });
+
+  assert.equal(result.remoteRef, "origin/feature/test");
+  assert.equal(result.source, "push-args");
 });
 
 test("parsePushTarget normalizes HEAD refspecs to the current branch", () => {
@@ -176,6 +192,22 @@ test("parsePushTarget normalizes HEAD refspecs to the current branch", () => {
   assert.equal(result.source, "push-args");
 });
 
+test("parsePushTarget lets an explicit remote and refspec override upstream", () => {
+  const result = parsePushTarget(["other-remote", "HEAD:release"], (_command, args) => {
+    const joined = args.join(" ");
+    if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+      return "origin/current\n";
+    }
+    if (joined === "branch --show-current") {
+      return "feature/test\n";
+    }
+    throw new Error(`unexpected git args: ${joined}`);
+  });
+
+  assert.equal(result.remoteRef, "other-remote/release");
+  assert.equal(result.source, "push-args");
+});
+
 test("verifyRemoteTracking detects stale remote refs after fetch", () => {
   const calls = [];
   const result = verifyRemoteTracking(["-u", "origin", "feature"], {
@@ -183,7 +215,10 @@ test("verifyRemoteTracking detects stale remote refs after fetch", () => {
       calls.push(args.join(" "));
       const joined = args.join(" ");
       if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
-        return "origin/feature\n";
+        throw new Error("no upstream");
+      }
+      if (joined === "branch --show-current") {
+        return "feature/test\n";
       }
       if (joined === "rev-parse HEAD") {
         return "abc123\n";
@@ -203,6 +238,36 @@ test("verifyRemoteTracking detects stale remote refs after fetch", () => {
   assert.ok(calls.includes("fetch --no-tags origin feature"));
 });
 
+test("verifyRemoteTracking follows an explicit push target instead of upstream", () => {
+  const calls = [];
+  const result = verifyRemoteTracking(["other-remote", "HEAD:release"], {
+    exec: (_command, args) => {
+      calls.push(args.join(" "));
+      const joined = args.join(" ");
+      if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
+        return "origin/current\n";
+      }
+      if (joined === "branch --show-current") {
+        return "feature/test\n";
+      }
+      if (joined === "rev-parse HEAD") {
+        return "abc123\n";
+      }
+      if (joined === "fetch --no-tags other-remote release") {
+        return "";
+      }
+      if (joined === "rev-parse refs/remotes/other-remote/release") {
+        return "abc123\n";
+      }
+      throw new Error(`unexpected git args: ${joined}`);
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.target.remoteRef, "other-remote/release");
+  assert.ok(calls.includes("fetch --no-tags other-remote release"));
+});
+
 test("runPushWithVerification retries once when remote verification lags", () => {
   const runnerCalls = [];
   const pushResponses = [
@@ -219,7 +284,10 @@ test("runPushWithVerification retries once when remote verification lags", () =>
     exec: (_command, args) => {
       const joined = args.join(" ");
       if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
-        return "origin/feature\n";
+        throw new Error("no upstream");
+      }
+      if (joined === "branch --show-current") {
+        return "feature/test\n";
       }
       if (joined === "rev-parse HEAD") {
         return "head123\n";
@@ -253,7 +321,10 @@ test("runPushWithVerification fails when the remote ref still lags after retry",
     exec: (_command, args) => {
       const joined = args.join(" ");
       if (joined === "rev-parse --abbrev-ref --symbolic-full-name @{u}") {
-        return "origin/feature\n";
+        throw new Error("no upstream");
+      }
+      if (joined === "branch --show-current") {
+        return "feature/test\n";
       }
       if (joined === "rev-parse HEAD") {
         return "head123\n";
