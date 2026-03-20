@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const {
   parseArgs,
   parseAllowedCheckCommand,
+  detectDefaultBaseRef,
+  getBranchChangedFiles,
   resolveUserImpact,
   buildOpenQuestions,
   buildCopyBlock,
@@ -10,6 +12,7 @@ const {
   buildPrePrChecklistOutcome,
   isFailingCheckStatus,
   formatHumanReadable,
+  getChangedFiles,
 } = require("../scripts/agent-summary.js");
 
 const tests = [];
@@ -40,10 +43,12 @@ function createAdvisoryResult(overrides = {}) {
   };
 }
 
-test("parseArgs supports json, staged, run-checks, files, and rules flags", () => {
+test("parseArgs supports json, staged, base, run-checks, files, and rules flags", () => {
   const options = parseArgs([
     "--json",
     "--staged",
+    "--base",
+    "origin/main",
     "--run-checks",
     "--files",
     "a.js,b.js",
@@ -54,6 +59,7 @@ test("parseArgs supports json, staged, run-checks, files, and rules flags", () =
   assert.deepEqual(options, {
     json: true,
     staged: true,
+    baseRef: "origin/main",
     files: ["a.js", "b.js"],
     rulesPath: "workflow/custom.json",
     runChecks: true,
@@ -62,6 +68,18 @@ test("parseArgs supports json, staged, run-checks, files, and rules flags", () =
     contractInseparable: false,
     errors: [],
   });
+});
+
+test("detectDefaultBaseRef returns null when origin head cannot be resolved", () => {
+  const fakeExec = () => {
+    throw new Error("missing origin head");
+  };
+
+  assert.equal(detectDefaultBaseRef(fakeExec), null);
+});
+
+test("getBranchChangedFiles returns empty array when diff lookup fails", () => {
+  assert.deepEqual(getBranchChangedFiles(null), []);
 });
 
 test("parseArgs supports contract consumer options", () => {
@@ -143,6 +161,9 @@ test("buildCopyBlock returns concise, copy-ready section", () => {
     changedFiles: ["a", "b"],
     advisory: { mergedAreas: ["gameplay"] },
     prePrChecklist: {
+      backlogSyncReview: {
+        resultSummary: "manual review required (no backlog paths in diff; do not assume none affected)",
+      },
       splitDecision: {
         finalDecision: "no-split-default",
         hardTriggerReasons: [],
@@ -171,8 +192,77 @@ test("buildSummaryResult includes required summary fields", () => {
   assert.ok(Array.isArray(result.risks));
   assert.ok(result.prePrChecklist);
   assert.equal(typeof result.prePrChecklist.splitDecision.finalDecision, "string");
+  assert.equal(typeof result.prePrChecklist.backlogSyncReview.resultSummary, "string");
   assert.ok(Array.isArray(result.openQuestions));
   assert.equal(typeof result.copyBlock, "string");
+});
+
+test("buildSummaryResult reports changed backlog files in backlog sync review", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["workflow-docs"],
+    matchedRules: [{ id: "repo-docs", area: "workflow-docs" }],
+    perFile: [],
+  });
+
+  const result = buildSummaryResult(
+    ["backlog/2-todo-reconcile-open-backlog-with-actual-implementation-state.md", "AGENTS.md"],
+    advisory,
+    { runChecks: false }
+  );
+
+  assert.equal(
+    result.prePrChecklist.backlogSyncReview.resultSummary,
+    "checked backlog updates in current branch: backlog/2-todo-reconcile-open-backlog-with-actual-implementation-state.md"
+  );
+});
+
+test("buildSummaryResult requires manual backlog review when no backlog files changed", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["tooling"],
+    matchedRules: [{ id: "tooling-scripts-tests", area: "tooling" }],
+    perFile: [],
+  });
+
+  const result = buildSummaryResult(
+    ["scripts/backlog-template-lint.js", "tests/backlog-template-lint.test.js"],
+    advisory,
+    { runChecks: false }
+  );
+
+  assert.equal(
+    result.prePrChecklist.backlogSyncReview.resultSummary,
+    "manual review required (no backlog paths in diff; do not assume none affected)"
+  );
+});
+
+test("getChangedFiles falls back to branch diff when working tree is clean", () => {
+  const calls = [];
+  const fakeExec = (_command, args) => {
+    calls.push(args);
+    const joined = args.join(" ");
+    if (joined === "diff --name-only --cached") {
+      return "";
+    }
+    if (joined === "diff --name-only") {
+      return "";
+    }
+    if (joined === "ls-files --others --exclude-standard") {
+      return "";
+    }
+    if (joined === "symbolic-ref --quiet refs/remotes/origin/HEAD") {
+      return "origin/main\n";
+    }
+    if (joined === "diff --name-only origin/main...HEAD") {
+      return "scripts/agent-summary.js\nbacklog/done/example.md\n";
+    }
+    throw new Error(`unexpected git args: ${joined}`);
+  };
+
+  assert.deepEqual(getChangedFiles({ files: null, staged: false, baseRef: null }, fakeExec), [
+    "scripts/agent-summary.js",
+    "backlog/done/example.md",
+  ]);
+  assert.ok(calls.some((args) => args.join(" ") === "diff --name-only origin/main...HEAD"));
 });
 
 test("buildSummaryResult prefers normalized advisory changedFiles output", () => {

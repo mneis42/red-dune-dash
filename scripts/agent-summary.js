@@ -36,6 +36,7 @@ function parseArgs(argv) {
   const options = {
     json: false,
     staged: false,
+    baseRef: null,
     files: null,
     rulesPath: null,
     runChecks: false,
@@ -77,6 +78,15 @@ function parseArgs(argv) {
     }
     if (arg === "--staged") {
       options.staged = true;
+      continue;
+    }
+    if (arg === "--base") {
+      const value = readOptionValue("--base", index);
+      if (value === null) {
+        continue;
+      }
+      index += 1;
+      options.baseRef = value;
       continue;
     }
     if (arg === "--run-checks") {
@@ -126,27 +136,62 @@ function parseArgs(argv) {
   return options;
 }
 
-function runGit(args) {
-  return execFileSync("git", args, { encoding: "utf8" })
+function runGit(args, exec = execFileSync) {
+  return exec("git", args, { encoding: "utf8" })
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
 }
 
-function getChangedFiles(options) {
+function tryRunGit(args, exec = execFileSync) {
+  try {
+    return runGit(args, exec);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function detectDefaultBaseRef(exec = execFileSync) {
+  try {
+    const value = exec("git", ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"], {
+      encoding: "utf8",
+    }).trim();
+    return value || null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getBranchChangedFiles(baseRef, exec = execFileSync) {
+  if (!baseRef) {
+    return [];
+  }
+
+  return tryRunGit(["diff", "--name-only", `${baseRef}...HEAD`], exec);
+}
+
+function getChangedFiles(options, exec = execFileSync) {
   if (Array.isArray(options.files)) {
     return stableUnique(options.files);
   }
 
   if (options.staged) {
-    return stableUnique(runGit(["diff", "--name-only", "--cached"]));
+    return stableUnique(runGit(["diff", "--name-only", "--cached"], exec));
   }
 
-  const staged = runGit(["diff", "--name-only", "--cached"]);
-  const unstaged = runGit(["diff", "--name-only"]);
-  const untracked = runGit(["ls-files", "--others", "--exclude-standard"]);
+  const staged = runGit(["diff", "--name-only", "--cached"], exec);
+  const unstaged = runGit(["diff", "--name-only"], exec);
+  const untracked = runGit(["ls-files", "--others", "--exclude-standard"], exec);
+  const localChanges = stableUnique([...staged, ...unstaged, ...untracked]);
 
-  return stableUnique([...staged, ...unstaged, ...untracked]);
+  if (localChanges.length > 0) {
+    return localChanges;
+  }
+
+  const baseRef = options.baseRef || detectDefaultBaseRef(exec);
+  const branchChanges = getBranchChangedFiles(baseRef, exec);
+
+  return stableUnique(branchChanges);
 }
 
 function resolveUserImpact(advisoryResult) {
@@ -395,6 +440,7 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
   const skippedChecks = checkOutcomes.filter((entry) => entry.status === "not-run" || entry.status === "skipped-unsafe");
   const failedChecks = checkOutcomes.filter((entry) => isFailingCheckStatus(entry.status));
   const fallbackFiles = advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
+  const changedBacklogPaths = stableUnique(changedFiles.filter((entry) => entry === "todo.md" || entry.startsWith("backlog/")));
 
   const likelyReviewerObjections = [];
   if (split.finalDecision === "split-required") {
@@ -442,6 +488,13 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
       affectedDocs: stableUnique([...advisoryResult.merged.suggestedDocs, ...advisoryResult.merged.suggestedReading]),
       touchedWorkflowDocs: split.matchedAreas.includes("workflow-docs"),
     },
+    backlogSyncReview: {
+      checkedPaths: changedBacklogPaths,
+      resultSummary:
+        changedBacklogPaths.length > 0
+          ? `checked backlog updates in current branch: ${changedBacklogPaths.join(", ")}`
+          : "manual review required (no backlog paths in diff; do not assume none affected)",
+    },
     likelyReviewerObjections,
     remainingRisks,
   };
@@ -462,6 +515,7 @@ function buildCopyBlock(result) {
     lines.push(`- pre_pr_split_advisory_signals: ${advisorySplitSignals.join("; ")}`);
   }
   lines.push(`- docs_to_review: ${result.affectedDocs.join(", ") || "none"}`);
+  lines.push(`- backlog_sync_review: ${result.prePrChecklist.backlogSyncReview.resultSummary}`);
 
   const checkSummary = result.checkOutcomes
     .map((entry) => `${entry.command}=${entry.status}`)
@@ -521,7 +575,7 @@ function formatHumanReadable(result, options) {
   lines.push(`Changed files: ${result.changedFiles.length}`);
 
   if (result.changedFiles.length === 0) {
-    lines.push("No local file changes detected.");
+    lines.push("No changed files detected from the working tree or branch diff.");
   } else {
     lines.push("");
     lines.push("Changed file list");
@@ -557,6 +611,7 @@ function formatHumanReadable(result, options) {
     advisorySplitSignals.forEach((entry) => lines.push(`- split advisory: ${entry}`));
   }
   lines.push(`- skipped-check justification required: ${result.prePrChecklist.verification.skippedCheckJustificationRequired ? "yes" : "no"}`);
+  lines.push(`- backlog sync review: ${result.prePrChecklist.backlogSyncReview.resultSummary}`);
   lines.push(`- likely reviewer objections: ${result.prePrChecklist.likelyReviewerObjections.join("; ") || "none"}`);
   lines.push(`- remaining risks: ${result.prePrChecklist.remainingRisks.join(", ") || "none"}`);
 
@@ -627,6 +682,8 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   parseAllowedCheckCommand,
+  detectDefaultBaseRef,
+  getBranchChangedFiles,
   getChangedFiles,
   resolveUserImpact,
   normalizeMatchedAreas,

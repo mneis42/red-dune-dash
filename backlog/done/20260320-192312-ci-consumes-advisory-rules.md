@@ -3,11 +3,11 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 10
 priority: 6
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-16
-last_updated: 2026-03-17
+last_updated: 2026-03-20
 ---
 
 # TODO: CI Consumption Of Advisory Rule Source
