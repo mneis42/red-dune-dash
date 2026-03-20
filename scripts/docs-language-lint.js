@@ -1,11 +1,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const TARGET_ROOTS = ["docs", "instructions", ".github/instructions"];
+const TARGET_ROOTS = ["docs", "instructions", ".github/instructions", "backlog"];
 const TARGET_ROOT_FILES = ["README.md", "CONTRIBUTING.md", "AGENTS.md", ".github/copilot-instructions.md"];
 const EXCLUDED_FILES = new Set(["developer-todos.md", "developer-todos.ms"]);
 // Historical archives and operational logs are intentionally outside the active-doc language policy.
-const EXCLUDED_DIRECTORIES = ["backlog", "reviews", "logs/agent-runs"];
+const EXCLUDED_DIRECTORIES = ["backlog/done", "reviews", "logs/agent-runs"];
 
 const GERMAN_MARKER_PATTERN =
   /(?:\b(?:der|die|das|und|oder|nicht|fuer|ist|sind|soll|sollen|wird|werden|mit|ohne|mehr|wenn|diese|dieses|dieser|diesen|aktuell|spaeter|kuenftig|zusaetzlich|bereits|ueber|dabei)\b|[A-Za-zäöüÄÖÜß]*[äöüÄÖÜß][A-Za-zäöüÄÖÜß]*)/i;

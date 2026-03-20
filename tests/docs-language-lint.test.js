@@ -94,6 +94,22 @@ test("ignores historical backlog archives outside the active docs policy", () =>
   });
 });
 
+test("reports German markers in open prioritized backlog docs", () => {
+  withTempRepo(({ root, write }) => {
+    write("README.md", "# Readme\n\nEnglish only.\n");
+    write("CONTRIBUTING.md", "# Contributing\n\nEnglish only.\n");
+    write("AGENTS.md", "# Agents\n\nEnglish only.\n");
+    write("backlog/12-todo-language-policy.md", "# TODO\n\nDieses technische Dokument ist noch offen.\n");
+
+    const result = runDocsLanguageLint({ repoRoot: root });
+    assert.equal(result.findings.length > 0, true);
+    assert.equal(
+      result.findings.some((finding) => finding.filePath === "backlog/12-todo-language-policy.md"),
+      true
+    );
+  });
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {

@@ -1,0 +1,18 @@
+date: 2026-03-20
+task_type: other
+short_goal: Commit and push the PR review friction log to the current branch
+changed_files:
+  - logs/agent-runs/2026-03-20-pr-review-friction-shell-quoting-and-self-review-limit.yaml
+checks:
+  - name: git commit -m "Log PR review friction incident"
+    outcome: fail
+  - name: git commit -m "Log PR review friction incident" (retry)
+    outcome: pass
+  - name: git push -u origin chore/backlog-5-docs-language-policy-lint
+    outcome: fail
+  - name: git push -u origin chore/backlog-5-docs-language-policy-lint (retry)
+    outcome: pass
+friction_category: blind-spot-after-green
+human_correction_needed: true
+missing_or_misleading_guardrail: The run had no guardrail for transient git index.lock contention and no automatic post-push verification when git push incorrectly reported Everything up-to-date while origin still lagged behind HEAD.
+improvement_proposal: When git commit fails on index.lock, automatically recheck for a stale lock and retry once after verifying the lock disappeared; after every successful-looking git push, compare HEAD with the tracked origin ref and retry or warn if the remote hash did not advance.
