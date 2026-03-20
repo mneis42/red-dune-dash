@@ -100,7 +100,7 @@ To enforce the technical documentation language policy directly:
 npm run docs:language:lint
 ```
 
-This check applies to active technical and workflow documentation. Historical backlog archives in `backlog/done/` are intentionally excluded.
+This check applies to active technical and workflow documentation, including open prioritized backlog items under `backlog/`. Historical backlog archives in `backlog/done/` are intentionally excluded.
 
 If you want to run the suites individually, you can also use:
 
