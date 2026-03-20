@@ -493,7 +493,7 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
       resultSummary:
         changedBacklogPaths.length > 0
           ? `checked backlog updates in current branch: ${changedBacklogPaths.join(", ")}`
-          : "none affected",
+          : "manual review required (no backlog paths in diff; do not assume none affected)",
     },
     likelyReviewerObjections,
     remainingRisks,

@@ -162,7 +162,7 @@ test("buildCopyBlock returns concise, copy-ready section", () => {
     advisory: { mergedAreas: ["gameplay"] },
     prePrChecklist: {
       backlogSyncReview: {
-        resultSummary: "none affected",
+        resultSummary: "manual review required (no backlog paths in diff; do not assume none affected)",
       },
       splitDecision: {
         finalDecision: "no-split-default",
@@ -213,6 +213,25 @@ test("buildSummaryResult reports changed backlog files in backlog sync review", 
   assert.equal(
     result.prePrChecklist.backlogSyncReview.resultSummary,
     "checked backlog updates in current branch: backlog/2-todo-reconcile-open-backlog-with-actual-implementation-state.md"
+  );
+});
+
+test("buildSummaryResult requires manual backlog review when no backlog files changed", () => {
+  const advisory = createAdvisoryResult({
+    areas: ["tooling"],
+    matchedRules: [{ id: "tooling-scripts-tests", area: "tooling" }],
+    perFile: [],
+  });
+
+  const result = buildSummaryResult(
+    ["scripts/backlog-template-lint.js", "tests/backlog-template-lint.test.js"],
+    advisory,
+    { runChecks: false }
+  );
+
+  assert.equal(
+    result.prePrChecklist.backlogSyncReview.resultSummary,
+    "manual review required (no backlog paths in diff; do not assume none affected)"
   );
 });
 
