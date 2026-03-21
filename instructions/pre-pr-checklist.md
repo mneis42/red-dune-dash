@@ -53,6 +53,7 @@ Catch predictable review objections early and keep change sets small, verifiable
 9. Run-log decision checkpoint
    - Explicitly decide whether a trigger from `docs/agent-run-logs.md` occurred during the run.
    - Record exactly one concise result: `none required` or `created/updated: <log path>`.
+   - Do not infer `none required` only from the absence of `logs/agent-runs/` changes; the decision must still be supplied explicitly.
 
 10. Docs/instruction impact review
    - State whether docs or instruction updates were required.

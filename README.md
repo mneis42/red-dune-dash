@@ -133,6 +133,12 @@ If you want the command to execute recommended checks and include real outcomes,
 npm run agent:summary -- --run-checks
 ```
 
+For PR-ready handoff usage, pass the explicit run-log decision so the summary does not infer `none required` only from an unchanged diff:
+
+```powershell
+npm run agent:summary -- --run-log-decision none-required
+```
+
 To turn a selected backlog item into a lightweight execution brief with a branch suggestion, run:
 
 ```powershell

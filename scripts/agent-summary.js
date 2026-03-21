@@ -43,6 +43,7 @@ function parseArgs(argv) {
     includeLogs: false,
     contractConsumers: null,
     contractInseparable: false,
+    runLogDecision: null,
     errors: [],
   };
 
@@ -108,6 +109,15 @@ function parseArgs(argv) {
     }
     if (arg === "--contract-inseparable") {
       options.contractInseparable = true;
+      continue;
+    }
+    if (arg === "--run-log-decision") {
+      const value = readOptionValue("--run-log-decision", index);
+      if (value === null) {
+        continue;
+      }
+      index += 1;
+      options.runLogDecision = value;
       continue;
     }
     if (arg === "--files") {
@@ -435,6 +445,29 @@ function evaluateSplitDecision(changedFiles, advisoryResult, options) {
   };
 }
 
+
+function normalizeRunLogDecision(decision, runLogPaths) {
+  const normalizedValue = String(decision || "").trim();
+
+  if (!normalizedValue) {
+    if (runLogPaths.length > 0) {
+      return `created/updated: ${runLogPaths.join(", ")}`;
+    }
+    return "manual confirmation required";
+  }
+
+  if (normalizedValue === "none-required" || normalizedValue === "none required") {
+    return "none required";
+  }
+
+  const createdUpdatedMatch = normalizedValue.match(/^created\/updated\s*:\s*(.+)$/);
+  if (createdUpdatedMatch) {
+    return `created/updated: ${createdUpdatedMatch[1].trim()}`;
+  }
+
+  return normalizedValue;
+}
+
 function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes, risks, options) {
   const split = evaluateSplitDecision(changedFiles, advisoryResult, options);
   const skippedChecks = checkOutcomes.filter((entry) => entry.status === "not-run" || entry.status === "skipped-unsafe");
@@ -486,9 +519,11 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
       skippedCheckJustificationRequired: skippedChecks.length > 0,
     },
     runLogDecision: {
-      result: runLogPaths.length > 0 ? `created/updated: ${runLogPaths.join(', ')}` : 'none required',
+      result: normalizeRunLogDecision(options.runLogDecision, runLogPaths),
       logPaths: runLogPaths,
-      triggerDocument: 'docs/agent-run-logs.md',
+      triggerDocument: "docs/agent-run-logs.md",
+      explicitDecisionProvided: Boolean(String(options.runLogDecision || "").trim()),
+      inferredFromChangedLogsOnly: !String(options.runLogDecision || "").trim() && runLogPaths.length > 0,
     },
     docsInstructionImpact: {
       affectedDocs: stableUnique([...advisoryResult.merged.suggestedDocs, ...advisoryResult.merged.suggestedReading]),
@@ -694,6 +729,7 @@ module.exports = {
   getBranchChangedFiles,
   getChangedFiles,
   resolveUserImpact,
+  normalizeRunLogDecision,
   normalizeMatchedAreas,
   evaluateSplitDecision,
   buildPrePrChecklistOutcome,

@@ -13,6 +13,7 @@ const {
   isFailingCheckStatus,
   formatHumanReadable,
   getChangedFiles,
+  normalizeRunLogDecision,
 } = require("../scripts/agent-summary.js");
 
 const tests = [];
@@ -66,8 +67,26 @@ test("parseArgs supports json, staged, base, run-checks, files, and rules flags"
     includeLogs: false,
     contractConsumers: null,
     contractInseparable: false,
+    runLogDecision: null,
     errors: [],
   });
+});
+
+
+test("parseArgs supports explicit run-log decision flag", () => {
+  const options = parseArgs(["--run-log-decision", "none-required"]);
+
+  assert.equal(options.runLogDecision, "none-required");
+  assert.deepEqual(options.errors, []);
+});
+
+test("normalizeRunLogDecision requires manual confirmation when no evidence is supplied", () => {
+  assert.equal(normalizeRunLogDecision(null, []), "manual confirmation required");
+  assert.equal(normalizeRunLogDecision("none-required", []), "none required");
+  assert.equal(
+    normalizeRunLogDecision("created/updated: logs/agent-runs/example.yaml", []),
+    "created/updated: logs/agent-runs/example.yaml"
+  );
 });
 
 test("detectDefaultBaseRef returns null when origin head cannot be resolved", () => {
@@ -200,6 +219,27 @@ test("buildSummaryResult includes required summary fields", () => {
   assert.equal(typeof result.copyBlock, "string");
 });
 
+test("buildSummaryResult requires manual run-log confirmation when no decision is supplied", () => {
+  const advisory = createAdvisoryResult({ perFile: [] });
+
+  const result = buildSummaryResult(["instructions/pre-pr-checklist.md"], advisory, { runChecks: false });
+
+  assert.equal(result.prePrChecklist.runLogDecision.result, "manual confirmation required");
+  assert.equal(result.prePrChecklist.runLogDecision.explicitDecisionProvided, false);
+});
+
+test("buildSummaryResult preserves explicit none-required run-log decisions", () => {
+  const advisory = createAdvisoryResult({ perFile: [] });
+
+  const result = buildSummaryResult(["instructions/pre-pr-checklist.md"], advisory, {
+    runChecks: false,
+    runLogDecision: "none-required",
+  });
+
+  assert.equal(result.prePrChecklist.runLogDecision.result, "none required");
+  assert.equal(result.prePrChecklist.runLogDecision.explicitDecisionProvided, true);
+});
+
 test("buildSummaryResult reports run-log creation when agent run logs changed", () => {
   const advisory = createAdvisoryResult(["instructions/pre-pr-checklist.md", "logs/agent-runs/2026-03-21-example.yaml"]);
 
@@ -213,6 +253,7 @@ test("buildSummaryResult reports run-log creation when agent run logs changed", 
     result.prePrChecklist.runLogDecision.result,
     "created/updated: logs/agent-runs/2026-03-21-example.yaml"
   );
+  assert.equal(result.prePrChecklist.runLogDecision.inferredFromChangedLogsOnly, true);
 });
 
 test("buildSummaryResult reports changed backlog files in backlog sync review", () => {
