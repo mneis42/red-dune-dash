@@ -103,6 +103,8 @@ If the user asks for a review, stay in review mode.
 Only edit code or files when the user explicitly asks for fixes or for the review to be applied.
 
 When posting multiline or Markdown-rich review findings back through GitHub CLI, prefer `npm run gh:safe -- pr comment ... --body-stdin` or `--body-file` instead of inline `--body` quoting.
+In this agent environment, request escalated execution up front for networked `gh` commands such as `gh pr create`, `gh pr comment`, `gh pr review`, `gh pr view`, `gh pr diff`, `gh api`, and `gh run view/list`; keep sandbox `gh` usage for clearly local-only commands such as `gh help` and `gh version`.
+If `gh pr view --json` lacks a needed field, describe that as a high-level subcommand field limitation and use `gh api` for the supported follow-up query instead of implying a broader GitHub API limitation.
 
 
 ## Run-Log Handling For Review Runs

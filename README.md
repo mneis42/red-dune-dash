@@ -170,6 +170,8 @@ Deployment remains Linux-only by design, and the advisory hint step is kept as a
 - Push the feature branch and open a pull request against `main`.
 - Use `npm run setup` after cloning so the local Git hook guardrail is active.
 - For multiline or Markdown-heavy GitHub CLI text, prefer `npm run gh:safe -- ... --body-stdin` or `--body-file` instead of inline `--body` quoting.
+- In this agent environment, request escalated execution up front for networked `gh` commands such as `gh pr create`, `gh pr comment`, `gh pr review`, `gh pr view`, `gh pr diff`, `gh api`, and `gh run view/list`; keep sandbox `gh` usage for clearly local-only commands such as `gh help` and `gh version`.
+- If `gh pr view --json` lacks a field you need, use `gh api` for the follow-up query instead of treating it as a broader GitHub API limitation.
 
 ## Automation Status
 

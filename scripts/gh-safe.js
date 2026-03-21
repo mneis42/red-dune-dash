@@ -4,6 +4,102 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const INLINE_BODY_MAX_LENGTH = 120;
+const NETWORK_REQUIRED_PREFIXES = [
+  ["api"],
+  ["auth", "status"],
+  ["pr", "checks"],
+  ["pr", "comment"],
+  ["pr", "create"],
+  ["pr", "diff"],
+  ["pr", "edit"],
+  ["pr", "list"],
+  ["pr", "review"],
+  ["pr", "view"],
+  ["run", "list"],
+  ["run", "view"],
+];
+const LOCAL_SAFE_PREFIXES = [
+  ["alias"],
+  ["completion"],
+  ["help"],
+  ["version"],
+];
+
+function matchesPrefix(args, prefix) {
+  if (!Array.isArray(args) || !Array.isArray(prefix) || prefix.length === 0 || args.length < prefix.length) {
+    return false;
+  }
+
+  return prefix.every((value, index) => args[index] === value);
+}
+
+function classifyGhCommand(args) {
+  const normalizedArgs = Array.isArray(args) ? args.filter(Boolean) : [];
+
+  if (normalizedArgs.length === 0) {
+    return {
+      classification: "manual-review",
+      reason: "No gh subcommand was provided.",
+    };
+  }
+
+  if (normalizedArgs[0] === "--version" || normalizedArgs[0] === "--help") {
+    return {
+      classification: "sandbox-safe",
+      reason: "Built-in help/version output does not require live GitHub API access.",
+    };
+  }
+
+  if (normalizedArgs.includes("--help") || normalizedArgs.includes("-h")) {
+    return {
+      classification: "sandbox-safe",
+      reason: "Help output does not require live GitHub API access, even when attached to a networked subcommand.",
+    };
+  }
+
+  const networkPrefix = NETWORK_REQUIRED_PREFIXES.find((prefix) => matchesPrefix(normalizedArgs, prefix));
+  if (networkPrefix) {
+    return {
+      classification: "network-required",
+      reason: `Command prefix "${networkPrefix.join(" ")}" typically needs live GitHub API access in this environment.`,
+    };
+  }
+
+  const localPrefix = LOCAL_SAFE_PREFIXES.find((prefix) => matchesPrefix(normalizedArgs, prefix));
+  if (localPrefix) {
+    return {
+      classification: "sandbox-safe",
+      reason: `Command prefix "${localPrefix.join(" ")}" is local-only and can stay in the sandbox.`,
+    };
+  }
+
+  return {
+    classification: "manual-review",
+    reason: "Unknown gh subcommand; confirm whether it needs live GitHub API access before choosing sandbox or escalation.",
+  };
+}
+
+function collectExecutionNotes(args) {
+  const classification = classifyGhCommand(args);
+  const notes = [];
+
+  if (classification.classification === "network-required") {
+    notes.push(
+      "gh-safe note: this gh command usually needs live GitHub API access; in agent runs, request escalated execution up front instead of trying the sandbox first."
+    );
+  }
+
+  if (matchesPrefix(args, ["pr", "view"]) && args.includes("--json")) {
+    notes.push(
+      "gh-safe note: if `gh pr view --json` lacks a field, use `gh api` for the supported follow-up query instead of describing it as a broader GitHub API limitation."
+    );
+  }
+
+  return {
+    classification,
+    notes,
+  };
+}
 
 function readOptionValue(argv, index, flagName) {
   const arg = argv[index];
@@ -212,6 +308,10 @@ function main(argv = process.argv.slice(2), dependencies = {}) {
     return 1;
   }
 
+  const logError = dependencies.logError || console.error;
+  const executionNotes = collectExecutionNotes(options.passthroughArgs);
+  executionNotes.notes.forEach((entry) => logError(entry));
+
   const bodyArgs = buildBodyArgs(options, dependencies);
   const finalArgs = [...options.passthroughArgs, ...bodyArgs.args];
   const result = runGhCommand(finalArgs, dependencies.runner || spawnSync);
@@ -238,6 +338,11 @@ module.exports = {
   parseArgs,
   isShortSingleLinePlainText,
   shouldUseBodyFile,
+  NETWORK_REQUIRED_PREFIXES,
+  LOCAL_SAFE_PREFIXES,
+  matchesPrefix,
+  classifyGhCommand,
+  collectExecutionNotes,
   readBodyFromMode,
   createTemporaryBodyFile,
   buildBodyArgs,

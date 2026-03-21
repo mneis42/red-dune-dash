@@ -18,4 +18,7 @@ For bug reports and gameplay defects, follow the bug analysis and fix workflow i
 
 For full-code-review runs, enforce the mandatory stop-prevention checklist in `instructions/full-code-review.md` before ending any response.
 
+For `gh` usage in this agent environment, request escalated execution up front for commands that typically need live GitHub API access, such as `gh pr create`, `gh pr comment`, `gh pr review`, `gh pr view`, `gh pr diff`, `gh api`, and `gh run view/list`. Keep sandbox execution for clearly local-only `gh` commands such as `gh help` or `gh version`.
+If `gh pr view --json` does not expose a needed field, describe that as a high-level subcommand field limitation and use `gh api` for the supported follow-up query instead of implying a broader GitHub API limitation.
+
 These instructions are intentionally shared across coding agents so the required review workflow stays the same regardless of whether the reviewer uses Codex, Copilot, or another agent.
