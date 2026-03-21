@@ -7,6 +7,7 @@ const {
   buildHeadingAnchors,
   runInstructionLint,
   ISSUE_SEVERITY_BY_CODE,
+  evaluateRunLogPolicyCoverage,
 } = require("../scripts/instruction-lint.js");
 
 const tests = [];
@@ -56,22 +57,32 @@ test("runInstructionLint succeeds for valid canonical references and anchors", (
         "- [Feature](instructions/feature-request.md)",
         "- [Bug](instructions/bug-report.md)",
         "- [Pre-PR](instructions/pre-pr-checklist.md)",
+        "",
+        "When a triggering incident from [Run Logs](docs/agent-run-logs.md) occurs, create or update the corresponding run log.",
+        "When no trigger occurred, do not write a run log.",
       ].join("\n")
     );
 
     write("README.md", "# Readme\n\nSee [Guide](instructions/feature-request.md#goal).\n");
     write("CONTRIBUTING.md", "# Contributing\n\nSee [Checklist](instructions/pre-pr-checklist.md).\n");
-    write("instructions/full-code-review.md", "# Full Code Review Instructions\n\n## Goal\n");
+    write("docs/agent-run-logs.md", "# Run Logs\n");
+    write(
+      "instructions/full-code-review.md",
+      "# Full Code Review Instructions\n\n## Goal\n\nSee [Run Logs](../docs/agent-run-logs.md).\nBefore handoff, make a run-log decision checkpoint.\nIf a trigger occurred, create or update the run log.\nIf no trigger occurred, record none required.\nUse created/updated: logs/agent-runs/example.yaml when needed.\n"
+    );
     write("instructions/change-review.md", "# Change Review Instructions\n\n## Goal\n");
     write(
       "instructions/feature-request.md",
-      "# Feature Request Instructions\n\n## Goal\n\nSee [Checklist](pre-pr-checklist.md).\n"
+      "# Feature Request Instructions\n\n## Goal\n\nSee [Checklist](pre-pr-checklist.md).\nSee [Run Logs](../docs/agent-run-logs.md).\nBefore handoff, make a run-log decision checkpoint.\nIf a trigger occurred, create or update the run log.\nIf no trigger occurred, record none required.\nUse created/updated: logs/agent-runs/example.yaml when needed.\n"
     );
     write(
       "instructions/bug-report.md",
-      "# Bug Report Instructions\n\n## Goal\n\nSee [Checklist](pre-pr-checklist.md).\n"
+      "# Bug Report Instructions\n\n## Goal\n\nSee [Checklist](pre-pr-checklist.md).\nSee [Run Logs](../docs/agent-run-logs.md).\nBefore handoff, make a run-log decision checkpoint.\nIf a trigger occurred, create or update the run log.\nIf no trigger occurred, record none required.\nUse created/updated: logs/agent-runs/example.yaml when needed.\n"
     );
-    write("instructions/pre-pr-checklist.md", "# Pre-PR Checklist\n\n## Purpose\n");
+    write(
+      "instructions/pre-pr-checklist.md",
+      "# Pre-PR Checklist\n\n## Purpose\n\nSee [Run Logs](../docs/agent-run-logs.md).\nRun-log decision checkpoint: if a trigger occurred, create or update the run log; if no trigger occurred, record none required; otherwise use created/updated: logs/agent-runs/example.yaml.\n"
+    );
     write(
       ".github/copilot-instructions.md",
       "# Copilot\n\nSee [Feature](../instructions/feature-request.md#goal).\nSee [Checklist](../instructions/pre-pr-checklist.md).\n"
@@ -248,6 +259,85 @@ test("runInstructionLint reports missing required checklist-reference files with
   });
 });
 
+
+test("evaluateRunLogPolicyCoverage accepts equivalent trigger and no-trigger wording", () => {
+  const coverage = evaluateRunLogPolicyCoverage(`
+See [Run Logs](docs/agent-run-logs.md).
+Before handoff, make a run-log decision checkpoint.
+If a triggering incident happened, create or update the run log.
+If no trigger occurred, record none required.
+Use created/updated: logs/agent-runs/example.yaml when needed.
+  `);
+
+  assert.equal(coverage.mentionsDecision, true);
+  assert.equal(coverage.mentionsTrigger, true);
+  assert.equal(coverage.mentionsRunLogAction, true);
+  assert.equal(coverage.mentionsNoTriggerOutcome, true);
+  assert.equal(coverage.mentionsCreatedUpdatedOutcome, true);
+});
+
+test("runInstructionLint reports missing run-log policy reference and checkpoint semantics", () => {
+  withTempRepo(({ root, write }) => {
+    write("AGENTS.md", [
+      "# Agent Instructions",
+      "",
+      "- [Full](instructions/full-code-review.md)",
+      "- [Change](instructions/change-review.md)",
+      "- [Feature](instructions/feature-request.md)",
+      "- [Bug](instructions/bug-report.md)",
+      "- [Pre-PR](instructions/pre-pr-checklist.md)",
+      "",
+      "When a triggering incident from [Run Logs](docs/agent-run-logs.md) occurs, create or update the run log.",
+      "If no trigger occurred, do not write a run log.",
+    ].join("\n"));
+
+    write("README.md", "# Readme\n");
+    write("CONTRIBUTING.md", "# Contributing\n\nSee [Checklist](instructions/pre-pr-checklist.md).\n");
+    write("docs/agent-run-logs.md", "# Run Logs\n");
+    write("instructions/full-code-review.md", "# Full\n\nSee [Run Logs](../docs/agent-run-logs.md).\n");
+    write("instructions/change-review.md", "# Change\n");
+    write("instructions/feature-request.md", "# Feature\n\nSee [Checklist](pre-pr-checklist.md).\nSee [Run Logs](../docs/agent-run-logs.md).\n");
+    write("instructions/bug-report.md", "# Bug\n\nSee [Checklist](pre-pr-checklist.md).\nSee [Run Logs](../docs/agent-run-logs.md).\n");
+    write("instructions/pre-pr-checklist.md", "# Checklist\n\nSee [Run Logs](../docs/agent-run-logs.md).\n");
+    write(".github/copilot-instructions.md", "# Copilot\n\nSee [Checklist](../instructions/pre-pr-checklist.md).\n");
+
+    const result = runInstructionLint({ repoRoot: root });
+    const codes = result.issues.map((issue) => issue.code);
+    assert.equal(codes.includes("missing-run-log-routing-semantics"), true);
+    assert.equal(codes.includes("missing-run-log-decision-checkpoint"), true);
+  });
+});
+
+test("runInstructionLint accepts reasonable run-log wording changes across mandatory workflows", () => {
+  withTempRepo(({ root, write }) => {
+    write("AGENTS.md", [
+      "# Agent Instructions",
+      "",
+      "- [Full](instructions/full-code-review.md)",
+      "- [Change](instructions/change-review.md)",
+      "- [Feature](instructions/feature-request.md)",
+      "- [Bug](instructions/bug-report.md)",
+      "- [Pre-PR](instructions/pre-pr-checklist.md)",
+      "",
+      "When a triggering incident from [Run Logs](docs/agent-run-logs.md) occurs, create or update the run log.",
+      "If no trigger occurred, no log should be written.",
+    ].join("\n"));
+
+    write("README.md", "# Readme\n");
+    write("CONTRIBUTING.md", "# Contributing\n\nSee [Checklist](instructions/pre-pr-checklist.md).\n");
+    write("docs/agent-run-logs.md", "# Run Logs\n");
+    write("instructions/full-code-review.md", "# Full\n\nSee [Run Logs](../docs/agent-run-logs.md).\nBefore handoff, make a run-log decision checkpoint.\nIf a trigger occurred, create or update the run log.\nIf no trigger occurred, record none required.\nUse created/updated: logs/agent-runs/example.yaml when needed.\n");
+    write("instructions/change-review.md", "# Change\n");
+    write("instructions/feature-request.md", "# Feature\n\nSee [Checklist](pre-pr-checklist.md).\nSee [Run Logs](../docs/agent-run-logs.md).\nBefore handoff, make a run-log decision checkpoint.\nIf a triggering incident happened, create or update the run log.\nIf no trigger occurred, record none required.\nUse created/updated: logs/agent-runs/example.yaml when needed.\n");
+    write("instructions/bug-report.md", "# Bug\n\nSee [Checklist](pre-pr-checklist.md).\nSee [Run Logs](../docs/agent-run-logs.md).\nBefore handoff, make a run-log decision checkpoint.\nIf a trigger occurred, create or update the run log.\nIf no trigger occurred, record none required.\nUse created/updated: logs/agent-runs/example.yaml when needed.\n");
+    write("instructions/pre-pr-checklist.md", "# Checklist\n\nSee [Run Logs](../docs/agent-run-logs.md).\nRun-log decision checkpoint: if a trigger occurred, create or update the run log; if no trigger occurred, record none required; otherwise use created/updated: logs/agent-runs/example.yaml.\n");
+    write(".github/copilot-instructions.md", "# Copilot\n\nSee [Checklist](../instructions/pre-pr-checklist.md).\n");
+
+    const result = runInstructionLint({ repoRoot: root });
+    assert.equal(result.issues.length, 0);
+  });
+});
+
 test("runInstructionLint reports missing canonical checklist file against stable AGENTS.md path", () => {
   withTempRepo(({ root, write }) => {
     write(
@@ -289,6 +379,10 @@ test("all known issue codes have explicit severity mapping", () => {
     "missing-canonical-reference",
     "missing-pre-pr-checklist-reference",
     "missing-required-checklist-reference-file",
+    "missing-required-run-log-coverage-file",
+    "missing-run-log-policy-reference",
+    "missing-run-log-routing-semantics",
+    "missing-run-log-decision-checkpoint",
     "missing-link-target",
     "missing-anchor",
     "invalid-anchor-target",
