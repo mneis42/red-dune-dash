@@ -91,6 +91,7 @@ Deploy-only behavior remains Linux-only, and advisory change hints stay non-bloc
 - Keep commits focused and readable.
 - Prefer English commit messages.
 - Explain user-visible impact, test coverage, and known risks in the pull request description.
+- For multiline or Markdown-rich GitHub CLI bodies, prefer `npm run gh:safe -- ... --body-stdin` or `--body-file` so backticks and fenced code do not depend on shell quoting.
 - If an AI agent produced most of the change, that is fine; clarity and verifiability matter more than authorship style.
 
 ## Good Contributions

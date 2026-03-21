@@ -102,6 +102,8 @@ If many issues exist, lead with the most severe ones and compress the rest.
 If the user asks for a review, stay in review mode.
 Only edit code or files when the user explicitly asks for fixes or for the review to be applied.
 
+When posting multiline or Markdown-rich review findings back through GitHub CLI, prefer `npm run gh:safe -- pr comment ... --body-stdin` or `--body-file` instead of inline `--body` quoting.
+
 ## Task Packages (Canonical Insertion Point)
 
 This section defines reusable task-package shapes for common repository work.

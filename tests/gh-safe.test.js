@@ -73,7 +73,6 @@ test("parseArgs accepts inline body values that begin with dashes", () => {
     errors: [],
   });
 });
-
 test("short single-line plain text bodies stay inline", () => {
   assert.equal(isShortSingleLinePlainText("Short plain note."), true);
   assert.equal(shouldUseBodyFile("Short plain note."), false);
@@ -160,7 +159,7 @@ test("main routes stdin markdown through body-file and cleans temporary director
   assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body-file", path.join("/tmp", "gh-body-run", "body.md")]]);
   assert.equal(createdFiles[0].contents, body);
   assert.deepEqual(removedPaths, [path.join("/tmp", "gh-body-run")]);
-  });
+});
 
 test("main keeps short inline bodies on native --body", () => {
   const runnerCalls = [];

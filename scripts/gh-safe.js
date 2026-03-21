@@ -34,7 +34,6 @@ function readOptionValue(argv, index, flagName) {
     missing: false,
   };
 }
-
 function parseArgs(argv) {
   const options = {
     passthroughArgs: [],
