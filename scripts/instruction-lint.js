@@ -17,6 +17,15 @@ const PRE_PR_CHECKLIST_REQUIRED_REFERENCE_PATHS = [
   ".github/copilot-instructions.md",
 ];
 
+const RUN_LOG_ROUTING_REQUIRED_PATHS = [
+  "AGENTS.md",
+  "instructions/feature-request.md",
+  "instructions/bug-report.md",
+  "instructions/full-code-review.md",
+  "instructions/pre-pr-checklist.md",
+];
+const RUN_LOG_POLICY_PATH = "docs/agent-run-logs.md";
+
 const DEFAULT_ROOT_MARKDOWN_FILES = ["AGENTS.md", "README.md", "CONTRIBUTING.md"];
 const DEFAULT_SCAN_DIRECTORIES = ["instructions", ".github"];
 
@@ -26,6 +35,10 @@ const ISSUE_SEVERITY_BY_CODE = {
   "missing-canonical-reference": "high",
   "missing-pre-pr-checklist-reference": "high",
   "missing-required-checklist-reference-file": "high",
+  "missing-required-run-log-coverage-file": "high",
+  "missing-run-log-policy-reference": "high",
+  "missing-run-log-routing-semantics": "high",
+  "missing-run-log-decision-checkpoint": "high",
   "missing-link-target": "medium",
   "missing-anchor": "medium",
   "invalid-anchor-target": "medium",
@@ -163,6 +176,18 @@ function safeDecodeURIComponent(value) {
   } catch {
     return value;
   }
+}
+
+function normalizeSemanticText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[`*_>#:\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasAnyPattern(text, patterns) {
+  return patterns.some((pattern) => pattern.test(text));
 }
 
 function createIssue(code, filePath, line, message) {
@@ -332,6 +357,121 @@ function lintPrePrChecklistReferences(repoRoot, byPath) {
   return issues;
 }
 
+function evaluateRunLogPolicyCoverage(markdownText) {
+  const text = normalizeSemanticText(markdownText);
+  const mentionsDecision = hasAnyPattern(text, [/run log decision checkpoint/, /run log decision/]);
+  const mentionsTrigger = hasAnyPattern(text, [/trigger(?:ing)? incident/, /trigger occurred/, /whether a trigger/, /if a trigger/]);
+  const mentionsRunLogAction = hasAnyPattern(text, [
+    /create(?:d)? or update(?:d)?(?: [a-z]+){0,3} run log/,
+    /create(?:d)? or update(?:d)?(?: [a-z]+){0,3} log/,
+    /run log .*create(?:d)? or update(?:d)?/,
+    /log path recorded explicitly/,
+  ]);
+  const mentionsNoTriggerOutcome = hasAnyPattern(text, [
+    /none required/,
+    /no trigger occurred/,
+    /when no trigger occurred/,
+    /do not write (?:a )?run log/,
+    /no log should be written/,
+  ]);
+  const mentionsCreatedUpdatedOutcome = hasAnyPattern(text, [/created\/updated/, /created or updated/, /create or update/]);
+
+  return {
+    mentionsDecision,
+    mentionsTrigger,
+    mentionsRunLogAction,
+    mentionsNoTriggerOutcome,
+    mentionsCreatedUpdatedOutcome,
+  };
+}
+
+function lintRunLogCoverage(repoRoot, byPath) {
+  const issues = [];
+  const runLogAbsolutePath = path.join(repoRoot, RUN_LOG_POLICY_PATH);
+
+  if (!fs.existsSync(runLogAbsolutePath)) {
+    issues.push(
+      createIssue(
+        "missing-canonical-file",
+        "AGENTS.md",
+        1,
+        `Canonical instruction file is missing: ${RUN_LOG_POLICY_PATH}`
+      )
+    );
+    return issues;
+  }
+
+  for (const sourcePath of RUN_LOG_ROUTING_REQUIRED_PATHS) {
+    const source = byPath.get(sourcePath);
+    if (!source) {
+      issues.push(
+        createIssue(
+          "missing-required-run-log-coverage-file",
+          sourcePath,
+          1,
+          `Required run-log coverage file is missing: ${sourcePath}`
+        )
+      );
+      continue;
+    }
+
+    const hasReference = source.links.some((entry) => {
+      if (isExternalTarget(entry.href)) {
+        return false;
+      }
+      const target = splitLinkTarget(entry.href);
+      const cleanTarget = safeDecodeURIComponent(target.linkPath).trim();
+      const resolvedTargetPath = toPosix(path.normalize(path.join(path.dirname(sourcePath), cleanTarget)));
+      return resolvedTargetPath === RUN_LOG_POLICY_PATH;
+    });
+
+    if (!hasReference) {
+      issues.push(
+        createIssue(
+          "missing-run-log-policy-reference",
+          sourcePath,
+          1,
+          `${sourcePath} does not reference run-log policy path: ${RUN_LOG_POLICY_PATH}`
+        )
+      );
+      continue;
+    }
+
+    const coverage = evaluateRunLogPolicyCoverage(source.content);
+
+    if (!coverage.mentionsTrigger || !coverage.mentionsRunLogAction || !coverage.mentionsNoTriggerOutcome) {
+      issues.push(
+        createIssue(
+          "missing-run-log-routing-semantics",
+          sourcePath,
+          1,
+          `${sourcePath} is missing required run-log routing semantics for trigger and no-trigger outcomes.`
+        )
+      );
+    }
+
+    if (sourcePath !== "AGENTS.md") {
+      if (
+        !coverage.mentionsDecision ||
+        !coverage.mentionsTrigger ||
+        !coverage.mentionsNoTriggerOutcome ||
+        !coverage.mentionsCreatedUpdatedOutcome
+      ) {
+        issues.push(
+          createIssue(
+            "missing-run-log-decision-checkpoint",
+            sourcePath,
+            1,
+            `${sourcePath} is missing an explicit run-log decision checkpoint with trigger, none-required, and created/updated outcomes.`
+          )
+        );
+      }
+    }
+  }
+
+  return issues;
+}
+
 function lintInstructionLinks(repoRoot, files) {
   const issues = [];
   const byPath = new Map();
@@ -348,6 +488,7 @@ function lintInstructionLinks(repoRoot, files) {
 
   issues.push(...lintCanonicalAgentReferences(repoRoot, byPath));
   issues.push(...lintPrePrChecklistReferences(repoRoot, byPath));
+  issues.push(...lintRunLogCoverage(repoRoot, byPath));
 
   for (const sourcePath of files) {
     const sourceEntry = byPath.get(sourcePath);
@@ -494,6 +635,8 @@ if (require.main === module) {
 module.exports = {
   CANONICAL_INSTRUCTION_PATHS,
   ISSUE_SEVERITY_BY_CODE,
+  RUN_LOG_POLICY_PATH,
+  RUN_LOG_ROUTING_REQUIRED_PATHS,
   normalizeHeadingText,
   buildHeadingAnchors,
   parseMarkdownLinks,
@@ -501,4 +644,5 @@ module.exports = {
   lintInstructionLinks,
   runInstructionLint,
   formatInstructionLintResult,
+  evaluateRunLogPolicyCoverage,
 };

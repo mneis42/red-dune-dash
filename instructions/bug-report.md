@@ -108,7 +108,7 @@ Before ending any response, explicitly verify all of the following:
 - If the developer chose immediate implementation, the highest-priority open TODO is actively being executed unless all TODOs are complete.
 - If the developer chose backlog storage, `todo.md` has been moved to `backlog/{short-description}.md` and implementation has not started.
 - Before every implementation commit, the relevant tests and checks for that step passed.
-- Before any PR-ready handoff or final bug-fix response, a run-log decision was made using `docs/agent-run-logs.md`, with either `none required` or the created/updated log path recorded explicitly.
+- Before any PR-ready handoff or final bug-fix response, a run-log decision checkpoint was completed using [docs/agent-run-logs.md](../docs/agent-run-logs.md): if a trigger occurred, create or update the run log and record `created/updated: <log path>`; if no trigger occurred, record `none required` explicitly.
 - For PR-ready handoff responses after implementation, the mandatory checklist in [instructions/pre-pr-checklist.md](pre-pr-checklist.md) has been completed and reflected in the existing summary flow.
 - If all TODOs are complete, final verification has passed and `todo.md` has been moved to `backlog/done/{timestamp}-{short-title}.md` and left uncommitted.
 - If work is paused for any other reason, a real blocker is documented in `todo.md`.
@@ -126,7 +126,7 @@ Answer each item with `YES` or `NO`:
 5. If the developer chose immediate implementation, is there no higher-priority open TODO than the one currently being worked on?
 6. If the developer chose backlog storage, has `todo.md` been moved to `backlog/{short-description}.md`?
 7. Before every implementation commit so far, were the relevant tests green?
-8. Before any PR-ready handoff or final bug-fix response, was the run-log decision recorded explicitly as `none required` or `created/updated: <log path>` based on `docs/agent-run-logs.md`?
+8. Before any PR-ready handoff or final bug-fix response, was the run-log decision checkpoint completed based on [docs/agent-run-logs.md](../docs/agent-run-logs.md), with `created/updated: <log path>` when a trigger occurred and `none required` when no trigger occurred?
 9. If all TODOs are done, has final verification passed and has `todo.md` been archived to `backlog/done/{timestamp}-{short-title}.md` without an extra commit afterward?
 10. If handing off a PR-ready implementation result, was [instructions/pre-pr-checklist.md](pre-pr-checklist.md) completed and reflected in the existing summary flow?
 

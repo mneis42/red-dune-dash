@@ -51,8 +51,9 @@ Catch predictable review objections early and keep change sets small, verifiable
    - For every `not-run` or `skipped-unsafe` check, provide a short justification.
 
 9. Run-log decision checkpoint
-   - Explicitly decide whether a trigger from `docs/agent-run-logs.md` occurred during the run.
-   - Record exactly one concise result: `none required` or `created/updated: <log path>`.
+   - Complete a run-log decision checkpoint using [docs/agent-run-logs.md](../docs/agent-run-logs.md): explicitly decide whether a trigger occurred during the run.
+   - If a trigger occurred, create or update the run log and record `created/updated: <log path>`.
+   - If no trigger occurred, record `none required` explicitly.
    - Do not infer `none required` only from the absence of `logs/agent-runs/` changes; the decision must still be supplied explicitly.
 
 10. Docs/instruction impact review
@@ -81,7 +82,7 @@ Minimum handoff fields:
 - matched/touched scope areas
 - split decision and trigger reasons
 - checks run and skipped-check justifications
-- run-log decision
+- run-log decision checkpoint
 - docs/instruction impact
 - backlog sync review result
 - likely reviewer objections
@@ -97,7 +98,7 @@ Task: align one instruction sentence with current hook behavior.
 - hard triggers: none
 - checks: `npm run instruction:lint=pass`, `npm run test:preflight=pass`
 - skipped checks: none
-- run-log decision: none required
+- run-log decision checkpoint: none required
 - docs/instruction impact: instruction docs updated in both canonical and mirrored locations
 - backlog sync review: none affected
 - likely reviewer objections: wording mismatch risk resolved
