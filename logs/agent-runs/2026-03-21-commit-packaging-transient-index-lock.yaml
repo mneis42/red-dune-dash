@@ -1,0 +1,28 @@
+date: 2026-03-21
+task_type: other
+short_goal: Implement upfront escalation guidance for networked gh workflows and package the branch for PR
+changed_files:
+  - scripts/gh-safe.js
+  - tests/gh-safe.test.js
+  - workflow/advisory-rules.json
+  - tests/advisory-rules.test.js
+  - AGENTS.md
+  - README.md
+  - CONTRIBUTING.md
+  - instructions/change-review.md
+  - .github/instructions/change-review.instructions.md
+  - .github/copilot-instructions.md
+  - backlog/done/20260321-165246-route-networked-gh-commands-directly-to-escalation.md
+checks:
+  - name: npm run verify
+    outcome: pass
+  - name: npm run agent:summary -- --run-checks --run-log-decision none-required
+    outcome: pass
+  - name: git commit -m "Route networked gh workflows to upfront escalation"
+    outcome: fail
+  - name: git commit -m "Route networked gh workflows to upfront escalation" (retry)
+    outcome: pass
+friction_category: blind-spot-after-green
+human_correction_needed: false
+missing_or_misleading_guardrail: Final packaging hit a transient .git/index.lock after verification was already green, but the workflow still had no explicit preflight or automatic retry path for commit-time lock contention during PR packaging.
+improvement_proposal: Extend the commit/PR-packaging guardrail so transient .git/index.lock failures during final commit packaging are retried or surfaced with an explicit next-step hint before the run is treated as blocked.
