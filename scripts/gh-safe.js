@@ -5,6 +5,36 @@ const { spawnSync } = require("node:child_process");
 
 const INLINE_BODY_MAX_LENGTH = 120;
 
+function readOptionValue(argv, index, flagName) {
+  const arg = argv[index];
+  const equalsPrefix = `${flagName}=`;
+  if (arg.startsWith(equalsPrefix)) {
+    return {
+      value: arg.slice(equalsPrefix.length),
+      nextIndex: index,
+      missing: false,
+    };
+  }
+
+  if (arg !== flagName) {
+    return null;
+  }
+
+  if (index + 1 >= argv.length) {
+    return {
+      value: null,
+      nextIndex: index,
+      missing: true,
+    };
+  }
+
+  return {
+    value: argv[index + 1],
+    nextIndex: index + 1,
+    missing: false,
+  };
+}
+
 function parseArgs(argv) {
   const options = {
     passthroughArgs: [],
@@ -16,37 +46,37 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
 
-    if (arg === "--body") {
-      const value = argv[index + 1];
-      if (!value || String(value).startsWith("--")) {
+    const bodyOption = readOptionValue(argv, index, "--body");
+    if (bodyOption) {
+      if (bodyOption.missing) {
         options.errors.push("Missing value for --body.");
         continue;
       }
       if (options.bodyMode !== "none") {
         options.errors.push("Use only one of --body, --body-file, or --body-stdin.");
-        index += 1;
+        index = bodyOption.nextIndex;
         continue;
       }
       options.bodyMode = "inline";
-      options.bodyValue = value;
-      index += 1;
+      options.bodyValue = bodyOption.value;
+      index = bodyOption.nextIndex;
       continue;
     }
 
-    if (arg === "--body-file") {
-      const value = argv[index + 1];
-      if (!value || String(value).startsWith("--")) {
+    const bodyFileOption = readOptionValue(argv, index, "--body-file");
+    if (bodyFileOption) {
+      if (bodyFileOption.missing) {
         options.errors.push("Missing value for --body-file.");
         continue;
       }
       if (options.bodyMode !== "none") {
         options.errors.push("Use only one of --body, --body-file, or --body-stdin.");
-        index += 1;
+        index = bodyFileOption.nextIndex;
         continue;
       }
       options.bodyMode = "file";
-      options.bodyValue = value;
-      index += 1;
+      options.bodyValue = bodyFileOption.value;
+      index = bodyFileOption.nextIndex;
       continue;
     }
 
@@ -205,6 +235,7 @@ function main(argv = process.argv.slice(2), dependencies = {}) {
 
 module.exports = {
   INLINE_BODY_MAX_LENGTH,
+  readOptionValue,
   parseArgs,
   isShortSingleLinePlainText,
   shouldUseBodyFile,
