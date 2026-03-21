@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {
+  readOptionValue,
   parseArgs,
   isShortSingleLinePlainText,
   shouldUseBodyFile,
@@ -27,6 +28,51 @@ test("parseArgs preserves gh args and body-stdin selection", () => {
   });
 });
 
+test("readOptionValue supports split and equals forms", () => {
+  assert.deepEqual(readOptionValue(["--body", "hello"], 0, "--body"), {
+    value: "hello",
+    nextIndex: 1,
+    missing: false,
+  });
+  assert.deepEqual(readOptionValue(["--body=hello"], 0, "--body"), {
+    value: "hello",
+    nextIndex: 0,
+    missing: false,
+  });
+});
+
+test("parseArgs supports equals syntax for body options", () => {
+  const result = parseArgs(["pr", "comment", "42", "--body=Use `npm test` before merge."]);
+
+  assert.deepEqual(result, {
+    passthroughArgs: ["pr", "comment", "42"],
+    bodyMode: "inline",
+    bodyValue: "Use `npm test` before merge.",
+    errors: [],
+  });
+});
+
+test("parseArgs supports equals syntax for body-file options", () => {
+  const result = parseArgs(["pr", "comment", "42", "--body-file=message.md"]);
+
+  assert.deepEqual(result, {
+    passthroughArgs: ["pr", "comment", "42"],
+    bodyMode: "file",
+    bodyValue: "message.md",
+    errors: [],
+  });
+});
+
+test("parseArgs accepts inline body values that begin with dashes", () => {
+  const result = parseArgs(["pr", "comment", "42", "--body", "--dry-run still fails here"]);
+
+  assert.deepEqual(result, {
+    passthroughArgs: ["pr", "comment", "42"],
+    bodyMode: "inline",
+    bodyValue: "--dry-run still fails here",
+    errors: [],
+  });
+});
 test("short single-line plain text bodies stay inline", () => {
   assert.equal(isShortSingleLinePlainText("Short plain note."), true);
   assert.equal(shouldUseBodyFile("Short plain note."), false);
@@ -110,9 +156,9 @@ test("main routes stdin markdown through body-file and cleans temporary director
   });
 
   assert.equal(exitCode, 0);
-  assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body-file", "/tmp/gh-body-run/body.md"]]);
+  assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body-file", path.join("/tmp", "gh-body-run", "body.md")]]);
   assert.equal(createdFiles[0].contents, body);
-  assert.deepEqual(removedPaths, ["/tmp/gh-body-run"]);
+  assert.deepEqual(removedPaths, [path.join("/tmp", "gh-body-run")]);
 });
 
 test("main keeps short inline bodies on native --body", () => {
