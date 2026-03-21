@@ -20,6 +20,8 @@ Keep the output high signal:
 - call out missing verification when behavior changed
 - say explicitly if no meaningful findings were found
 
+When posting multiline or Markdown-rich review findings back through GitHub CLI, prefer `npm run gh:safe -- pr comment ... --body-stdin` or `--body-file` instead of inline `--body` quoting.
+
 For reusable review task-package guidance (Balancing Tweak, PWA / Offline Reliability, Gameplay Bugfix, Workflow / Docs Update, Targeted Review Readiness), follow the canonical section "Task Packages (Canonical Insertion Point)" in `instructions/change-review.md`.
 
 Do not turn a small review into a whole-repository audit unless the blast radius clearly requires it.

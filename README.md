@@ -163,6 +163,7 @@ Deployment remains Linux-only by design, and the advisory hint step is kept as a
 - Create a feature branch for each change.
 - Push the feature branch and open a pull request against `main`.
 - Use `npm run setup` after cloning so the local Git hook guardrail is active.
+- For multiline or Markdown-heavy GitHub CLI text, prefer `npm run gh:safe -- ... --body-stdin` or `--body-file` instead of inline `--body` quoting.
 
 ## Automation Status
 
