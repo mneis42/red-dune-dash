@@ -441,6 +441,7 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
   const failedChecks = checkOutcomes.filter((entry) => isFailingCheckStatus(entry.status));
   const fallbackFiles = advisoryResult.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
   const changedBacklogPaths = stableUnique(changedFiles.filter((entry) => entry === "todo.md" || entry.startsWith("backlog/")));
+  const runLogPaths = stableUnique(changedFiles.filter((entry) => entry.startsWith("logs/agent-runs/")));
 
   const likelyReviewerObjections = [];
   if (split.finalDecision === "split-required") {
@@ -484,6 +485,11 @@ function buildPrePrChecklistOutcome(changedFiles, advisoryResult, checkOutcomes,
       skippedChecks,
       skippedCheckJustificationRequired: skippedChecks.length > 0,
     },
+    runLogDecision: {
+      result: runLogPaths.length > 0 ? `created/updated: ${runLogPaths.join(', ')}` : 'none required',
+      logPaths: runLogPaths,
+      triggerDocument: 'docs/agent-run-logs.md',
+    },
     docsInstructionImpact: {
       affectedDocs: stableUnique([...advisoryResult.merged.suggestedDocs, ...advisoryResult.merged.suggestedReading]),
       touchedWorkflowDocs: split.matchedAreas.includes("workflow-docs"),
@@ -515,6 +521,7 @@ function buildCopyBlock(result) {
     lines.push(`- pre_pr_split_advisory_signals: ${advisorySplitSignals.join("; ")}`);
   }
   lines.push(`- docs_to_review: ${result.affectedDocs.join(", ") || "none"}`);
+  lines.push(`- run_log_decision: ${result.prePrChecklist.runLogDecision.result}`);
   lines.push(`- backlog_sync_review: ${result.prePrChecklist.backlogSyncReview.resultSummary}`);
 
   const checkSummary = result.checkOutcomes
@@ -611,6 +618,7 @@ function formatHumanReadable(result, options) {
     advisorySplitSignals.forEach((entry) => lines.push(`- split advisory: ${entry}`));
   }
   lines.push(`- skipped-check justification required: ${result.prePrChecklist.verification.skippedCheckJustificationRequired ? "yes" : "no"}`);
+  lines.push(`- run-log decision: ${result.prePrChecklist.runLogDecision.result}`);
   lines.push(`- backlog sync review: ${result.prePrChecklist.backlogSyncReview.resultSummary}`);
   lines.push(`- likely reviewer objections: ${result.prePrChecklist.likelyReviewerObjections.join("; ") || "none"}`);
   lines.push(`- remaining risks: ${result.prePrChecklist.remainingRisks.join(", ") || "none"}`);

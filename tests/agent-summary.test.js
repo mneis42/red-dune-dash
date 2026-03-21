@@ -161,6 +161,9 @@ test("buildCopyBlock returns concise, copy-ready section", () => {
     changedFiles: ["a", "b"],
     advisory: { mergedAreas: ["gameplay"] },
     prePrChecklist: {
+      runLogDecision: {
+        result: 'none required',
+      },
       backlogSyncReview: {
         resultSummary: "manual review required (no backlog paths in diff; do not assume none affected)",
       },
@@ -195,6 +198,21 @@ test("buildSummaryResult includes required summary fields", () => {
   assert.equal(typeof result.prePrChecklist.backlogSyncReview.resultSummary, "string");
   assert.ok(Array.isArray(result.openQuestions));
   assert.equal(typeof result.copyBlock, "string");
+});
+
+test("buildSummaryResult reports run-log creation when agent run logs changed", () => {
+  const advisory = createAdvisoryResult(["instructions/pre-pr-checklist.md", "logs/agent-runs/2026-03-21-example.yaml"]);
+
+  const result = buildSummaryResult(
+    ["instructions/pre-pr-checklist.md", "logs/agent-runs/2026-03-21-example.yaml"],
+    advisory,
+    { runChecks: false }
+  );
+
+  assert.equal(
+    result.prePrChecklist.runLogDecision.result,
+    "created/updated: logs/agent-runs/2026-03-21-example.yaml"
+  );
 });
 
 test("buildSummaryResult reports changed backlog files in backlog sync review", () => {

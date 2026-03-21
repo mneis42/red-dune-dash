@@ -104,6 +104,7 @@ Before ending any response during a full-code-review run, explicitly verify all 
 - `todo.md` was created and committed locally.
 - The highest-priority open TODO is actively being executed.
 - If no TODO is in progress, confirm all TODOs are complete and final verification has passed.
+- Before any final handoff, a run-log decision was made using `docs/agent-run-logs.md`, with either `none required` or the created/updated log path recorded explicitly.
 - If final verification passed, `todo.md` was moved into `reviews/` using `yyyyMMdd-HHmmss-complete.md` and that move is left uncommitted.
 - If work is paused, a real blocker is documented (permissions, conflicting instructions, missing critical information, or hard platform/runtime limit).
 
@@ -116,9 +117,10 @@ Answer each item with `YES` or `NO`:
 1. Before `todo.md` was created, was a new suitably named local branch created from `origin/main` and used for the rest of the workflow?
 2. Is the review backlog in `todo.md` fully up to date and committed locally?
 3. Is there no higher-priority open TODO than the one currently being worked on?
-4. If all TODOs are marked done, has full final verification actually been executed and passed?
-5. If verification passed, has `todo.md` already been moved to `reviews/yyyyMMdd-HHmmss-complete.md` and left uncommitted?
-6. If any work remains, is there a real blocker documented (and not just a pause for confirmation)?
+4. Before the final handoff, was the run-log decision recorded explicitly as `none required` or `created/updated: <log path>` based on `docs/agent-run-logs.md`?
+5. If all TODOs are marked done, has full final verification actually been executed and passed?
+6. If verification passed, has `todo.md` already been moved to `reviews/yyyyMMdd-HHmmss-complete.md` and left uncommitted?
+7. If any work remains, is there a real blocker documented (and not just a pause for confirmation)?
 
 Decision rule:
 
