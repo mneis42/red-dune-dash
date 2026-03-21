@@ -92,6 +92,8 @@ Deploy-only behavior remains Linux-only, and advisory change hints stay non-bloc
 - Prefer English commit messages.
 - Explain user-visible impact, test coverage, and known risks in the pull request description.
 - For multiline or Markdown-rich GitHub CLI bodies, prefer `npm run gh:safe -- ... --body-stdin` or `--body-file` so backticks and fenced code do not depend on shell quoting.
+- In this agent environment, request escalated execution up front for networked `gh` commands such as `gh pr create`, `gh pr comment`, `gh pr review`, `gh pr view`, `gh api`, and `gh run view/list`; keep sandbox `gh` usage for clearly local-only commands such as `gh help` and `gh version`.
+- If `gh pr view --json` lacks a field you need, use `gh api` for the follow-up query instead of treating it as a broader GitHub API limitation.
 - If an AI agent produced most of the change, that is fine; clarity and verifiability matter more than authorship style.
 
 ## Good Contributions

@@ -7,6 +7,8 @@ const {
   parseArgs,
   isShortSingleLinePlainText,
   shouldUseBodyFile,
+  classifyGhCommand,
+  collectExecutionNotes,
   buildBodyArgs,
   main,
 } = require("../scripts/gh-safe.js");
@@ -81,6 +83,26 @@ test("short single-line plain text bodies stay inline", () => {
 test("inline code forces file-backed body handling", () => {
   assert.equal(isShortSingleLinePlainText("Use `npm test` before merge."), false);
   assert.equal(shouldUseBodyFile("Use `npm test` before merge."), true);
+});
+
+test("classifyGhCommand marks networked PR operations for upfront escalation", () => {
+  assert.deepEqual(classifyGhCommand(["pr", "create", "--title", "Demo"]).classification, "network-required");
+  assert.deepEqual(classifyGhCommand(["api", "repos/owner/repo/pulls"]).classification, "network-required");
+});
+
+test("classifyGhCommand keeps local help/version commands sandbox-safe", () => {
+  assert.deepEqual(classifyGhCommand(["version"]).classification, "sandbox-safe");
+  assert.deepEqual(classifyGhCommand(["--help"]).classification, "sandbox-safe");
+  assert.deepEqual(classifyGhCommand(["pr", "create", "--help"]).classification, "sandbox-safe");
+});
+
+test("collectExecutionNotes adds gh api fallback wording for pr view json", () => {
+  const result = collectExecutionNotes(["pr", "view", "42", "--json", "reviewThreads"]);
+
+  assert.equal(result.classification.classification, "network-required");
+  assert.equal(result.notes.length, 2);
+  assert.match(result.notes[0], /request escalated execution up front/);
+  assert.match(result.notes[1], /use `gh api`/);
 });
 
 test("multiline markdown review text is written to a temporary file", () => {
@@ -173,6 +195,19 @@ test("main keeps short inline bodies on native --body", () => {
 
   assert.equal(exitCode, 0);
   assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body", "Short plain note."]]);
+});
+
+test("main emits escalation note before running network-required gh commands", () => {
+  const logs = [];
+
+  const exitCode = main(["pr", "comment", "42", "--body", "Short plain note."], {
+    logError: (line) => logs.push(line),
+    runner: () => ({ status: 0 }),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /request escalated execution up front/);
 });
 
 async function runTests() {

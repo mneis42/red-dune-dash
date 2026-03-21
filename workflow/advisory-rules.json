@@ -48,7 +48,14 @@
     },
     {
       "id": "workflow-docs",
-      "match": ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/**"],
+      "match": [
+        "README.md",
+        "CONTRIBUTING.md",
+        "AGENTS.md",
+        "instructions/**",
+        ".github/copilot-instructions.md",
+        ".github/instructions/**"
+      ],
       "area": "workflow-docs",
       "riskTags": ["process-drift", "instruction-consistency"],
       "recommendedChecks": ["npm run check"],

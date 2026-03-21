@@ -40,6 +40,19 @@ test("unknown files use fallback advisory rule", () => {
   assert.deepEqual(result.perFile[0].ruleIds, ["fallback-unclassified"]);
 });
 
+test("github instruction mirrors resolve as workflow docs instead of fallback", () => {
+  const { document } = loadAdvisoryDocument();
+  const result = resolveAdvisoryForFiles(
+    [".github/copilot-instructions.md", ".github/instructions/change-review.instructions.md"],
+    document
+  );
+
+  assert.deepEqual(result.merged.areas, ["workflow-docs"]);
+  assert.equal(result.perFile.every((entry) => entry.usedFallback === false), true);
+  assert.deepEqual(result.perFile[0].ruleIds, ["workflow-docs"]);
+  assert.deepEqual(result.perFile[1].ruleIds, ["workflow-docs"]);
+});
+
 test("multi-match strategy merges and de-duplicates arrays in stable order", () => {
   const customDocument = {
     version: 1,
