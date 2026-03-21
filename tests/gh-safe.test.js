@@ -1,0 +1,149 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const {
+  parseArgs,
+  isShortSingleLinePlainText,
+  shouldUseBodyFile,
+  buildBodyArgs,
+  main,
+} = require("../scripts/gh-safe.js");
+
+const tests = [];
+
+function test(name, fn) {
+  tests.push({ name, fn });
+}
+
+test("parseArgs preserves gh args and body-stdin selection", () => {
+  const result = parseArgs(["pr", "create", "--title", "Demo", "--body-stdin"]);
+
+  assert.deepEqual(result, {
+    passthroughArgs: ["pr", "create", "--title", "Demo"],
+    bodyMode: "stdin",
+    bodyValue: null,
+    errors: [],
+  });
+});
+
+test("short single-line plain text bodies stay inline", () => {
+  assert.equal(isShortSingleLinePlainText("Short plain note."), true);
+  assert.equal(shouldUseBodyFile("Short plain note."), false);
+});
+
+test("inline code forces file-backed body handling", () => {
+  assert.equal(isShortSingleLinePlainText("Use `npm test` before merge."), false);
+  assert.equal(shouldUseBodyFile("Use `npm test` before merge."), true);
+});
+
+test("multiline markdown review text is written to a temporary file", () => {
+  const body = [
+    "High: review body should preserve inline code like `npm test`.",
+    "",
+    "```text",
+    "fenced code survives",
+    "```",
+  ].join("\n");
+  let removedPath = null;
+  const createdFiles = [];
+
+  const result = buildBodyArgs(
+    {
+      passthroughArgs: ["pr", "review", "42", "--comment"],
+      bodyMode: "inline",
+      bodyValue: body,
+      errors: [],
+    },
+    {
+      tmpRoot: "/tmp",
+      mkdtempSync: (prefix) => `${prefix}fixture`,
+      writeFileSync: (filePath, contents) => {
+        createdFiles.push({ filePath, contents });
+      },
+      rmSync: (candidatePath) => {
+        removedPath = candidatePath;
+      },
+    }
+  );
+
+  assert.equal(result.mode, "temp-file");
+  assert.deepEqual(result.args, ["--body-file", path.join("/tmp", "gh-body-fixture", "body.md")]);
+  assert.equal(createdFiles.length, 1);
+  assert.equal(createdFiles[0].contents, body);
+  result.cleanup();
+  assert.equal(removedPath, path.join("/tmp", "gh-body-fixture"));
+});
+
+test("explicit body files are preserved without temp-file rewrite", () => {
+  const result = buildBodyArgs({
+    passthroughArgs: ["pr", "comment", "42"],
+    bodyMode: "file",
+    bodyValue: "message.md",
+    errors: [],
+  });
+
+  assert.equal(result.mode, "explicit-file");
+  assert.deepEqual(result.args, ["--body-file", "message.md"]);
+});
+
+test("main routes stdin markdown through body-file and cleans temporary directory", () => {
+  const body = "Line one with `code`.\n\n```text\nblock\n```";
+  const createdFiles = [];
+  const removedPaths = [];
+  const runnerCalls = [];
+
+  const exitCode = main(["pr", "comment", "42", "--body-stdin"], {
+    readStdin: () => body,
+    tmpRoot: "/tmp",
+    mkdtempSync: (prefix) => `${prefix}run`,
+    writeFileSync: (filePath, contents) => {
+      createdFiles.push({ filePath, contents });
+    },
+    rmSync: (candidatePath) => {
+      removedPaths.push(candidatePath);
+    },
+    runner: (_command, args) => {
+      runnerCalls.push(args);
+      return { status: 0 };
+    },
+  });
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body-file", "/tmp/gh-body-run/body.md"]]);
+  assert.equal(createdFiles[0].contents, body);
+  assert.deepEqual(removedPaths, ["/tmp/gh-body-run"]);
+});
+
+test("main keeps short inline bodies on native --body", () => {
+  const runnerCalls = [];
+
+  const exitCode = main(["pr", "comment", "42", "--body", "Short plain note."], {
+    runner: (_command, args) => {
+      runnerCalls.push(args);
+      return { status: 0 };
+    },
+  });
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body", "Short plain note."]]);
+});
+
+async function runTests() {
+  for (const { name, fn } of tests) {
+    try {
+      await fn();
+      console.log(`ok - ${name}`);
+    } catch (error) {
+      console.error(`not ok - ${name}`);
+      console.error(error);
+      process.exitCode = 1;
+    }
+  }
+}
+
+runTests().catch((error) => {
+  console.error("not ok - unhandled test runner failure");
+  console.error(error);
+  process.exitCode = 1;
+});
