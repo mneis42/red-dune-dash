@@ -26,6 +26,10 @@ const RUN_LOG_ROUTING_REQUIRED_PATHS = [
   "instructions/pre-pr-checklist.md",
 ];
 const RUN_LOG_POLICY_PATH = "docs/agent-run-logs.md";
+const CHANGE_REVIEW_RUN_LOG_POLICY_PATHS = [
+  "instructions/change-review.md",
+  ".github/instructions/change-review.instructions.md",
+];
 
 const DEFAULT_ROOT_MARKDOWN_FILES = ["AGENTS.md", "README.md", "CONTRIBUTING.md"];
 const DEFAULT_SCAN_DIRECTORIES = ["instructions", ".github"];
@@ -393,6 +397,7 @@ function evaluateChangeReviewRunLogCoverage(markdownText) {
   const mentionsReviewContext = hasAnyPattern(text, [/during the review/, /review process/, /review only/, /review runs?/]);
   const mentionsCleanReviewNoLog = hasAnyPattern(text, [
     /do not write (?:a )?(?:routine )?(?:review )?log/,
+    /do not create (?:routine )?logs?/,
     /no log should be written/,
     /clean review only runs? .* no log/,
     /no trigger occurred .* do not write .* review log/,
@@ -418,6 +423,25 @@ function lintRunLogCoverage(repoRoot, byPath) {
       )
     );
     return issues;
+  }
+
+  function lintChangeReviewNoLogSemantics(sourcePath) {
+    const source = byPath.get(sourcePath);
+    if (!source) {
+      return;
+    }
+
+    const reviewCoverage = evaluateChangeReviewRunLogCoverage(source.content);
+    if (!reviewCoverage.mentionsReviewContext || !reviewCoverage.mentionsCleanReviewNoLog) {
+      issues.push(
+        createIssue(
+          "missing-change-review-no-log-semantics",
+          sourcePath,
+          1,
+          `${sourcePath} must explicitly say that clean review-only runs do not create routine run logs.`
+        )
+      );
+    }
   }
 
   for (const sourcePath of RUN_LOG_ROUTING_REQUIRED_PATHS) {
@@ -487,19 +511,16 @@ function lintRunLogCoverage(repoRoot, byPath) {
       }
     }
 
-    if (sourcePath === "instructions/change-review.md") {
-      const reviewCoverage = evaluateChangeReviewRunLogCoverage(source.content);
-      if (!reviewCoverage.mentionsReviewContext || !reviewCoverage.mentionsCleanReviewNoLog) {
-        issues.push(
-          createIssue(
-            "missing-change-review-no-log-semantics",
-            sourcePath,
-            1,
-            `${sourcePath} must explicitly say that clean review-only runs do not create routine run logs.`
-          )
-        );
-      }
+    if (CHANGE_REVIEW_RUN_LOG_POLICY_PATHS.includes(sourcePath)) {
+      lintChangeReviewNoLogSemantics(sourcePath);
     }
+  }
+
+  for (const sourcePath of CHANGE_REVIEW_RUN_LOG_POLICY_PATHS) {
+    if (RUN_LOG_ROUTING_REQUIRED_PATHS.includes(sourcePath)) {
+      continue;
+    }
+    lintChangeReviewNoLogSemantics(sourcePath);
   }
 
   return issues;
