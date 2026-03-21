@@ -50,19 +50,24 @@ Catch predictable review objections early and keep change sets small, verifiable
 8. Skipped-check justification
    - For every `not-run` or `skipped-unsafe` check, provide a short justification.
 
-9. Docs/instruction impact review
+9. Run-log decision checkpoint
+   - Explicitly decide whether a trigger from `docs/agent-run-logs.md` occurred during the run.
+   - Record exactly one concise result: `none required` or `created/updated: <log path>`.
+   - Do not infer `none required` only from the absence of `logs/agent-runs/` changes; the decision must still be supplied explicitly.
+
+10. Docs/instruction impact review
    - State whether docs or instruction updates were required.
    - List updated docs/instructions or state why none were needed.
 
-10. Backlog sync review
+11. Backlog sync review
    - Check whether the branch makes any open prioritized backlog item done, obsolete, or superseded.
    - If yes, update or archive that backlog item in the same branch before PR handoff.
    - Record which backlog paths were checked or state `none affected`.
 
-11. Likely reviewer objections self-review
+12. Likely reviewer objections self-review
    - List likely objections and whether each is resolved, accepted-risk, or deferred.
 
-12. Remaining risks
+13. Remaining risks
    - List residual risks explicitly, or state `none`.
 
 ## Handoff Output Requirements
@@ -76,6 +81,7 @@ Minimum handoff fields:
 - matched/touched scope areas
 - split decision and trigger reasons
 - checks run and skipped-check justifications
+- run-log decision
 - docs/instruction impact
 - backlog sync review result
 - likely reviewer objections
@@ -91,6 +97,7 @@ Task: align one instruction sentence with current hook behavior.
 - hard triggers: none
 - checks: `npm run instruction:lint=pass`, `npm run test:preflight=pass`
 - skipped checks: none
+- run-log decision: none required
 - docs/instruction impact: instruction docs updated in both canonical and mirrored locations
 - backlog sync review: none affected
 - likely reviewer objections: wording mismatch risk resolved

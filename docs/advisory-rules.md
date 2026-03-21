@@ -83,6 +83,12 @@ Run recommended checks and include command outcomes in the same summary output:
 npm run agent:summary -- --run-checks
 ```
 
+For PR-ready handoff usage, pass the explicit run-log decision so the summary does not infer `none required` only from an unchanged diff:
+
+```bash
+npm run agent:summary -- --run-log-decision none-required
+```
+
 Include check logs explicitly in JSON/human output when checks are executed:
 
 ```bash
