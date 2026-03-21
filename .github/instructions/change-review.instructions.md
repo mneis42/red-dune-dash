@@ -26,3 +26,7 @@ For reusable review task-package guidance (Balancing Tweak, PWA / Offline Reliab
 
 Do not turn a small review into a whole-repository audit unless the blast radius clearly requires it.
 Respect repository language conventions: German for player-facing UI, English for code and active technical documentation. Historical backlog archives in `backlog/done/` may remain in their original language unless the reviewed change explicitly migrates them.
+
+
+Review runs follow the same low-noise run-log rule as the canonical workflow in `instructions/change-review.md`: use `docs/agent-run-logs.md` when a triggering incident occurs during the review, and do not create routine logs for clean review-only runs.
+If the review is part of a PR-ready handoff workflow, still complete that workflow's explicit run-log decision checkpoint.

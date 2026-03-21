@@ -19,12 +19,17 @@ const PRE_PR_CHECKLIST_REQUIRED_REFERENCE_PATHS = [
 
 const RUN_LOG_ROUTING_REQUIRED_PATHS = [
   "AGENTS.md",
+  "instructions/change-review.md",
   "instructions/feature-request.md",
   "instructions/bug-report.md",
   "instructions/full-code-review.md",
   "instructions/pre-pr-checklist.md",
 ];
 const RUN_LOG_POLICY_PATH = "docs/agent-run-logs.md";
+const CHANGE_REVIEW_RUN_LOG_POLICY_PATHS = [
+  "instructions/change-review.md",
+  ".github/instructions/change-review.instructions.md",
+];
 
 const DEFAULT_ROOT_MARKDOWN_FILES = ["AGENTS.md", "README.md", "CONTRIBUTING.md"];
 const DEFAULT_SCAN_DIRECTORIES = ["instructions", ".github"];
@@ -39,6 +44,7 @@ const ISSUE_SEVERITY_BY_CODE = {
   "missing-run-log-policy-reference": "high",
   "missing-run-log-routing-semantics": "high",
   "missing-run-log-decision-checkpoint": "high",
+  "missing-change-review-no-log-semantics": "high",
   "missing-link-target": "medium",
   "missing-anchor": "medium",
   "invalid-anchor-target": "medium",
@@ -385,6 +391,24 @@ function evaluateRunLogPolicyCoverage(markdownText) {
   };
 }
 
+
+function evaluateChangeReviewRunLogCoverage(markdownText) {
+  const text = normalizeSemanticText(markdownText);
+  const mentionsReviewContext = hasAnyPattern(text, [/during the review/, /review process/, /review only/, /review runs?/]);
+  const mentionsCleanReviewNoLog = hasAnyPattern(text, [
+    /do not write (?:a )?(?:routine )?(?:review )?log/,
+    /do not create (?:routine )?logs?/,
+    /no log should be written/,
+    /clean review only runs? .* no log/,
+    /no trigger occurred .* do not write .* review log/,
+  ]);
+
+  return {
+    mentionsReviewContext,
+    mentionsCleanReviewNoLog,
+  };
+}
+
 function lintRunLogCoverage(repoRoot, byPath) {
   const issues = [];
   const runLogAbsolutePath = path.join(repoRoot, RUN_LOG_POLICY_PATH);
@@ -399,6 +423,25 @@ function lintRunLogCoverage(repoRoot, byPath) {
       )
     );
     return issues;
+  }
+
+  function lintChangeReviewNoLogSemantics(sourcePath) {
+    const source = byPath.get(sourcePath);
+    if (!source) {
+      return;
+    }
+
+    const reviewCoverage = evaluateChangeReviewRunLogCoverage(source.content);
+    if (!reviewCoverage.mentionsReviewContext || !reviewCoverage.mentionsCleanReviewNoLog) {
+      issues.push(
+        createIssue(
+          "missing-change-review-no-log-semantics",
+          sourcePath,
+          1,
+          `${sourcePath} must explicitly say that clean review-only runs do not create routine run logs.`
+        )
+      );
+    }
   }
 
   for (const sourcePath of RUN_LOG_ROUTING_REQUIRED_PATHS) {
@@ -467,6 +510,17 @@ function lintRunLogCoverage(repoRoot, byPath) {
         );
       }
     }
+
+    if (CHANGE_REVIEW_RUN_LOG_POLICY_PATHS.includes(sourcePath)) {
+      lintChangeReviewNoLogSemantics(sourcePath);
+    }
+  }
+
+  for (const sourcePath of CHANGE_REVIEW_RUN_LOG_POLICY_PATHS) {
+    if (RUN_LOG_ROUTING_REQUIRED_PATHS.includes(sourcePath)) {
+      continue;
+    }
+    lintChangeReviewNoLogSemantics(sourcePath);
   }
 
   return issues;
