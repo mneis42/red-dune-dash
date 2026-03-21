@@ -104,6 +104,22 @@ Only edit code or files when the user explicitly asks for fixes or for the revie
 
 When posting multiline or Markdown-rich review findings back through GitHub CLI, prefer `npm run gh:safe -- pr comment ... --body-stdin` or `--body-file` instead of inline `--body` quoting.
 
+
+## Run-Log Handling For Review Runs
+
+Lightweight reviews stay low-noise, but they are not exempt from the repository run-log policy.
+Use [docs/agent-run-logs.md](../docs/agent-run-logs.md) as the authority for trigger conditions, storage, anti-noise rules, and schema.
+
+For change-review runs:
+
+- if a triggering incident occurred during the review process, create or update the run log
+- if no trigger occurred, do not write a run log for the review
+- treat clean review-only runs as explicit no-log cases, not as missing workflow output
+- when the review is part of a PR-ready implementation run or another workflow that requires handoff metadata, complete that workflow's explicit run-log decision checkpoint and record either `created/updated: <log path>` or `none required`
+
+Normal review findings are not incidents by themselves.
+Only create or update a run log when the review actually hits one of the trigger categories from `docs/agent-run-logs.md`, such as instruction misrouting, repeated major rework, an unexpected verification failure, or a workflow blind spot discovered after checks looked green.
+
 ## Task Packages (Canonical Insertion Point)
 
 This section defines reusable task-package shapes for common repository work.
