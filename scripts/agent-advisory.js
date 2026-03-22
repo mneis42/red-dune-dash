@@ -326,12 +326,17 @@ function evaluateRuntimeSignals(result, options) {
 function buildPolicyGateStatus(runtimeSignals, policyGatesDocument = {}) {
   const warnings = stableUnique(runtimeSignals.warningHints || []);
   const stages = Array.isArray(policyGatesDocument.stages) ? policyGatesDocument.stages : [];
+  const hasExplicitRuntimeSignals = runtimeSignals.hasExplicitRuntimeSignals === true;
 
   return {
     stages: stages.map((stage) => {
       const normalizedStage = { ...stage };
       if (stage.id === "stage-2-warning") {
-        normalizedStage.status = warnings.length > 0 ? "active-with-warnings" : "active-no-warnings";
+        if (!hasExplicitRuntimeSignals) {
+          normalizedStage.status = stage.status;
+        } else {
+          normalizedStage.status = warnings.length > 0 ? "active-with-warnings" : "active-no-warnings";
+        }
         normalizedStage.warnings = warnings;
       }
       return normalizedStage;

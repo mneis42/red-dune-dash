@@ -269,6 +269,7 @@ test("evaluateRuntimeSignals keeps independent aggregate job hints alongside spe
 test("buildPolicyGateStatus exposes warning mode and selective hard-fail candidates", () => {
   const cli = loadCliModuleFresh();
   const policy = cli.buildPolicyGateStatus({
+    hasExplicitRuntimeSignals: true,
     warningHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
     actionableHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
   }, {
@@ -311,10 +312,43 @@ test("buildPolicyGateStatus exposes warning mode and selective hard-fail candida
   assert.equal(policy.stages[2].candidateGates.some((entry) => entry.status === "enforced"), true);
 });
 
+test("buildPolicyGateStatus preserves unevaluated stage 2 state when no runtime signals were provided", () => {
+  const cli = loadCliModuleFresh();
+  const policy = cli.buildPolicyGateStatus(
+    {
+      hasExplicitRuntimeSignals: false,
+      warningHints: [],
+      actionableHints: [],
+    },
+    {
+      stages: [
+        {
+          id: "stage-1-advisory",
+          label: "Advisory only",
+          blocking: false,
+          status: "active",
+          summary: "Changed-file matching and workflow hints stay advisory and do not reroute canonical workflows.",
+        },
+        {
+          id: "stage-2-warning",
+          label: "Warning mode",
+          blocking: false,
+          status: "runtime-evaluated",
+          summary: "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals.",
+        },
+      ],
+    }
+  );
+
+  assert.equal(policy.stages[1].status, "runtime-evaluated");
+  assert.deepEqual(policy.stages[1].warnings, []);
+});
+
 test("formatHumanReadable includes runtime signal sections when provided", () => {
   const cli = loadCliModuleFresh();
   const policyGates = cli.buildPolicyGateStatus(
     {
+      hasExplicitRuntimeSignals: true,
       warningHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
       actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
     },
