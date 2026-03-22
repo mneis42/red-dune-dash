@@ -10,56 +10,67 @@ const SIGNAL_METADATA = {
     label: "Syntax validation",
     checkOutcomes: ["npm run check"],
     jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
   },
   "simulation-tests": {
     label: "Simulation tests",
     checkOutcomes: ["npm run test:simulation"],
     jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
   },
   "service-worker-tests": {
     label: "Service worker tests",
     checkOutcomes: ["npm run test:service-worker"],
     jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
   },
   "instruction-lint": {
     label: "Instruction lint",
     checkOutcomes: ["npm run instruction:lint"],
     jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
   },
   "docs-language-lint": {
     label: "Docs language lint",
     checkOutcomes: ["npm run docs:language:lint"],
     jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
   },
   "backlog-lint": {
     label: "Backlog lint",
     checkOutcomes: ["npm run backlog:lint"],
     jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
   },
   "test-suite": {
     label: "Repository test suite",
     checkOutcomes: ["npm test"],
     jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
   },
   "verify-linux-signals": {
     label: "Linux verification job",
     checkOutcomes: [],
     jobStatuses: ["verify-linux-signals"],
+    aggregateJobs: [],
   },
   "cross-platform-verify": {
     label: "Cross-platform verification job",
     checkOutcomes: [],
     jobStatuses: ["cross-platform-verify"],
+    aggregateJobs: [],
   },
   "required-check": {
     label: "Required compatibility gate",
     checkOutcomes: [],
     jobStatuses: ["required-check"],
+    aggregateJobs: [],
   },
   "advisory-fallback": {
     label: "Fallback advisory classification",
     checkOutcomes: [],
     jobStatuses: [],
+    aggregateJobs: [],
   },
 };
 
@@ -189,6 +200,28 @@ function isAggregateOnlySignal(signalId) {
   return metadata.checkOutcomes.length === 0 && metadata.jobStatuses.length > 0;
 }
 
+function shouldSuppressAggregateHint(entry, matchedSignals) {
+  if (!isAggregateOnlySignal(entry.id)) {
+    return false;
+  }
+
+  const aggregateJobNames = new Set(
+    entry.observedJobs.filter((job) => isProblemRuntimeState(job.status)).map((job) => job.jobName)
+  );
+  if (aggregateJobNames.size === 0) {
+    return false;
+  }
+
+  return matchedSignals.some((otherEntry) => {
+    if (otherEntry.id === entry.id || isAggregateOnlySignal(otherEntry.id) || !isProblemRuntimeState(otherEntry.status)) {
+      return false;
+    }
+
+    const metadata = SIGNAL_METADATA[otherEntry.id] || { aggregateJobs: [] };
+    return Array.isArray(metadata.aggregateJobs) && metadata.aggregateJobs.some((jobName) => aggregateJobNames.has(jobName));
+  });
+}
+
 function evaluateRuntimeSignals(result, options) {
   const runtime = {
     jobStatuses: mergeRuntimeStateMaps(
@@ -210,6 +243,7 @@ function evaluateRuntimeSignals(result, options) {
       label: signalId,
       checkOutcomes: [],
       jobStatuses: [],
+      aggregateJobs: [],
     };
     const observedChecks = metadata.checkOutcomes.map((command) => ({
       command,
@@ -251,13 +285,9 @@ function evaluateRuntimeSignals(result, options) {
 
   const actionableHints = [];
 
-  const hasSpecificProblemHint = matchedSignals.some(
-    (entry) => isProblemRuntimeState(entry.status) && !isAggregateOnlySignal(entry.id)
-  );
-
   matchedSignals
     .filter((entry) => isProblemRuntimeState(entry.status))
-    .filter((entry) => !(hasSpecificProblemHint && isAggregateOnlySignal(entry.id)))
+    .filter((entry) => !shouldSuppressAggregateHint(entry, matchedSignals))
     .forEach((entry) => {
       const failingChecks = entry.observedChecks
         .filter((check) => isProblemRuntimeState(check.status))
@@ -520,6 +550,7 @@ function main(argv = process.argv.slice(2)) {
 module.exports = {
   SIGNAL_METADATA,
   isAggregateOnlySignal,
+  shouldSuppressAggregateHint,
   isProblemRuntimeState,
   describeProblemState,
   parseArgs,

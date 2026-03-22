@@ -44,6 +44,7 @@ test("module exports reusable CLI helpers", () => {
   const cli = loadCliModuleFresh();
   assert.equal(typeof cli.parseArgs, "function");
   assert.equal(typeof cli.isAggregateOnlySignal, "function");
+  assert.equal(typeof cli.shouldSuppressAggregateHint, "function");
   assert.equal(typeof cli.isProblemRuntimeState, "function");
   assert.equal(typeof cli.describeProblemState, "function");
   assert.equal(typeof cli.parseRuntimeStateMap, "function");
@@ -229,6 +230,23 @@ test("evaluateRuntimeSignals keeps aggregate job hint when no specific failed ch
   });
 
   assert.deepEqual(runtime.actionableHints, ["Linux verification job is currently failing (verify-linux-signals)."]);
+});
+
+test("evaluateRuntimeSignals keeps independent aggregate job hints alongside specific check failures", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["docs-language-lint", "verify-linux-signals", "cross-platform-verify"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: ["verify-linux-signals=failure", "cross-platform-verify=failure"],
+    ciCheckOutcomes: ["npm run docs:language:lint=failure"],
+  });
+
+  assert.match(runtime.actionableHints.join("\n"), /Docs language lint is currently failing/);
+  assert.equal(runtime.actionableHints.some((entry) => entry.includes("Linux verification job is currently failing")), false);
+  assert.match(runtime.actionableHints.join("\n"), /Cross-platform verification job is currently failing/);
 });
 
 test("formatHumanReadable includes runtime signal sections when provided", () => {
