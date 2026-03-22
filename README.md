@@ -107,7 +107,17 @@ If you want to run the suites individually, you can also use:
 ```powershell
 npm run test:simulation
 npm run test:service-worker
+npm run test:pwa-assets
+npm run test:pwa-smoke
 ```
+
+For a local HTTP PWA smoke check against a running dev server, use:
+
+```powershell
+npm run pwa:smoke -- --base-url http://127.0.0.1:8000
+```
+
+This helper is intentionally narrow. It checks that the local server exposes the core PWA entry points (`/`, `manifest.webmanifest`, `service-worker.js`, and `version.json`) with plausible content so deploy-shape drift is easier to catch before PR review.
 
 For advisory change hints based on changed file paths, run:
 

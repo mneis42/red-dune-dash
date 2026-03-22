@@ -4,6 +4,14 @@ const assert = require("node:assert/strict");
 const listeners = {};
 const fakeCaches = new Map();
 const fetchCalls = [];
+let fetchImplementation = async (request) => ({
+  status: 200,
+  type: "basic",
+  url: typeof request === "string" ? request : request.url,
+  clone() {
+    return this;
+  },
+});
 globalThis.self = globalThis;
 self.addEventListener = function(type, listener) {
   listeners[type] = listener;
@@ -43,14 +51,7 @@ globalThis.caches = {
 
 globalThis.fetch = async (request, options) => {
   fetchCalls.push({ request, options });
-  return {
-    status: 200,
-    type: "basic",
-    url: typeof request === "string" ? request : request.url,
-    clone() {
-      return this;
-    },
-  };
+  return fetchImplementation(request, options);
 };
 
 globalThis.importScripts = (...urls) => {
@@ -90,6 +91,17 @@ function createEvent(url, options = {}) {
       respondWith(promise) {
         responds.push(promise);
       },
+    },
+  };
+}
+
+function createResponse(url, overrides = {}) {
+  return {
+    status: overrides.status ?? 200,
+    type: overrides.type ?? "basic",
+    url,
+    clone() {
+      return this;
     },
   };
 }
@@ -187,6 +199,52 @@ test("service worker keeps non-core same-origin assets on stale-while-revalidate
 
   assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].options, undefined);
+});
+
+test("service worker clears outdated caches during activation", async () => {
+  reloadServiceWorkerWithScope("https://example.com/red-dune-dash/");
+  const activateListener = listeners["activate"];
+  assert.ok(typeof activateListener === "function");
+
+  fakeCaches.set("legacy-cache", new Map([["https://example.com/red-dune-dash/index.html", createResponse("https://example.com/red-dune-dash/index.html")]]));
+  fakeCaches.set(assetManifest.cacheName, new Map([["https://example.com/red-dune-dash/version.json", createResponse("https://example.com/red-dune-dash/version.json")]]));
+
+  const event = {
+    waitUntil(promise) {
+      this._promise = promise;
+    },
+  };
+
+  activateListener(event);
+  await event._promise;
+
+  assert.equal(fakeCaches.has("legacy-cache"), false);
+  assert.equal(fakeCaches.has(assetManifest.cacheName), true);
+});
+
+test("service worker falls back to the cached core response when network-first fetch fails", async () => {
+  reloadServiceWorkerWithScope("https://example.com/red-dune-dash/");
+  const fetchListener = listeners["fetch"];
+  assert.ok(typeof fetchListener === "function");
+
+  fetchCalls.length = 0;
+  fetchImplementation = async () => {
+    throw new Error("offline");
+  };
+
+  const cachedUrl = "https://example.com/red-dune-dash/version.json";
+  const cache = await caches.open(assetManifest.cacheName);
+  const cachedResponse = createResponse(cachedUrl);
+  await cache.put(cachedUrl, cachedResponse);
+
+  const versionRequest = createEvent(cachedUrl);
+  fetchListener(versionRequest.event);
+  const response = await versionRequest.responds[0];
+
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(response, cachedResponse);
+
+  fetchImplementation = async (request) => createResponse(typeof request === "string" ? request : request.url);
 });
 
 async function runTests() {

@@ -3,8 +3,9 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 11
 priority: 7
-status: open
+status: done
 created_at: 2026-03-16
+last_updated: 2026-03-22
 ---
 
 # TODO: Expand Validation Coverage Before Extra Commentary
@@ -40,3 +41,7 @@ Increase trustworthy validation coverage in high-value areas before adding more 
 ## Notes
 
 - Reliability is more valuable than quantity of checks.
+- Completed with targeted PWA validation coverage:
+  - manifest-vs-HTML asset drift detection for offline/network-first coverage
+  - service-worker activation and offline fallback regression tests
+  - local HTTP smoke helper for core PWA endpoints
