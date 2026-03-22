@@ -29,6 +29,41 @@ CI hinting follows an explicit phased rollout so low-noise machine signals land 
 
 Phase changes are qualitative maintainer decisions based on observed trustworthiness, usefulness, and noise. There is no required numeric gate in v1.
 
+## Progressive Policy Gates
+
+The phased rollout is now reflected in both documentation and `agent:advisory` output so contributors can see which signals are advisory, warning-only, or selective hard-fail candidates.
+
+- Stage 1 advisory-only mode is active:
+  - changed-path classification, suggested reading, and recommended checks remain non-blocking
+  - canonical workflow routing still stays in `AGENTS.md` and `instructions/`
+- Stage 2 warning mode is active:
+  - `agent:advisory` surfaces non-blocking warnings when explicit CI runtime signals show risky states such as failed, cancelled, or skipped matched checks/jobs
+  - warning mode uses deterministic inputs only: matched rule signals, supplied job status, and supplied check outcomes
+- Stage 3 hard-fail mode is selective:
+  - only narrow, high-confidence policy gates should block
+  - candidate hard gates and current repo status are listed below
+
+### Stage 3 Candidate Hard Gates
+
+1. `broken-instruction-references`
+   - Current repo status: enforced
+   - Enforcement path: `npm run instruction:lint` in CI
+   - Scope: broken local instruction links/anchors, missing canonical references, missing required workflow coverage
+2. `missing-mandatory-canonical-artifacts`
+   - Current repo status: enforced
+   - Enforcement path: deterministic workflow/document lint checks such as `npm run instruction:lint` and `npm run backlog:lint`
+   - Scope: required canonical workflow files, required template/backlog artifacts
+3. `broken-mandatory-validation-jobs`
+   - Current repo status: enforced
+   - Enforcement path: `verify-linux-signals` and the compatibility `test` gate in CI
+   - Scope: required deterministic validation jobs going red
+4. `protected-branch-violations`
+   - Current repo status: candidate only, not a CI hard-fail gate
+   - Current coverage: local `.githooks/pre-push` protection plus `agent:preflight` guardrail visibility
+   - Promotion rule: keep local/preflight-only until maintainers explicitly decide the CI false-positive risk is acceptably low
+
+This means the repository already combines advisory and warning-only workflow hints with a narrow set of deterministic hard failures, but it does not yet promote protected-branch enforcement into CI policy blocking.
+
 ## File Locations
 
 - Rules: workflow/advisory-rules.json

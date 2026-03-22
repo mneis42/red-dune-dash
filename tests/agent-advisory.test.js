@@ -50,6 +50,7 @@ test("module exports reusable CLI helpers", () => {
   assert.equal(typeof cli.parseRuntimeStateMap, "function");
   assert.equal(typeof cli.parseNameValuePairs, "function");
   assert.equal(typeof cli.evaluateRuntimeSignals, "function");
+  assert.equal(typeof cli.buildPolicyGateStatus, "function");
   assert.equal(typeof cli.runGit, "function");
   assert.equal(typeof cli.getChangedFiles, "function");
   assert.equal(typeof cli.formatHumanReadable, "function");
@@ -249,6 +250,22 @@ test("evaluateRuntimeSignals keeps independent aggregate job hints alongside spe
   assert.match(runtime.actionableHints.join("\n"), /Cross-platform verification job is currently failing/);
 });
 
+test("buildPolicyGateStatus exposes warning mode and selective hard-fail candidates", () => {
+  const cli = loadCliModuleFresh();
+  const policy = cli.buildPolicyGateStatus({
+    actionableHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
+  });
+
+  assert.equal(policy.stages.length, 3);
+  assert.equal(policy.stages[0].id, "stage-1-advisory");
+  assert.equal(policy.stages[1].id, "stage-2-warning");
+  assert.equal(policy.stages[1].status, "active-with-warnings");
+  assert.deepEqual(policy.stages[1].warnings, ["Instruction lint is currently failing (npm run instruction:lint)."]);
+  assert.equal(policy.stages[2].id, "stage-3-hard-fail");
+  assert.equal(policy.stages[2].candidateGates.some((entry) => entry.id === "protected-branch-violations"), true);
+  assert.equal(policy.stages[2].candidateGates.some((entry) => entry.status === "enforced"), true);
+});
+
 test("formatHumanReadable includes runtime signal sections when provided", () => {
   const cli = loadCliModuleFresh();
   const output = cli.formatHumanReadable({
@@ -266,6 +283,9 @@ test("formatHumanReadable includes runtime signal sections when provided", () =>
       matchedSignals: [{ id: "service-worker-tests", label: "Service worker tests", status: "fail" }],
       actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
     },
+    policyGates: cli.buildPolicyGateStatus({
+      actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
+    }),
   });
 
   assert.match(output, /CI runtime signals/);
@@ -273,6 +293,31 @@ test("formatHumanReadable includes runtime signal sections when provided", () =>
   assert.match(output, /check npm run test:service-worker: fail/);
   assert.match(output, /signal service-worker-tests \(Service worker tests\): fail/);
   assert.match(output, /Advisory CI hints/);
+  assert.match(output, /Progressive policy gates/);
+  assert.match(output, /stage-2-warning \(Warning mode\): active-with-warnings, non-blocking/);
+  assert.match(output, /gate protected-branch-violations: candidate-only, non-blocking, confidence=high/);
+});
+
+test("formatHumanReadable tolerates callers that do not pass policyGates", () => {
+  const cli = loadCliModuleFresh();
+  const output = cli.formatHumanReadable({
+    changedFiles: ["README.md"],
+    merged: {
+      areas: ["workflow-docs"],
+      recommendedChecks: [],
+      manualChecks: [],
+    },
+    matchedRules: [{ id: "workflow-docs-core" }],
+    perFile: [{ filePath: "README.md", ruleIds: ["workflow-docs-core"], usedFallback: false }],
+    runtimeSignals: {
+      jobStatuses: {},
+      checkOutcomes: {},
+      matchedSignals: [],
+      actionableHints: [],
+    },
+  });
+
+  assert.match(output, /Progressive policy gates/);
 });
 
 test("main keeps JSON behavior when executed programmatically", () => {
@@ -306,6 +351,8 @@ test("main keeps JSON behavior when executed programmatically", () => {
   assert.deepEqual(payload.runtimeSignals.jobStatuses, {
     "verify-linux": "pass",
   });
+  assert.equal(Array.isArray(payload.policyGates.stages), true);
+  assert.equal(payload.policyGates.stages[2].id, "stage-3-hard-fail");
 });
 
 test("main returns non-zero for invalid advisory rules without exiting host process", () => {
