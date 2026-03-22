@@ -3,11 +3,11 @@ workflow_type: backlog-item
 source: review-findings-2026-03-17
 idea_number: 1
 priority: 12
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-17
-last_updated: 2026-03-17
+last_updated: 2026-03-22
 ---
 
 # TODO: Expand Backlog Lint Scope Beyond Numbered Files
@@ -42,3 +42,4 @@ Ensure backlog template validation also covers newly created backlog items that 
 ## Notes
 
 - This addresses the gap where the feature-request workflow can create backlog/{short-description}.md files that are currently not linted.
+- Completed by expanding backlog lint discovery from numbered files to all Markdown files created directly under `backlog/`, while still excluding `backlog/done/`.
