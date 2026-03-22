@@ -163,7 +163,12 @@ npm run backlog:branch -- --file backlog/<path-to-backlog-item>.md --json
 
 The GitHub Actions workflows also run the same syntax and test steps before deployment.
 
-Core workflow verification in CI now runs as an OS matrix on Linux, macOS, and Windows for:
+Core workflow verification in CI now runs as:
+
+- a dedicated Linux verification job that also exports per-check outcomes for advisory hinting
+- a macOS/Windows matrix for the same core verification categories
+
+Across that topology, CI covers:
 
 - `npm run check`
 - `npm test`

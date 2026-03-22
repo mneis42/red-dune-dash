@@ -19,6 +19,16 @@ This rule source is advisory only.
 - Instruction files in instructions/ remain the authoritative execution workflows.
 - Advisory output may suggest reading or checks, but it must not reroute feature, bug, or review workflows.
 
+## CI Hint Rollout
+
+CI hinting follows an explicit phased rollout so low-noise machine signals land before more interpretive messaging:
+
+- Phase 1: robust machine signals only. `agent:advisory` may use changed paths, touched workflow/docs files, explicit CI job status, and explicit check outcomes passed in by the workflow run.
+- Phase 2: optional human-facing advisory messaging layered on top of the same reliable signals.
+- Phase 3: selective policy enforcement only for narrow, high-confidence cases with low false-positive risk.
+
+Phase changes are qualitative maintainer decisions based on observed trustworthiness, usefulness, and noise. There is no required numeric gate in v1.
+
 ## File Locations
 
 - Rules: workflow/advisory-rules.json
@@ -115,6 +125,7 @@ This lint is focused on process docs and instruction references. It validates lo
 - A file can match multiple rules.
 - Multi-match output uses merge with de-duplication and stable ordering.
 - Unknown files get a generic fallback advisory rule if unknownFileFallback is configured.
+- CI runtime signal evaluation is deterministic and only reflects explicit job/check outcomes that the current workflow run supplied.
 
 ## Preflight Behavior Notes
 

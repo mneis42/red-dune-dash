@@ -3,11 +3,11 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 12
 priority: 8
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-16
-last_updated: 2026-03-17
+last_updated: 2026-03-22
 ---
 
 # TODO: CI Hints Based On Robust Signals First
@@ -47,3 +47,4 @@ Introduce CI advisory hints only where signals are reliable and low-noise.
 ## Notes
 
 - Favor trustworthiness over breadth of hinting.
+- Completed by extending `agent:advisory` with explicit CI runtime signal ingestion, targeted runtime hint output, and a Linux verification job that supplies robust job/check outcomes to the advisory step.

@@ -5,6 +5,323 @@ const {
   resolveAdvisoryForFiles,
 } = require("./advisory-rules.js");
 
+const SIGNAL_METADATA = {
+  syntax: {
+    label: "Syntax validation",
+    checkOutcomes: ["npm run check"],
+    jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
+  },
+  "simulation-tests": {
+    label: "Simulation tests",
+    checkOutcomes: ["npm run test:simulation"],
+    jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
+  },
+  "service-worker-tests": {
+    label: "Service worker tests",
+    checkOutcomes: ["npm run test:service-worker"],
+    jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
+  },
+  "instruction-lint": {
+    label: "Instruction lint",
+    checkOutcomes: ["npm run instruction:lint"],
+    jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
+  },
+  "docs-language-lint": {
+    label: "Docs language lint",
+    checkOutcomes: ["npm run docs:language:lint"],
+    jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
+  },
+  "backlog-lint": {
+    label: "Backlog lint",
+    checkOutcomes: ["npm run backlog:lint"],
+    jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
+  },
+  "test-suite": {
+    label: "Repository test suite",
+    checkOutcomes: ["npm test"],
+    jobStatuses: [],
+    aggregateJobs: ["verify-linux-signals"],
+  },
+  "verify-linux-signals": {
+    label: "Linux verification job",
+    checkOutcomes: [],
+    jobStatuses: ["verify-linux-signals"],
+    aggregateJobs: [],
+  },
+  "cross-platform-verify": {
+    label: "Cross-platform verification job",
+    checkOutcomes: [],
+    jobStatuses: ["cross-platform-verify"],
+    aggregateJobs: [],
+  },
+  "required-check": {
+    label: "Required compatibility gate",
+    checkOutcomes: [],
+    jobStatuses: ["required-check"],
+    aggregateJobs: [],
+  },
+  "advisory-fallback": {
+    label: "Fallback advisory classification",
+    checkOutcomes: [],
+    jobStatuses: [],
+    aggregateJobs: [],
+  },
+};
+
+const VALID_RUNTIME_STATES = new Set(["pass", "fail", "cancelled", "skipped", "not-observed"]);
+
+function stableUnique(values) {
+  const seen = new Set();
+  const result = [];
+
+  for (const value of values) {
+    if (!seen.has(value)) {
+      seen.add(value);
+      result.push(value);
+    }
+  }
+
+  return result;
+}
+
+function normalizeRuntimeState(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (normalized === "success" || normalized === "passed" || normalized === "pass") {
+    return "pass";
+  }
+
+  if (normalized === "failure" || normalized === "failed" || normalized === "fail" || normalized === "error") {
+    return "fail";
+  }
+
+  if (normalized === "cancelled" || normalized === "canceled") {
+    return "cancelled";
+  }
+
+  if (normalized === "skipped") {
+    return "skipped";
+  }
+
+  if (normalized === "not-observed" || normalized === "missing" || normalized === "unknown") {
+    return "not-observed";
+  }
+
+  return null;
+}
+
+function readOptionValue(argv, index) {
+  const candidate = argv[index + 1];
+  if (!candidate || String(candidate).startsWith("--")) {
+    return null;
+  }
+  return String(candidate);
+}
+
+function parseNameValuePairs(entries) {
+  const result = {};
+
+  entries.forEach((entry) => {
+    const value = String(entry || "").trim();
+    if (!value) {
+      return;
+    }
+
+    const separatorIndex = value.indexOf("=");
+    if (separatorIndex === -1) {
+      return;
+    }
+
+    const key = value.slice(0, separatorIndex).trim();
+    const rawState = value.slice(separatorIndex + 1).trim();
+    const normalizedState = normalizeRuntimeState(rawState);
+    if (!key || !normalizedState) {
+      return;
+    }
+
+    result[key] = normalizedState;
+  });
+
+  return result;
+}
+
+function parseRuntimeStateMap(raw) {
+  if (!raw) {
+    return {};
+  }
+
+  const value = String(raw).trim();
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, state]) => [String(key), normalizeRuntimeState(state)])
+        .filter((entry) => entry[0] && entry[1] && VALID_RUNTIME_STATES.has(entry[1]))
+    );
+  } catch (_error) {
+    return parseNameValuePairs(value.split(","));
+  }
+}
+
+function mergeRuntimeStateMaps(...maps) {
+  return Object.assign({}, ...maps);
+}
+
+function isProblemRuntimeState(status) {
+  return status === "fail" || status === "cancelled" || status === "skipped";
+}
+
+function describeProblemState(status) {
+  if (status === "cancelled") {
+    return "was cancelled";
+  }
+  if (status === "skipped") {
+    return "was skipped";
+  }
+  return "is currently failing";
+}
+
+function isAggregateOnlySignal(signalId) {
+  const metadata = SIGNAL_METADATA[signalId] || { checkOutcomes: [], jobStatuses: [] };
+  return metadata.checkOutcomes.length === 0 && metadata.jobStatuses.length > 0;
+}
+
+function shouldSuppressAggregateHint(entry, matchedSignals) {
+  if (!isAggregateOnlySignal(entry.id)) {
+    return false;
+  }
+
+  const aggregateJobNames = new Set(
+    entry.observedJobs.filter((job) => isProblemRuntimeState(job.status)).map((job) => job.jobName)
+  );
+  if (aggregateJobNames.size === 0) {
+    return false;
+  }
+
+  return matchedSignals.some((otherEntry) => {
+    if (otherEntry.id === entry.id || isAggregateOnlySignal(otherEntry.id) || !isProblemRuntimeState(otherEntry.status)) {
+      return false;
+    }
+
+    const metadata = SIGNAL_METADATA[otherEntry.id] || { aggregateJobs: [] };
+    return Array.isArray(metadata.aggregateJobs) && metadata.aggregateJobs.some((jobName) => aggregateJobNames.has(jobName));
+  });
+}
+
+function evaluateRuntimeSignals(result, options) {
+  const runtime = {
+    jobStatuses: mergeRuntimeStateMaps(
+      parseRuntimeStateMap(process.env.AGENT_ADVISORY_CI_JOB_STATUSES),
+      parseNameValuePairs(options.ciJobStatuses)
+    ),
+    checkOutcomes: mergeRuntimeStateMaps(
+      parseRuntimeStateMap(process.env.AGENT_ADVISORY_CI_CHECK_OUTCOMES),
+      parseNameValuePairs(options.ciCheckOutcomes)
+    ),
+  };
+  const hasExplicitRuntimeSignals =
+    Object.keys(runtime.jobStatuses).length > 0 || Object.keys(runtime.checkOutcomes).length > 0;
+  const observedJobNames = new Set(Object.keys(runtime.jobStatuses));
+  const observedCheckCommands = new Set(Object.keys(runtime.checkOutcomes));
+
+  const matchedSignals = stableUnique(result.merged.ciSignals || []).map((signalId) => {
+    const metadata = SIGNAL_METADATA[signalId] || {
+      label: signalId,
+      checkOutcomes: [],
+      jobStatuses: [],
+      aggregateJobs: [],
+    };
+    const observedChecks = metadata.checkOutcomes.map((command) => ({
+      command,
+      status: runtime.checkOutcomes[command] || "not-observed",
+    }));
+    const observedJobs = metadata.jobStatuses.map((jobName) => ({
+      jobName,
+      status: runtime.jobStatuses[jobName] || "not-observed",
+    }));
+    const observedStatuses = stableUnique(
+      [...observedChecks.map((entry) => entry.status), ...observedJobs.map((entry) => entry.status)].filter(Boolean)
+    );
+    const hasRelevantRuntimeContext =
+      metadata.checkOutcomes.some((command) => observedCheckCommands.has(command)) ||
+      metadata.jobStatuses.some((jobName) => observedJobNames.has(jobName));
+
+    let status = "not-observed";
+    if (observedStatuses.includes("fail")) {
+      status = "fail";
+    } else if (observedStatuses.includes("cancelled")) {
+      status = "cancelled";
+    } else if (observedStatuses.includes("skipped")) {
+      status = "skipped";
+    } else if (observedStatuses.includes("pass") && observedStatuses.every((entry) => entry === "pass")) {
+      status = "pass";
+    } else if (observedStatuses.includes("pass")) {
+      status = "pass";
+    }
+
+    return {
+      id: signalId,
+      label: metadata.label,
+      status,
+      observedChecks,
+      observedJobs,
+      hasRelevantRuntimeContext,
+    };
+  });
+
+  const actionableHints = [];
+
+  matchedSignals
+    .filter((entry) => isProblemRuntimeState(entry.status))
+    .filter((entry) => !shouldSuppressAggregateHint(entry, matchedSignals))
+    .forEach((entry) => {
+      const failingChecks = entry.observedChecks
+        .filter((check) => isProblemRuntimeState(check.status))
+        .map((check) => check.command);
+      const failingJobs = entry.observedJobs
+        .filter((job) => isProblemRuntimeState(job.status))
+        .map((job) => job.jobName);
+      const failingTargets = [...failingChecks, ...failingJobs];
+      actionableHints.push(
+        `${entry.label} ${describeProblemState(entry.status)}${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`
+      );
+    });
+
+  matchedSignals
+    .filter(
+      (entry) =>
+        hasExplicitRuntimeSignals &&
+        entry.status === "not-observed" &&
+        entry.hasRelevantRuntimeContext &&
+        (entry.observedChecks.length > 0 || entry.observedJobs.length > 0)
+    )
+    .forEach((entry) => {
+      actionableHints.push(`${entry.label} has no observed runtime outcome in this advisory run yet.`);
+    });
+
+  return {
+    hasExplicitRuntimeSignals,
+    jobStatuses: runtime.jobStatuses,
+    checkOutcomes: runtime.checkOutcomes,
+    matchedSignals,
+    actionableHints: stableUnique(actionableHints),
+  };
+}
+
 function parseArgs(argv) {
   const options = {
     json: false,
@@ -12,6 +329,8 @@ function parseArgs(argv) {
     unmatched: false,
     files: null,
     rulesPath: null,
+    ciJobStatuses: [],
+    ciCheckOutcomes: [],
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -29,7 +348,7 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--files") {
-      const value = argv[index + 1] || "";
+      const value = readOptionValue(argv, index) || "";
       index += 1;
       options.files = value
         .split(",")
@@ -38,8 +357,24 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--rules") {
-      options.rulesPath = argv[index + 1] || null;
+      options.rulesPath = readOptionValue(argv, index) || null;
       index += 1;
+      continue;
+    }
+    if (arg === "--ci-job-status") {
+      const value = readOptionValue(argv, index);
+      if (value) {
+        options.ciJobStatuses.push(value);
+        index += 1;
+      }
+      continue;
+    }
+    if (arg === "--ci-check-outcome") {
+      const value = readOptionValue(argv, index);
+      if (value) {
+        options.ciCheckOutcomes.push(value);
+        index += 1;
+      }
       continue;
     }
   }
@@ -113,6 +448,47 @@ function formatHumanReadable(result) {
   }
 
   lines.push("");
+  lines.push("CI runtime signals");
+  if (
+    Object.keys(result.runtimeSignals.jobStatuses || {}).length === 0 &&
+    Object.keys(result.runtimeSignals.checkOutcomes || {}).length === 0 &&
+    (result.runtimeSignals.matchedSignals || []).length === 0
+  ) {
+    lines.push("- none observed");
+  } else {
+    const jobStatuses = Object.entries(result.runtimeSignals.jobStatuses || {});
+    if (jobStatuses.length === 0) {
+      lines.push("- jobs: none observed");
+    } else {
+      jobStatuses.forEach(([jobName, status]) => lines.push(`- job ${jobName}: ${status}`));
+    }
+
+    const checkOutcomes = Object.entries(result.runtimeSignals.checkOutcomes || {});
+    if (checkOutcomes.length === 0) {
+      lines.push("- checks: none observed");
+    } else {
+      checkOutcomes.forEach(([command, status]) => lines.push(`- check ${command}: ${status}`));
+    }
+
+    const matchedSignals = result.runtimeSignals.matchedSignals || [];
+    if (matchedSignals.length === 0) {
+      lines.push("- matched CI signals: none");
+    } else {
+      matchedSignals.forEach((entry) => {
+        lines.push(`- signal ${entry.id} (${entry.label}): ${entry.status}`);
+      });
+    }
+  }
+
+  lines.push("");
+  lines.push("Advisory CI hints");
+  if ((result.runtimeSignals.actionableHints || []).length === 0) {
+    lines.push("- none");
+  } else {
+    result.runtimeSignals.actionableHints.forEach((entry) => lines.push(`- ${entry}`));
+  }
+
+  lines.push("");
   lines.push("Per-file mapping");
   result.perFile.forEach((entry) => {
     const fallbackMark = entry.usedFallback ? " (fallback)" : "";
@@ -136,6 +512,7 @@ function main(argv = process.argv.slice(2)) {
   const changedFiles = getChangedFiles(options);
   const result = resolveAdvisoryForFiles(changedFiles, document);
   result.rulesPath = absolutePath;
+  result.runtimeSignals = evaluateRuntimeSignals(result, options);
 
   if (options.unmatched) {
     const unmatchedFiles = result.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
@@ -171,7 +548,15 @@ function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
+  SIGNAL_METADATA,
+  isAggregateOnlySignal,
+  shouldSuppressAggregateHint,
+  isProblemRuntimeState,
+  describeProblemState,
   parseArgs,
+  parseRuntimeStateMap,
+  parseNameValuePairs,
+  evaluateRuntimeSignals,
   runGit,
   getChangedFiles,
   formatHumanReadable,
