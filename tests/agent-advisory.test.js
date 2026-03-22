@@ -43,6 +43,7 @@ test("importing advisory CLI module does not auto-run main", () => {
 test("module exports reusable CLI helpers", () => {
   const cli = loadCliModuleFresh();
   assert.equal(typeof cli.parseArgs, "function");
+  assert.equal(typeof cli.isAggregateOnlySignal, "function");
   assert.equal(typeof cli.isProblemRuntimeState, "function");
   assert.equal(typeof cli.describeProblemState, "function");
   assert.equal(typeof cli.parseRuntimeStateMap, "function");
@@ -212,6 +213,22 @@ test("evaluateRuntimeSignals prefers specific docs and backlog lint hints for wo
 
   assert.match(runtime.actionableHints.join("\n"), /Docs language lint is currently failing/);
   assert.match(runtime.actionableHints.join("\n"), /Backlog lint is currently failing/);
+  assert.equal(runtime.actionableHints.some((entry) => entry.includes("Linux verification job is currently failing")), false);
+});
+
+test("evaluateRuntimeSignals keeps aggregate job hint when no specific failed check explains it", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["verify-linux-signals"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: ["verify-linux-signals=failure"],
+    ciCheckOutcomes: [],
+  });
+
+  assert.deepEqual(runtime.actionableHints, ["Linux verification job is currently failing (verify-linux-signals)."]);
 });
 
 test("formatHumanReadable includes runtime signal sections when provided", () => {

@@ -184,6 +184,11 @@ function describeProblemState(status) {
   return "is currently failing";
 }
 
+function isAggregateOnlySignal(signalId) {
+  const metadata = SIGNAL_METADATA[signalId] || { checkOutcomes: [], jobStatuses: [] };
+  return metadata.checkOutcomes.length === 0 && metadata.jobStatuses.length > 0;
+}
+
 function evaluateRuntimeSignals(result, options) {
   const runtime = {
     jobStatuses: mergeRuntimeStateMaps(
@@ -246,8 +251,13 @@ function evaluateRuntimeSignals(result, options) {
 
   const actionableHints = [];
 
+  const hasSpecificProblemHint = matchedSignals.some(
+    (entry) => isProblemRuntimeState(entry.status) && !isAggregateOnlySignal(entry.id)
+  );
+
   matchedSignals
     .filter((entry) => isProblemRuntimeState(entry.status))
+    .filter((entry) => !(hasSpecificProblemHint && isAggregateOnlySignal(entry.id)))
     .forEach((entry) => {
       const failingChecks = entry.observedChecks
         .filter((check) => isProblemRuntimeState(check.status))
@@ -509,6 +519,7 @@ function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   SIGNAL_METADATA,
+  isAggregateOnlySignal,
   isProblemRuntimeState,
   describeProblemState,
   parseArgs,
