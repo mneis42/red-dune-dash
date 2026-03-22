@@ -131,6 +131,24 @@ test("policy gate document and advisory docs stay in sync for stage 3 gate entri
   }
 });
 
+test("validateAdvisoryDocument rejects unexpected policy gate keys", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  invalidDocument.policyGates.extraField = true;
+  invalidDocument.policyGates.stages[0].unexpected = "nope";
+  invalidDocument.policyGates.stages[2].candidateGates[0].typoField = "bad";
+
+  const result = validateAdvisoryDocument(invalidDocument);
+
+  assert.equal(result.valid, false);
+  assert.equal(result.errors.includes("policyGates.extraField is not allowed"), true);
+  assert.equal(result.errors.includes("policyGates.stages[0].unexpected is not allowed"), true);
+  assert.equal(
+    result.errors.includes("policyGates.stages[2].candidateGates[0].typoField is not allowed"),
+    true
+  );
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {

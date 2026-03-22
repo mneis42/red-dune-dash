@@ -283,6 +283,7 @@ function evaluateRuntimeSignals(result, options) {
   });
 
   const actionableHints = [];
+  const warningHints = [];
 
   matchedSignals
     .filter((entry) => isProblemRuntimeState(entry.status))
@@ -295,9 +296,9 @@ function evaluateRuntimeSignals(result, options) {
         .filter((job) => isProblemRuntimeState(job.status))
         .map((job) => job.jobName);
       const failingTargets = [...failingChecks, ...failingJobs];
-      actionableHints.push(
-        `${entry.label} ${describeProblemState(entry.status)}${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`
-      );
+      const hint = `${entry.label} ${describeProblemState(entry.status)}${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`;
+      actionableHints.push(hint);
+      warningHints.push(hint);
     });
 
   matchedSignals
@@ -317,12 +318,13 @@ function evaluateRuntimeSignals(result, options) {
     jobStatuses: runtime.jobStatuses,
     checkOutcomes: runtime.checkOutcomes,
     matchedSignals,
+    warningHints: stableUnique(warningHints),
     actionableHints: stableUnique(actionableHints),
   };
 }
 
 function buildPolicyGateStatus(runtimeSignals, policyGatesDocument = {}) {
-  const warnings = stableUnique(runtimeSignals.actionableHints || []);
+  const warnings = stableUnique(runtimeSignals.warningHints || []);
   const stages = Array.isArray(policyGatesDocument.stages) ? policyGatesDocument.stages : [];
 
   return {
@@ -427,39 +429,45 @@ function formatHumanReadable(result) {
 
   if (result.changedFiles.length === 0) {
     lines.push("No local file changes detected.");
-    return lines.join("\n");
-  }
-
-  lines.push("");
-  lines.push("Areas");
-  if (result.merged.areas.length === 0) {
-    lines.push("- none");
   } else {
-    result.merged.areas.forEach((entry) => lines.push(`- ${entry}`));
-  }
+    lines.push("");
+    lines.push("Areas");
+    if (result.merged.areas.length === 0) {
+      lines.push("- none");
+    } else {
+      result.merged.areas.forEach((entry) => lines.push(`- ${entry}`));
+    }
 
-  lines.push("");
-  lines.push("Recommended checks");
-  if (result.merged.recommendedChecks.length === 0) {
-    lines.push("- none");
-  } else {
-    result.merged.recommendedChecks.forEach((entry) => lines.push(`- ${entry}`));
-  }
+    lines.push("");
+    lines.push("Recommended checks");
+    if (result.merged.recommendedChecks.length === 0) {
+      lines.push("- none");
+    } else {
+      result.merged.recommendedChecks.forEach((entry) => lines.push(`- ${entry}`));
+    }
 
-  lines.push("");
-  lines.push("Manual checks");
-  if (result.merged.manualChecks.length === 0) {
-    lines.push("- none");
-  } else {
-    result.merged.manualChecks.forEach((entry) => lines.push(`- ${entry}`));
-  }
+    lines.push("");
+    lines.push("Manual checks");
+    if (result.merged.manualChecks.length === 0) {
+      lines.push("- none");
+    } else {
+      result.merged.manualChecks.forEach((entry) => lines.push(`- ${entry}`));
+    }
 
-  lines.push("");
-  lines.push("Matched rule ids");
-  if (result.matchedRules.length === 0) {
-    lines.push("- none");
-  } else {
-    result.matchedRules.forEach((rule) => lines.push(`- ${rule.id}`));
+    lines.push("");
+    lines.push("Matched rule ids");
+    if (result.matchedRules.length === 0) {
+      lines.push("- none");
+    } else {
+      result.matchedRules.forEach((rule) => lines.push(`- ${rule.id}`));
+    }
+
+    lines.push("");
+    lines.push("Per-file mapping");
+    result.perFile.forEach((entry) => {
+      const fallbackMark = entry.usedFallback ? " (fallback)" : "";
+      lines.push(`- ${entry.filePath}: ${entry.ruleIds.join(", ")}${fallbackMark}`);
+    });
   }
 
   lines.push("");
@@ -518,13 +526,6 @@ function formatHumanReadable(result) {
         );
       });
     }
-  });
-
-  lines.push("");
-  lines.push("Per-file mapping");
-  result.perFile.forEach((entry) => {
-    const fallbackMark = entry.usedFallback ? " (fallback)" : "";
-    lines.push(`- ${entry.filePath}: ${entry.ruleIds.join(", ")}${fallbackMark}`);
   });
 
   return lines.join("\n");

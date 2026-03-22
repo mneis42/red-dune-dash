@@ -201,6 +201,22 @@ test("evaluateRuntimeSignals suppresses unrelated not-observed hints for partial
   assert.equal(runtime.actionableHints.some((entry) => entry.includes("Required compatibility gate has no observed runtime outcome")), false);
 });
 
+test("evaluateRuntimeSignals keeps missing-runtime hints out of warningHints", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["instruction-lint"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: [],
+    ciCheckOutcomes: ["npm run instruction:lint=missing"],
+  });
+
+  assert.equal(runtime.actionableHints.some((entry) => entry.includes("has no observed runtime outcome")), true);
+  assert.deepEqual(runtime.warningHints, []);
+});
+
 test("evaluateRuntimeSignals prefers specific docs and backlog lint hints for workflow-doc changes", () => {
   const cli = loadCliModuleFresh();
   const advisory = {
@@ -253,6 +269,7 @@ test("evaluateRuntimeSignals keeps independent aggregate job hints alongside spe
 test("buildPolicyGateStatus exposes warning mode and selective hard-fail candidates", () => {
   const cli = loadCliModuleFresh();
   const policy = cli.buildPolicyGateStatus({
+    warningHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
     actionableHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
   }, {
     stages: [
@@ -298,6 +315,7 @@ test("formatHumanReadable includes runtime signal sections when provided", () =>
   const cli = loadCliModuleFresh();
   const policyGates = cli.buildPolicyGateStatus(
     {
+      warningHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
       actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
     },
     {
@@ -375,6 +393,42 @@ test("formatHumanReadable tolerates callers that do not pass policyGates", () =>
   });
 
   assert.match(output, /Progressive policy gates/);
+});
+
+test("formatHumanReadable keeps policy gate section on clean working trees", () => {
+  const cli = loadCliModuleFresh();
+  const output = cli.formatHumanReadable({
+    changedFiles: [],
+    merged: {
+      areas: [],
+      recommendedChecks: [],
+      manualChecks: [],
+    },
+    matchedRules: [],
+    perFile: [],
+    runtimeSignals: {
+      jobStatuses: {},
+      checkOutcomes: {},
+      matchedSignals: [],
+      warningHints: [],
+      actionableHints: [],
+    },
+    policyGates: {
+      stages: [
+        {
+          id: "stage-1-advisory",
+          label: "Advisory only",
+          blocking: false,
+          status: "active",
+          summary: "Changed-file matching and workflow hints stay advisory and do not reroute canonical workflows.",
+        },
+      ],
+    },
+  });
+
+  assert.match(output, /No local file changes detected\./);
+  assert.match(output, /Progressive policy gates/);
+  assert.match(output, /stage-1-advisory \(Advisory only\): active, non-blocking/);
 });
 
 test("main keeps JSON behavior when executed programmatically", () => {

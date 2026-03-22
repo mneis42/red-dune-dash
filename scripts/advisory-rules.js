@@ -48,6 +48,18 @@ function isStringArray(value) {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.length > 0);
 }
 
+function validateAllowedKeys(target, allowedKeys, fieldPath) {
+  const errors = [];
+
+  Object.keys(target).forEach((key) => {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${fieldPath}.${key} is not allowed`);
+    }
+  });
+
+  return errors;
+}
+
 function validateRuleLike(rule, fieldPath, { requireMatch }) {
   const errors = [];
   const required = [
@@ -164,6 +176,10 @@ function validateAdvisoryDocument(document) {
           return;
         }
 
+        validateAllowedKeys(stage, new Set(["id", "label", "blocking", "status", "summary", "candidateGates"]), fieldPath).forEach(
+          (entry) => errors.push(entry)
+        );
+
         ["id", "label", "status", "summary"].forEach((key) => {
           if (typeof stage[key] !== "string" || stage[key].trim().length === 0) {
             errors.push(`${fieldPath}.${key} must be a non-empty string`);
@@ -188,6 +204,20 @@ function validateAdvisoryDocument(document) {
             return;
           }
 
+          validateAllowedKeys(
+            gate,
+            new Set([
+              "id",
+              "status",
+              "confidence",
+              "blocking",
+              "source",
+              "documentationStatusLine",
+              "documentationDetailLine",
+            ]),
+            gateFieldPath
+          ).forEach((entry) => errors.push(entry));
+
           ["id", "status", "confidence", "documentationStatusLine", "documentationDetailLine"].forEach((key) => {
             if (typeof gate[key] !== "string" || gate[key].trim().length === 0) {
               errors.push(`${gateFieldPath}.${key} must be a non-empty string`);
@@ -202,6 +232,7 @@ function validateAdvisoryDocument(document) {
         });
       });
     }
+    validateAllowedKeys(document.policyGates, new Set(["stages"]), "policyGates").forEach((entry) => errors.push(entry));
   }
 
   return { valid: errors.length === 0, errors };
