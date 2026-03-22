@@ -26,6 +26,16 @@ const SIGNAL_METADATA = {
     checkOutcomes: ["npm run instruction:lint"],
     jobStatuses: [],
   },
+  "docs-language-lint": {
+    label: "Docs language lint",
+    checkOutcomes: ["npm run docs:language:lint"],
+    jobStatuses: [],
+  },
+  "backlog-lint": {
+    label: "Backlog lint",
+    checkOutcomes: ["npm run backlog:lint"],
+    jobStatuses: [],
+  },
   "test-suite": {
     label: "Repository test suite",
     checkOutcomes: ["npm test"],
@@ -53,7 +63,7 @@ const SIGNAL_METADATA = {
   },
 };
 
-const VALID_RUNTIME_STATES = new Set(["pass", "fail", "not-observed"]);
+const VALID_RUNTIME_STATES = new Set(["pass", "fail", "cancelled", "skipped", "not-observed"]);
 
 function stableUnique(values) {
   const seen = new Set();
@@ -78,6 +88,14 @@ function normalizeRuntimeState(value) {
 
   if (normalized === "failure" || normalized === "failed" || normalized === "fail" || normalized === "error") {
     return "fail";
+  }
+
+  if (normalized === "cancelled" || normalized === "canceled") {
+    return "cancelled";
+  }
+
+  if (normalized === "skipped") {
+    return "skipped";
   }
 
   if (normalized === "not-observed" || normalized === "missing" || normalized === "unknown") {
@@ -152,6 +170,20 @@ function mergeRuntimeStateMaps(...maps) {
   return Object.assign({}, ...maps);
 }
 
+function isProblemRuntimeState(status) {
+  return status === "fail" || status === "cancelled" || status === "skipped";
+}
+
+function describeProblemState(status) {
+  if (status === "cancelled") {
+    return "was cancelled";
+  }
+  if (status === "skipped") {
+    return "was skipped";
+  }
+  return "is currently failing";
+}
+
 function evaluateRuntimeSignals(result, options) {
   const runtime = {
     jobStatuses: mergeRuntimeStateMaps(
@@ -165,6 +197,8 @@ function evaluateRuntimeSignals(result, options) {
   };
   const hasExplicitRuntimeSignals =
     Object.keys(runtime.jobStatuses).length > 0 || Object.keys(runtime.checkOutcomes).length > 0;
+  const observedJobNames = new Set(Object.keys(runtime.jobStatuses));
+  const observedCheckCommands = new Set(Object.keys(runtime.checkOutcomes));
 
   const matchedSignals = stableUnique(result.merged.ciSignals || []).map((signalId) => {
     const metadata = SIGNAL_METADATA[signalId] || {
@@ -183,10 +217,17 @@ function evaluateRuntimeSignals(result, options) {
     const observedStatuses = stableUnique(
       [...observedChecks.map((entry) => entry.status), ...observedJobs.map((entry) => entry.status)].filter(Boolean)
     );
+    const hasRelevantRuntimeContext =
+      metadata.checkOutcomes.some((command) => observedCheckCommands.has(command)) ||
+      metadata.jobStatuses.some((jobName) => observedJobNames.has(jobName));
 
     let status = "not-observed";
     if (observedStatuses.includes("fail")) {
       status = "fail";
+    } else if (observedStatuses.includes("cancelled")) {
+      status = "cancelled";
+    } else if (observedStatuses.includes("skipped")) {
+      status = "skipped";
     } else if (observedStatuses.includes("pass") && observedStatuses.every((entry) => entry === "pass")) {
       status = "pass";
     } else if (observedStatuses.includes("pass")) {
@@ -199,23 +240,24 @@ function evaluateRuntimeSignals(result, options) {
       status,
       observedChecks,
       observedJobs,
+      hasRelevantRuntimeContext,
     };
   });
 
   const actionableHints = [];
 
   matchedSignals
-    .filter((entry) => entry.status === "fail")
+    .filter((entry) => isProblemRuntimeState(entry.status))
     .forEach((entry) => {
       const failingChecks = entry.observedChecks
-        .filter((check) => check.status === "fail")
+        .filter((check) => isProblemRuntimeState(check.status))
         .map((check) => check.command);
       const failingJobs = entry.observedJobs
-        .filter((job) => job.status === "fail")
+        .filter((job) => isProblemRuntimeState(job.status))
         .map((job) => job.jobName);
       const failingTargets = [...failingChecks, ...failingJobs];
       actionableHints.push(
-        `${entry.label} is currently failing${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`
+        `${entry.label} ${describeProblemState(entry.status)}${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`
       );
     });
 
@@ -224,6 +266,7 @@ function evaluateRuntimeSignals(result, options) {
       (entry) =>
         hasExplicitRuntimeSignals &&
         entry.status === "not-observed" &&
+        entry.hasRelevantRuntimeContext &&
         (entry.observedChecks.length > 0 || entry.observedJobs.length > 0)
     )
     .forEach((entry) => {
@@ -466,6 +509,8 @@ function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   SIGNAL_METADATA,
+  isProblemRuntimeState,
+  describeProblemState,
   parseArgs,
   parseRuntimeStateMap,
   parseNameValuePairs,

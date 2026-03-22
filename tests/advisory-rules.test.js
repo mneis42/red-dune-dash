@@ -55,6 +55,8 @@ test("github workflow-adjacent files resolve as workflow docs instead of fallbac
   assert.equal(result.perFile.every((entry) => entry.usedFallback === false), true);
   assert.deepEqual(result.merged.ciSignals, [
     "instruction-lint",
+    "docs-language-lint",
+    "backlog-lint",
     "verify-linux-signals",
     "cross-platform-verify",
     "required-check",

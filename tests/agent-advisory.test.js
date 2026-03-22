@@ -43,6 +43,8 @@ test("importing advisory CLI module does not auto-run main", () => {
 test("module exports reusable CLI helpers", () => {
   const cli = loadCliModuleFresh();
   assert.equal(typeof cli.parseArgs, "function");
+  assert.equal(typeof cli.isProblemRuntimeState, "function");
+  assert.equal(typeof cli.describeProblemState, "function");
   assert.equal(typeof cli.parseRuntimeStateMap, "function");
   assert.equal(typeof cli.parseNameValuePairs, "function");
   assert.equal(typeof cli.evaluateRuntimeSignals, "function");
@@ -70,11 +72,15 @@ test("parseArgs collects explicit CI runtime signal flags", () => {
 
 test("parseRuntimeStateMap accepts JSON and normalizes statuses", () => {
   const cli = loadCliModuleFresh();
-  const result = cli.parseRuntimeStateMap('{"verify-linux":"success","required-gate":"failure","ignored":"weird"}');
+  const result = cli.parseRuntimeStateMap(
+    '{"verify-linux":"success","required-gate":"failure","cross-platform":"cancelled","docs":"skipped","ignored":"weird"}'
+  );
 
   assert.deepEqual(result, {
     "verify-linux": "pass",
     "required-gate": "fail",
+    "cross-platform": "cancelled",
+    docs: "skipped",
   });
 });
 
@@ -123,6 +129,22 @@ test("evaluateRuntimeSignals turns matched failing job status into an advisory h
   assert.match(runtime.actionableHints.join("\n"), /Cross-platform verification job is currently failing/);
 });
 
+test("evaluateRuntimeSignals treats cancelled github job states as visible advisory problems", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["cross-platform-verify"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: ["cross-platform-verify=cancelled"],
+    ciCheckOutcomes: [],
+  });
+
+  assert.equal(runtime.matchedSignals[0].status, "cancelled");
+  assert.match(runtime.actionableHints.join("\n"), /Cross-platform verification job was cancelled/);
+});
+
 test("evaluateRuntimeSignals keeps unmatched failing job status visible without adding unrelated hints", () => {
   const cli = loadCliModuleFresh();
   const advisory = {
@@ -156,6 +178,40 @@ test("evaluateRuntimeSignals suppresses not-observed hints when no runtime signa
   assert.equal(runtime.hasExplicitRuntimeSignals, false);
   assert.equal(runtime.matchedSignals.every((entry) => entry.status === "not-observed"), true);
   assert.deepEqual(runtime.actionableHints, []);
+});
+
+test("evaluateRuntimeSignals suppresses unrelated not-observed hints for partial runtime context", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["instruction-lint", "cross-platform-verify", "required-check"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: ["cross-platform-verify=cancelled"],
+    ciCheckOutcomes: [],
+  });
+
+  assert.equal(runtime.hasExplicitRuntimeSignals, true);
+  assert.match(runtime.actionableHints.join("\n"), /Cross-platform verification job was cancelled/);
+  assert.equal(runtime.actionableHints.some((entry) => entry.includes("Instruction lint has no observed runtime outcome")), false);
+  assert.equal(runtime.actionableHints.some((entry) => entry.includes("Required compatibility gate has no observed runtime outcome")), false);
+});
+
+test("evaluateRuntimeSignals prefers specific docs and backlog lint hints for workflow-doc changes", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["instruction-lint", "docs-language-lint", "backlog-lint", "verify-linux-signals"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: ["verify-linux-signals=failure"],
+    ciCheckOutcomes: ["npm run docs:language:lint=failure", "npm run backlog:lint=failure"],
+  });
+
+  assert.match(runtime.actionableHints.join("\n"), /Docs language lint is currently failing/);
+  assert.match(runtime.actionableHints.join("\n"), /Backlog lint is currently failing/);
 });
 
 test("formatHumanReadable includes runtime signal sections when provided", () => {
