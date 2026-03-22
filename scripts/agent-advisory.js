@@ -75,7 +75,6 @@ const SIGNAL_METADATA = {
 };
 
 const VALID_RUNTIME_STATES = new Set(["pass", "fail", "cancelled", "skipped", "not-observed"]);
-
 function stableUnique(values) {
   const seen = new Set();
   const result = [];
@@ -322,6 +321,22 @@ function evaluateRuntimeSignals(result, options) {
   };
 }
 
+function buildPolicyGateStatus(runtimeSignals, policyGatesDocument = {}) {
+  const warnings = stableUnique(runtimeSignals.actionableHints || []);
+  const stages = Array.isArray(policyGatesDocument.stages) ? policyGatesDocument.stages : [];
+
+  return {
+    stages: stages.map((stage) => {
+      const normalizedStage = { ...stage };
+      if (stage.id === "stage-2-warning") {
+        normalizedStage.status = warnings.length > 0 ? "active-with-warnings" : "active-no-warnings";
+        normalizedStage.warnings = warnings;
+      }
+      return normalizedStage;
+    }),
+  };
+}
+
 function parseArgs(argv) {
   const options = {
     json: false,
@@ -489,6 +504,23 @@ function formatHumanReadable(result) {
   }
 
   lines.push("");
+  lines.push("Progressive policy gates");
+  ((result.policyGates && result.policyGates.stages) || []).forEach((stage) => {
+    lines.push(`- ${stage.id} (${stage.label}): ${stage.status}${stage.blocking ? ", blocking" : ", non-blocking"}`);
+    lines.push(`  summary: ${stage.summary}`);
+    if (Array.isArray(stage.warnings) && stage.warnings.length > 0) {
+      stage.warnings.forEach((entry) => lines.push(`  warning: ${entry}`));
+    }
+    if (Array.isArray(stage.candidateGates) && stage.candidateGates.length > 0) {
+      stage.candidateGates.forEach((gate) => {
+        lines.push(
+          `  gate ${gate.id}: ${gate.status}, ${gate.blocking ? "blocking" : "non-blocking"}, confidence=${gate.confidence}`
+        );
+      });
+    }
+  });
+
+  lines.push("");
   lines.push("Per-file mapping");
   result.perFile.forEach((entry) => {
     const fallbackMark = entry.usedFallback ? " (fallback)" : "";
@@ -513,6 +545,7 @@ function main(argv = process.argv.slice(2)) {
   const result = resolveAdvisoryForFiles(changedFiles, document);
   result.rulesPath = absolutePath;
   result.runtimeSignals = evaluateRuntimeSignals(result, options);
+  result.policyGates = buildPolicyGateStatus(result.runtimeSignals, document.policyGates);
 
   if (options.unmatched) {
     const unmatchedFiles = result.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
@@ -557,6 +590,7 @@ module.exports = {
   parseRuntimeStateMap,
   parseNameValuePairs,
   evaluateRuntimeSignals,
+  buildPolicyGateStatus,
   runGit,
   getChangedFiles,
   formatHumanReadable,
