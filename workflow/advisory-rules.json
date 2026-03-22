@@ -63,7 +63,7 @@
       "manualChecks": ["cross-read nearby docs for contradiction risk"],
       "suggestedDocs": ["README.md", "CONTRIBUTING.md", "AGENTS.md", "instructions/"],
       "suggestedReading": ["AGENTS.md"],
-      "ciSignals": ["instruction-lint"]
+      "ciSignals": ["instruction-lint", "verify-linux-signals", "cross-platform-verify", "required-check"]
     },
     {
       "id": "ui-shell",
@@ -85,7 +85,7 @@
       "manualChecks": ["cross-read nearby docs for contradiction risk"],
       "suggestedDocs": ["README.md", "CONTRIBUTING.md", "docs/", "instructions/"],
       "suggestedReading": ["AGENTS.md", "instructions/change-review.md"],
-      "ciSignals": ["instruction-lint"]
+      "ciSignals": ["instruction-lint", "verify-linux-signals", "cross-platform-verify", "required-check"]
     },
     {
       "id": "tooling-scripts-tests",

@@ -9,26 +9,47 @@ const SIGNAL_METADATA = {
   syntax: {
     label: "Syntax validation",
     checkOutcomes: ["npm run check"],
+    jobStatuses: [],
   },
   "simulation-tests": {
     label: "Simulation tests",
     checkOutcomes: ["npm run test:simulation"],
+    jobStatuses: [],
   },
   "service-worker-tests": {
     label: "Service worker tests",
     checkOutcomes: ["npm run test:service-worker"],
+    jobStatuses: [],
   },
   "instruction-lint": {
     label: "Instruction lint",
     checkOutcomes: ["npm run instruction:lint"],
+    jobStatuses: [],
   },
   "test-suite": {
     label: "Repository test suite",
     checkOutcomes: ["npm test"],
+    jobStatuses: [],
+  },
+  "verify-linux-signals": {
+    label: "Linux verification job",
+    checkOutcomes: [],
+    jobStatuses: ["verify-linux-signals"],
+  },
+  "cross-platform-verify": {
+    label: "Cross-platform verification job",
+    checkOutcomes: [],
+    jobStatuses: ["cross-platform-verify"],
+  },
+  "required-check": {
+    label: "Required compatibility gate",
+    checkOutcomes: [],
+    jobStatuses: ["required-check"],
   },
   "advisory-fallback": {
     label: "Fallback advisory classification",
     checkOutcomes: [],
+    jobStatuses: [],
   },
 };
 
@@ -147,12 +168,19 @@ function evaluateRuntimeSignals(result, options) {
     const metadata = SIGNAL_METADATA[signalId] || {
       label: signalId,
       checkOutcomes: [],
+      jobStatuses: [],
     };
     const observedChecks = metadata.checkOutcomes.map((command) => ({
       command,
       status: runtime.checkOutcomes[command] || "not-observed",
     }));
-    const observedStatuses = stableUnique(observedChecks.map((entry) => entry.status).filter(Boolean));
+    const observedJobs = metadata.jobStatuses.map((jobName) => ({
+      jobName,
+      status: runtime.jobStatuses[jobName] || "not-observed",
+    }));
+    const observedStatuses = stableUnique(
+      [...observedChecks.map((entry) => entry.status), ...observedJobs.map((entry) => entry.status)].filter(Boolean)
+    );
 
     let status = "not-observed";
     if (observedStatuses.includes("fail")) {
@@ -168,6 +196,7 @@ function evaluateRuntimeSignals(result, options) {
       label: metadata.label,
       status,
       observedChecks,
+      observedJobs,
     };
   });
 
@@ -179,13 +208,17 @@ function evaluateRuntimeSignals(result, options) {
       const failingChecks = entry.observedChecks
         .filter((check) => check.status === "fail")
         .map((check) => check.command);
+      const failingJobs = entry.observedJobs
+        .filter((job) => job.status === "fail")
+        .map((job) => job.jobName);
+      const failingTargets = [...failingChecks, ...failingJobs];
       actionableHints.push(
-        `${entry.label} is currently failing${failingChecks.length > 0 ? ` (${failingChecks.join(", ")})` : ""}.`
+        `${entry.label} is currently failing${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`
       );
     });
 
   matchedSignals
-    .filter((entry) => entry.status === "not-observed" && entry.observedChecks.length > 0)
+    .filter((entry) => entry.status === "not-observed" && (entry.observedChecks.length > 0 || entry.observedJobs.length > 0))
     .forEach((entry) => {
       actionableHints.push(`${entry.label} has no observed runtime outcome in this advisory run yet.`);
     });

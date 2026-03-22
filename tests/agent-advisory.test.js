@@ -104,7 +104,26 @@ test("evaluateRuntimeSignals maps matched CI signals to observed check outcomes"
   assert.match(runtime.actionableHints.join("\n"), /Service worker tests is currently failing/);
 });
 
-test("evaluateRuntimeSignals keeps failing job status visible without adding unrelated generic hints", () => {
+test("evaluateRuntimeSignals turns matched failing job status into an advisory hint", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["cross-platform-verify"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: ["cross-platform-verify=failure"],
+    ciCheckOutcomes: ["npm run check=success"],
+  });
+
+  assert.deepEqual(runtime.jobStatuses, {
+    "cross-platform-verify": "fail",
+  });
+  assert.equal(runtime.matchedSignals[0].status, "fail");
+  assert.match(runtime.actionableHints.join("\n"), /Cross-platform verification job is currently failing/);
+});
+
+test("evaluateRuntimeSignals keeps unmatched failing job status visible without adding unrelated hints", () => {
   const cli = loadCliModuleFresh();
   const advisory = {
     merged: {

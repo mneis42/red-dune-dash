@@ -53,6 +53,12 @@ test("github workflow-adjacent files resolve as workflow docs instead of fallbac
 
   assert.deepEqual(result.merged.areas, ["workflow-docs"]);
   assert.equal(result.perFile.every((entry) => entry.usedFallback === false), true);
+  assert.deepEqual(result.merged.ciSignals, [
+    "instruction-lint",
+    "verify-linux-signals",
+    "cross-platform-verify",
+    "required-check",
+  ]);
   assert.deepEqual(result.perFile[0].ruleIds, ["workflow-docs"]);
   assert.deepEqual(result.perFile[1].ruleIds, ["workflow-docs"]);
   assert.deepEqual(result.perFile[2].ruleIds, ["workflow-docs"]);
