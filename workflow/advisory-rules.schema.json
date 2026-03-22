@@ -124,6 +124,30 @@
       "type": "object",
       "required": ["id", "label", "blocking", "status", "summary"],
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "stage-3-hard-fail"
+              }
+            },
+            "required": ["id"]
+          },
+          "then": {
+            "required": ["candidateGates"],
+            "properties": {
+              "candidateGates": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/policyGate"
+                }
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "id": {
           "type": "string",

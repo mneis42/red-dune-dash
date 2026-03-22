@@ -39,12 +39,12 @@
           },
           {
             "id": "missing-mandatory-canonical-artifacts",
-            "status": "enforced",
+            "status": "partial-coverage",
             "confidence": "high",
-            "blocking": true,
+            "blocking": false,
             "source": ["npm run instruction:lint", "npm run backlog:lint", "CI verify-linux-signals"],
-            "documentationStatusLine": "Current repo status: enforced",
-            "documentationDetailLine": "Enforcement path: deterministic workflow/document lint checks such as `npm run instruction:lint` and `npm run backlog:lint`"
+            "documentationStatusLine": "Current repo status: partial coverage only, not a single enforced hard-fail gate",
+            "documentationDetailLine": "Current coverage: deterministic lint checks cover some canonical workflow files and backlog structure, but template-artifact existence is not enforced as one complete CI gate"
           },
           {
             "id": "broken-mandatory-validation-jobs",

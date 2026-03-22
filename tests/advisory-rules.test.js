@@ -172,6 +172,34 @@ test("validateAdvisoryDocument reports null policyGates as a validation error wi
   assert.equal(result.errors.includes("policyGates must be an object"), true);
 });
 
+test("validateAdvisoryDocument requires stage 3 candidate gates", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  delete invalidDocument.policyGates.stages[2].candidateGates;
+
+  const result = validateAdvisoryDocument(invalidDocument);
+
+  assert.equal(result.valid, false);
+  assert.equal(
+    result.errors.includes("policyGates.stages[2].candidateGates is required for stage-3-hard-fail"),
+    true
+  );
+});
+
+test("validateAdvisoryDocument rejects empty stage 3 candidate gate list", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  invalidDocument.policyGates.stages[2].candidateGates = [];
+
+  const result = validateAdvisoryDocument(invalidDocument);
+
+  assert.equal(result.valid, false);
+  assert.equal(
+    result.errors.includes("policyGates.stages[2].candidateGates must be a non-empty array for stage-3-hard-fail"),
+    true
+  );
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {

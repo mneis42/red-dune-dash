@@ -197,10 +197,17 @@ function validateAdvisoryDocument(document) {
           }
 
           if (!("candidateGates" in stage)) {
+            if (stage.id === "stage-3-hard-fail") {
+              errors.push(`${fieldPath}.candidateGates is required for stage-3-hard-fail`);
+            }
             return;
           }
           if (!Array.isArray(stage.candidateGates)) {
             errors.push(`${fieldPath}.candidateGates must be an array`);
+            return;
+          }
+          if (stage.id === "stage-3-hard-fail" && stage.candidateGates.length === 0) {
+            errors.push(`${fieldPath}.candidateGates must be a non-empty array for stage-3-hard-fail`);
             return;
           }
 

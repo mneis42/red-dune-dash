@@ -52,9 +52,9 @@ The canonical machine-readable source for these policy-gate definitions is `work
    - Enforcement path: `npm run instruction:lint` in CI
    - Scope: broken local instruction links/anchors, missing canonical references, missing required workflow coverage
 2. `missing-mandatory-canonical-artifacts`
-   - Current repo status: enforced
-   - Enforcement path: deterministic workflow/document lint checks such as `npm run instruction:lint` and `npm run backlog:lint`
-   - Scope: required canonical workflow files, required template/backlog artifacts
+   - Current repo status: partial coverage only, not a single enforced hard-fail gate
+   - Current coverage: deterministic lint checks cover some canonical workflow files and backlog structure, but template-artifact existence is not enforced as one complete CI gate
+   - Scope: required canonical workflow files, prioritized backlog structure, and template/backlog artifacts
 3. `broken-mandatory-validation-jobs`
    - Current repo status: enforced
    - Enforcement path: `verify-linux-signals` and the compatibility `test` gate in CI
