@@ -335,8 +335,10 @@ function buildPolicyGateStatus(runtimeSignals, policyGatesDocument = {}) {
     stages: stages.map((stage) => {
       const normalizedStage = { ...stage };
       if (stage.id === "stage-2-warning") {
-        if (!hasExplicitRuntimeSignals || !allMatchedSignalsObserved) {
+        if (!hasExplicitRuntimeSignals) {
           normalizedStage.status = stage.status;
+        } else if (!allMatchedSignalsObserved) {
+          normalizedStage.status = warnings.length > 0 ? "active-with-warnings-partial" : stage.status;
         } else {
           normalizedStage.status = warnings.length > 0 ? "active-with-warnings" : "active-no-warnings";
         }

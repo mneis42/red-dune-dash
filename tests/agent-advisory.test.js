@@ -381,6 +381,35 @@ test("buildPolicyGateStatus preserves unevaluated stage 2 state for partial runt
   assert.deepEqual(policy.stages[1].warnings, []);
 });
 
+test("buildPolicyGateStatus marks partial runtime coverage with warnings explicitly", () => {
+  const cli = loadCliModuleFresh();
+  const policy = cli.buildPolicyGateStatus(
+    {
+      hasExplicitRuntimeSignals: true,
+      warningHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
+      actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
+      matchedSignals: [
+        { id: "service-worker-tests", status: "fail" },
+        { id: "syntax", status: "not-observed" },
+      ],
+    },
+    {
+      stages: [
+        {
+          id: "stage-2-warning",
+          label: "Warning mode",
+          blocking: false,
+          status: "runtime-evaluated",
+          summary: "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals.",
+        },
+      ],
+    }
+  );
+
+  assert.equal(policy.stages[0].status, "active-with-warnings-partial");
+  assert.deepEqual(policy.stages[0].warnings, ["Service worker tests is currently failing (npm run test:service-worker)."]);
+});
+
 test("formatHumanReadable includes runtime signal sections when provided", () => {
   const cli = loadCliModuleFresh();
   const policyGates = cli.buildPolicyGateStatus(
