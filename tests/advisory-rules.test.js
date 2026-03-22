@@ -232,6 +232,22 @@ test("validateAdvisoryDocument rejects duplicate canonical progressive stage ids
   );
 });
 
+test("validateAdvisoryDocument rejects duplicate stage 3 candidate gate ids", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  invalidDocument.policyGates.stages[2].candidateGates[1].id = invalidDocument.policyGates.stages[2].candidateGates[0].id;
+
+  const result = validateAdvisoryDocument(invalidDocument);
+
+  assert.equal(result.valid, false);
+  assert.equal(
+    result.errors.includes(
+      "policyGates.stages[2].candidateGates must include unique gate ids; duplicate id broken-instruction-references"
+    ),
+    true
+  );
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {

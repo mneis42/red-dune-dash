@@ -216,6 +216,7 @@ function validateAdvisoryDocument(document) {
             return;
           }
 
+          const gateIdCounts = new Map();
           stage.candidateGates.forEach((gate, gateIndex) => {
             const gateFieldPath = `${fieldPath}.candidateGates[${gateIndex}]`;
             if (!gate || typeof gate !== "object" || Array.isArray(gate)) {
@@ -242,11 +243,20 @@ function validateAdvisoryDocument(document) {
                 errors.push(`${gateFieldPath}.${key} must be a non-empty string`);
               }
             });
+            if (typeof gate.id === "string" && gate.id.trim().length > 0) {
+              gateIdCounts.set(gate.id, (gateIdCounts.get(gate.id) || 0) + 1);
+            }
             if (typeof gate.blocking !== "boolean") {
               errors.push(`${gateFieldPath}.blocking must be a boolean`);
             }
             if (!isStringArray(gate.source) && !(Array.isArray(gate.source) && gate.source.length === 0)) {
               errors.push(`${gateFieldPath}.source must be a string array`);
+            }
+          });
+
+          gateIdCounts.forEach((count, gateId) => {
+            if (count > 1) {
+              errors.push(`${fieldPath}.candidateGates must include unique gate ids; duplicate id ${gateId}`);
             }
           });
         });

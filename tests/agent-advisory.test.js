@@ -345,6 +345,32 @@ test("buildPolicyGateStatus preserves unevaluated stage 2 state when no runtime 
   assert.deepEqual(policy.stages[1].warnings, []);
 });
 
+test("buildPolicyGateStatus preserves unevaluated stage 2 state when no matched CI signals exist", () => {
+  const cli = loadCliModuleFresh();
+  const policy = cli.buildPolicyGateStatus(
+    {
+      hasExplicitRuntimeSignals: true,
+      warningHints: [],
+      actionableHints: [],
+      matchedSignals: [],
+    },
+    {
+      stages: [
+        {
+          id: "stage-2-warning",
+          label: "Warning mode",
+          blocking: false,
+          status: "runtime-evaluated",
+          summary: "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals.",
+        },
+      ],
+    }
+  );
+
+  assert.equal(policy.stages[0].status, "runtime-evaluated");
+  assert.deepEqual(policy.stages[0].warnings, []);
+});
+
 test("buildPolicyGateStatus preserves unevaluated stage 2 state for partial runtime coverage", () => {
   const cli = loadCliModuleFresh();
   const policy = cli.buildPolicyGateStatus(
