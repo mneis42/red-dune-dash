@@ -140,6 +140,10 @@ function validateAdvisoryDocument(document) {
     }
   }
 
+  if (!("policyGates" in document)) {
+    errors.push("policyGates is required");
+  }
+
   if (!Array.isArray(document.rules) || document.rules.length === 0) {
     errors.push("rules must be a non-empty array");
   } else {
@@ -166,73 +170,76 @@ function validateAdvisoryDocument(document) {
   if ("policyGates" in document) {
     if (!document.policyGates || typeof document.policyGates !== "object" || Array.isArray(document.policyGates)) {
       errors.push("policyGates must be an object");
-    } else if (!Array.isArray(document.policyGates.stages) || document.policyGates.stages.length === 0) {
-      errors.push("policyGates.stages must be a non-empty array");
     } else {
-      document.policyGates.stages.forEach((stage, stageIndex) => {
-        const fieldPath = `policyGates.stages[${stageIndex}]`;
-        if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
-          errors.push(`${fieldPath} must be an object`);
-          return;
-        }
+      validateAllowedKeys(document.policyGates, new Set(["stages"]), "policyGates").forEach((entry) => errors.push(entry));
 
-        validateAllowedKeys(stage, new Set(["id", "label", "blocking", "status", "summary", "candidateGates"]), fieldPath).forEach(
-          (entry) => errors.push(entry)
-        );
-
-        ["id", "label", "status", "summary"].forEach((key) => {
-          if (typeof stage[key] !== "string" || stage[key].trim().length === 0) {
-            errors.push(`${fieldPath}.${key} must be a non-empty string`);
-          }
-        });
-        if (typeof stage.blocking !== "boolean") {
-          errors.push(`${fieldPath}.blocking must be a boolean`);
-        }
-
-        if (!("candidateGates" in stage)) {
-          return;
-        }
-        if (!Array.isArray(stage.candidateGates)) {
-          errors.push(`${fieldPath}.candidateGates must be an array`);
-          return;
-        }
-
-        stage.candidateGates.forEach((gate, gateIndex) => {
-          const gateFieldPath = `${fieldPath}.candidateGates[${gateIndex}]`;
-          if (!gate || typeof gate !== "object" || Array.isArray(gate)) {
-            errors.push(`${gateFieldPath} must be an object`);
+      if (!Array.isArray(document.policyGates.stages) || document.policyGates.stages.length === 0) {
+        errors.push("policyGates.stages must be a non-empty array");
+      } else {
+        document.policyGates.stages.forEach((stage, stageIndex) => {
+          const fieldPath = `policyGates.stages[${stageIndex}]`;
+          if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
+            errors.push(`${fieldPath} must be an object`);
             return;
           }
 
-          validateAllowedKeys(
-            gate,
-            new Set([
-              "id",
-              "status",
-              "confidence",
-              "blocking",
-              "source",
-              "documentationStatusLine",
-              "documentationDetailLine",
-            ]),
-            gateFieldPath
-          ).forEach((entry) => errors.push(entry));
+          validateAllowedKeys(stage, new Set(["id", "label", "blocking", "status", "summary", "candidateGates"]), fieldPath).forEach(
+            (entry) => errors.push(entry)
+          );
 
-          ["id", "status", "confidence", "documentationStatusLine", "documentationDetailLine"].forEach((key) => {
-            if (typeof gate[key] !== "string" || gate[key].trim().length === 0) {
-              errors.push(`${gateFieldPath}.${key} must be a non-empty string`);
+          ["id", "label", "status", "summary"].forEach((key) => {
+            if (typeof stage[key] !== "string" || stage[key].trim().length === 0) {
+              errors.push(`${fieldPath}.${key} must be a non-empty string`);
             }
           });
-          if (typeof gate.blocking !== "boolean") {
-            errors.push(`${gateFieldPath}.blocking must be a boolean`);
+          if (typeof stage.blocking !== "boolean") {
+            errors.push(`${fieldPath}.blocking must be a boolean`);
           }
-          if (!isStringArray(gate.source) && !(Array.isArray(gate.source) && gate.source.length === 0)) {
-            errors.push(`${gateFieldPath}.source must be a string array`);
+
+          if (!("candidateGates" in stage)) {
+            return;
           }
+          if (!Array.isArray(stage.candidateGates)) {
+            errors.push(`${fieldPath}.candidateGates must be an array`);
+            return;
+          }
+
+          stage.candidateGates.forEach((gate, gateIndex) => {
+            const gateFieldPath = `${fieldPath}.candidateGates[${gateIndex}]`;
+            if (!gate || typeof gate !== "object" || Array.isArray(gate)) {
+              errors.push(`${gateFieldPath} must be an object`);
+              return;
+            }
+
+            validateAllowedKeys(
+              gate,
+              new Set([
+                "id",
+                "status",
+                "confidence",
+                "blocking",
+                "source",
+                "documentationStatusLine",
+                "documentationDetailLine",
+              ]),
+              gateFieldPath
+            ).forEach((entry) => errors.push(entry));
+
+            ["id", "status", "confidence", "documentationStatusLine", "documentationDetailLine"].forEach((key) => {
+              if (typeof gate[key] !== "string" || gate[key].trim().length === 0) {
+                errors.push(`${gateFieldPath}.${key} must be a non-empty string`);
+              }
+            });
+            if (typeof gate.blocking !== "boolean") {
+              errors.push(`${gateFieldPath}.blocking must be a boolean`);
+            }
+            if (!isStringArray(gate.source) && !(Array.isArray(gate.source) && gate.source.length === 0)) {
+              errors.push(`${gateFieldPath}.source must be a string array`);
+            }
+          });
         });
-      });
+      }
     }
-    validateAllowedKeys(document.policyGates, new Set(["stages"]), "policyGates").forEach((entry) => errors.push(entry));
   }
 
   return { valid: errors.length === 0, errors };

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Red Dune Dash Advisory Rules",
   "type": "object",
-  "required": ["version", "governance", "rules"],
+  "required": ["version", "governance", "policyGates", "rules"],
   "additionalProperties": false,
   "properties": {
     "version": {

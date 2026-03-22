@@ -149,6 +149,29 @@ test("validateAdvisoryDocument rejects unexpected policy gate keys", () => {
   );
 });
 
+test("validateAdvisoryDocument rejects missing policyGates block", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  delete invalidDocument.policyGates;
+
+  const result = validateAdvisoryDocument(invalidDocument);
+
+  assert.equal(result.valid, false);
+  assert.equal(result.errors.includes("policyGates is required"), true);
+});
+
+test("validateAdvisoryDocument reports null policyGates as a validation error without throwing", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  invalidDocument.policyGates = null;
+
+  assert.doesNotThrow(() => validateAdvisoryDocument(invalidDocument));
+
+  const result = validateAdvisoryDocument(invalidDocument);
+  assert.equal(result.valid, false);
+  assert.equal(result.errors.includes("policyGates must be an object"), true);
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {
