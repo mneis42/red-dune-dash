@@ -272,6 +272,7 @@ test("buildPolicyGateStatus exposes warning mode and selective hard-fail candida
     hasExplicitRuntimeSignals: true,
     warningHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
     actionableHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
+    matchedSignals: [{ id: "instruction-lint", status: "fail" }],
   }, {
     stages: [
       {
@@ -344,6 +345,42 @@ test("buildPolicyGateStatus preserves unevaluated stage 2 state when no runtime 
   assert.deepEqual(policy.stages[1].warnings, []);
 });
 
+test("buildPolicyGateStatus preserves unevaluated stage 2 state for partial runtime coverage", () => {
+  const cli = loadCliModuleFresh();
+  const policy = cli.buildPolicyGateStatus(
+    {
+      hasExplicitRuntimeSignals: true,
+      warningHints: [],
+      actionableHints: [],
+      matchedSignals: [
+        { id: "instruction-lint", status: "not-observed" },
+        { id: "required-check", status: "pass" },
+      ],
+    },
+    {
+      stages: [
+        {
+          id: "stage-1-advisory",
+          label: "Advisory only",
+          blocking: false,
+          status: "active",
+          summary: "Changed-file matching and workflow hints stay advisory and do not reroute canonical workflows.",
+        },
+        {
+          id: "stage-2-warning",
+          label: "Warning mode",
+          blocking: false,
+          status: "runtime-evaluated",
+          summary: "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals.",
+        },
+      ],
+    }
+  );
+
+  assert.equal(policy.stages[1].status, "runtime-evaluated");
+  assert.deepEqual(policy.stages[1].warnings, []);
+});
+
 test("formatHumanReadable includes runtime signal sections when provided", () => {
   const cli = loadCliModuleFresh();
   const policyGates = cli.buildPolicyGateStatus(
@@ -351,6 +388,7 @@ test("formatHumanReadable includes runtime signal sections when provided", () =>
       hasExplicitRuntimeSignals: true,
       warningHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
       actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
+      matchedSignals: [{ id: "service-worker-tests", status: "fail" }],
     },
     {
       stages: [
@@ -389,6 +427,7 @@ test("formatHumanReadable includes runtime signal sections when provided", () =>
     matchedRules: [{ id: "pwa-offline" }],
     perFile: [{ filePath: "service-worker.js", ruleIds: ["pwa-offline"], usedFallback: false }],
     runtimeSignals: {
+      hasExplicitRuntimeSignals: true,
       jobStatuses: { "verify-linux": "pass" },
       checkOutcomes: { "npm run test:service-worker": "fail" },
       matchedSignals: [{ id: "service-worker-tests", label: "Service worker tests", status: "fail" }],
