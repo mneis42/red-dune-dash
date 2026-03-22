@@ -40,10 +40,14 @@ test("unknown files use fallback advisory rule", () => {
   assert.deepEqual(result.perFile[0].ruleIds, ["fallback-unclassified"]);
 });
 
-test("github instruction mirrors resolve as workflow docs instead of fallback", () => {
+test("github workflow-adjacent files resolve as workflow docs instead of fallback", () => {
   const { document } = loadAdvisoryDocument();
   const result = resolveAdvisoryForFiles(
-    [".github/copilot-instructions.md", ".github/instructions/change-review.instructions.md"],
+    [
+      ".github/copilot-instructions.md",
+      ".github/instructions/change-review.instructions.md",
+      ".github/workflows/ci.yml",
+    ],
     document
   );
 
@@ -51,6 +55,7 @@ test("github instruction mirrors resolve as workflow docs instead of fallback", 
   assert.equal(result.perFile.every((entry) => entry.usedFallback === false), true);
   assert.deepEqual(result.perFile[0].ruleIds, ["workflow-docs"]);
   assert.deepEqual(result.perFile[1].ruleIds, ["workflow-docs"]);
+  assert.deepEqual(result.perFile[2].ruleIds, ["workflow-docs"]);
 });
 
 test("multi-match strategy merges and de-duplicates arrays in stable order", () => {
