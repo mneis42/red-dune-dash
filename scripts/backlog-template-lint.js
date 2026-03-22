@@ -103,7 +103,7 @@ function hasPlaceholderValue(value) {
   return /^<.+>$/.test(normalized);
 }
 
-function listPrioritizedBacklogFiles(repoRoot) {
+function listBacklogFiles(repoRoot) {
   const backlogPath = path.join(repoRoot, BACKLOG_DIR);
   if (!fs.existsSync(backlogPath)) {
     return [];
@@ -111,7 +111,7 @@ function listPrioritizedBacklogFiles(repoRoot) {
 
   return fs
     .readdirSync(backlogPath, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && PRIORITIZED_FILE_PATTERN.test(entry.name))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => path.join(BACKLOG_DIR, entry.name).replaceAll("\\", "/"))
     .sort();
 }
@@ -287,7 +287,7 @@ function validateBacklogFile(repoRoot, filePath) {
 
 function runBacklogTemplateLint(options = {}) {
   const repoRoot = path.resolve(options.repoRoot || process.cwd());
-  const files = listPrioritizedBacklogFiles(repoRoot);
+  const files = listBacklogFiles(repoRoot);
   const doneFiles = listDoneBacklogFiles(repoRoot);
   const issues = [];
   const openKeys = [];
@@ -361,9 +361,9 @@ function formatResult(result) {
   const lines = [];
 
   if (result.files.length === 0) {
-    lines.push("backlog-template-lint: no prioritized backlog files found.");
+    lines.push("backlog-template-lint: no in-scope backlog files found.");
   } else {
-    lines.push(`backlog-template-lint: checked ${result.files.length} prioritized backlog files.`);
+    lines.push(`backlog-template-lint: checked ${result.files.length} in-scope backlog files.`);
   }
   lines.push(`backlog-template-lint: checked ${result.doneFiles.length} done backlog files.`);
 
@@ -392,7 +392,7 @@ if (require.main === module) {
 
 module.exports = {
   parseFrontmatter,
-  listPrioritizedBacklogFiles,
+  listBacklogFiles,
   listDoneBacklogFiles,
   extractTodoTitle,
   normalizeComparableTitle,

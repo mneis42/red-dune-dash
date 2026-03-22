@@ -292,12 +292,67 @@ test("runBacklogTemplateLint checks prioritized and done backlog files", () => {
       ].join("\n")
     );
 
+    write(
+      "backlog/some-feature.md",
+      [
+        "---",
+        "workflow_type: feature-request",
+        "title: Some feature",
+        "overall_status: open",
+        "planning_model: GPT-5.3-Codex",
+        "branch: feature/some-feature",
+        "created_at: 2026-03-16",
+        "last_updated: 2026-03-16",
+        "---",
+        "",
+        "# Feature Request TODO",
+        "",
+        "## Feature Summary",
+        "## Verification Baseline",
+        "## Assumptions And Open Questions",
+        "## Decision Gate",
+        "## TODO Index",
+        "## Documentation Follow-ups",
+      ].join("\n")
+    );
+
     write("backlog/done/20260316-foo.md", "---\nstatus: done\n---\n# TODO: done fixture entry\n");
 
     const result = runBacklogTemplateLint({ repoRoot: root });
-    assert.equal(result.files.length, 1);
+    assert.equal(result.files.length, 2);
     assert.equal(result.doneFiles.length, 1);
     assert.deepEqual(result.issues, []);
+  });
+});
+
+test("runBacklogTemplateLint validates non-numbered backlog files directly under backlog", () => {
+  withTempRepo(({ root, write }) => {
+    write(
+      "backlog/some-feature.md",
+      [
+        "---",
+        "workflow_type: feature-request",
+        "title: Some feature",
+        "overall_status: open",
+        "planning_model: GPT-5.3-Codex",
+        "created_at: 2026-03-16",
+        "last_updated: 2026-03-16",
+        "---",
+        "",
+        "# Feature Request TODO",
+        "",
+        "## Feature Summary",
+        "## Verification Baseline",
+        "## Assumptions And Open Questions",
+        "## Decision Gate",
+        "## TODO Index",
+        "## Documentation Follow-ups",
+      ].join("\n")
+    );
+
+    const result = runBacklogTemplateLint({ repoRoot: root });
+    assert.equal(result.files.includes("backlog/some-feature.md"), true);
+    assert.equal(result.issues.some((entry) => entry.includes("backlog/some-feature.md: missing frontmatter field branch.")), true);
   });
 });
 
@@ -492,7 +547,7 @@ test("runBacklogTemplateLint reports all matching done paths for open-vs-done co
   });
 });
 
-test("runBacklogTemplateLint rejects duplicate feature-request titles in prioritized backlog files", () => {
+test("runBacklogTemplateLint rejects duplicate feature-request titles across in-scope backlog files", () => {
   withTempRepo(({ root, write }) => {
     const featureBody = [
       "## Feature Summary",

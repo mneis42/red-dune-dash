@@ -11,6 +11,7 @@ For any writing-agent run that is intended to end in a PR-ready handoff, complet
 When a triggering incident from [docs/agent-run-logs.md](docs/agent-run-logs.md) occurs, create or update the corresponding run log. When no trigger occurred, do not write a run log. Treat `docs/agent-run-logs.md` as the authoritative source for trigger conditions, storage location, anti-noise behavior, and required schema.
 
 For prioritized idea files created directly under `backlog/` (for example `backlog/1-todo-*.md`), use either `templates/todo-backlog-item-template.md` (`workflow_type: backlog-item`) or `templates/todo-feature-request-template.md` (`workflow_type: feature-request`) and keep the file structure compatible with the selected template.
+Backlog lint validates Markdown files created directly under `backlog/`, including non-numbered files such as `backlog/{short-description}.md`; `backlog/done/` remains archive-only and outside that open-backlog validation scope.
 For prioritized backlog-item files whose filename starts at `12-` or higher, always include `planning_model`, `execution_model`, `created_at`, and `last_updated` metadata in frontmatter; earlier legacy backlog-item files are currently grandfathered by backlog lint until that policy is migrated explicitly.
 If a branch makes an open prioritized backlog item true, obsolete, or superseded, update or archive that backlog item in the same branch before opening or handing off a PR.
 
