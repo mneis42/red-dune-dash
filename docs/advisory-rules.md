@@ -33,6 +33,8 @@ Phase changes are qualitative maintainer decisions based on observed trustworthi
 
 The phased rollout is now reflected in both documentation and `agent:advisory` output so contributors can see which signals are advisory, warning-only, or selective hard-fail candidates.
 
+The canonical machine-readable source for these policy-gate definitions is `workflow/advisory-rules.json`. This section mirrors that source for human-readable review and is covered by a consistency test.
+
 - Stage 1 advisory-only mode is active:
   - changed-path classification, suggested reading, and recommended checks remain non-blocking
   - canonical workflow routing still stays in `AGENTS.md` and `instructions/`
@@ -71,6 +73,7 @@ This means the repository already combines advisory and warning-only workflow hi
 - Schema ID strategy: `workflow/advisory-rules.schema.json` intentionally omits `$id` to avoid publishing a misleading local-only canonical URI.
 - Local matcher and validator: scripts/advisory-rules.js
 - Local CLI summary command: scripts/agent-advisory.js
+- Progressive policy gate metadata: `workflow/advisory-rules.json` (`policyGates`)
 
 ## Local Usage
 

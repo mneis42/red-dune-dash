@@ -28,6 +28,20 @@
         }
       }
     },
+    "policyGates": {
+      "type": "object",
+      "required": ["stages"],
+      "additionalProperties": false,
+      "properties": {
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/policyStage"
+          }
+        }
+      }
+    },
     "unknownFileFallback": {
       "$ref": "#/$defs/ruleLike"
     },
@@ -105,6 +119,79 @@
           }
         }
       ]
+    },
+    "policyStage": {
+      "type": "object",
+      "required": ["id", "label", "blocking", "status", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidateGates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/policyGate"
+          }
+        }
+      }
+    },
+    "policyGate": {
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "confidence",
+        "blocking",
+        "source",
+        "documentationStatusLine",
+        "documentationDetailLine"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "source": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "documentationStatusLine": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentationDetailLine": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   }
 }

@@ -151,6 +151,59 @@ function validateAdvisoryDocument(document) {
     );
   }
 
+  if ("policyGates" in document) {
+    if (!document.policyGates || typeof document.policyGates !== "object" || Array.isArray(document.policyGates)) {
+      errors.push("policyGates must be an object");
+    } else if (!Array.isArray(document.policyGates.stages) || document.policyGates.stages.length === 0) {
+      errors.push("policyGates.stages must be a non-empty array");
+    } else {
+      document.policyGates.stages.forEach((stage, stageIndex) => {
+        const fieldPath = `policyGates.stages[${stageIndex}]`;
+        if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
+          errors.push(`${fieldPath} must be an object`);
+          return;
+        }
+
+        ["id", "label", "status", "summary"].forEach((key) => {
+          if (typeof stage[key] !== "string" || stage[key].trim().length === 0) {
+            errors.push(`${fieldPath}.${key} must be a non-empty string`);
+          }
+        });
+        if (typeof stage.blocking !== "boolean") {
+          errors.push(`${fieldPath}.blocking must be a boolean`);
+        }
+
+        if (!("candidateGates" in stage)) {
+          return;
+        }
+        if (!Array.isArray(stage.candidateGates)) {
+          errors.push(`${fieldPath}.candidateGates must be an array`);
+          return;
+        }
+
+        stage.candidateGates.forEach((gate, gateIndex) => {
+          const gateFieldPath = `${fieldPath}.candidateGates[${gateIndex}]`;
+          if (!gate || typeof gate !== "object" || Array.isArray(gate)) {
+            errors.push(`${gateFieldPath} must be an object`);
+            return;
+          }
+
+          ["id", "status", "confidence", "documentationStatusLine", "documentationDetailLine"].forEach((key) => {
+            if (typeof gate[key] !== "string" || gate[key].trim().length === 0) {
+              errors.push(`${gateFieldPath}.${key} must be a non-empty string`);
+            }
+          });
+          if (typeof gate.blocking !== "boolean") {
+            errors.push(`${gateFieldPath}.blocking must be a boolean`);
+          }
+          if (!isStringArray(gate.source) && !(Array.isArray(gate.source) && gate.source.length === 0)) {
+            errors.push(`${gateFieldPath}.source must be a string array`);
+          }
+        });
+      });
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

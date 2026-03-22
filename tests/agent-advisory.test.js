@@ -254,6 +254,34 @@ test("buildPolicyGateStatus exposes warning mode and selective hard-fail candida
   const cli = loadCliModuleFresh();
   const policy = cli.buildPolicyGateStatus({
     actionableHints: ["Instruction lint is currently failing (npm run instruction:lint)."],
+  }, {
+    stages: [
+      {
+        id: "stage-1-advisory",
+        label: "Advisory only",
+        blocking: false,
+        status: "active",
+        summary: "Changed-file matching and workflow hints stay advisory and do not reroute canonical workflows.",
+      },
+      {
+        id: "stage-2-warning",
+        label: "Warning mode",
+        blocking: false,
+        status: "runtime-evaluated",
+        summary: "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals.",
+      },
+        {
+          id: "stage-3-hard-fail",
+          label: "Selective hard fail",
+          blocking: true,
+          status: "selective-enforcement",
+          summary: "Only narrow, high-confidence policy gates should block.",
+          candidateGates: [
+            { id: "broken-instruction-references", status: "enforced", confidence: "high", blocking: true },
+            { id: "protected-branch-violations", status: "candidate-only", confidence: "high", blocking: false },
+          ],
+        },
+      ],
   });
 
   assert.equal(policy.stages.length, 3);
@@ -268,6 +296,37 @@ test("buildPolicyGateStatus exposes warning mode and selective hard-fail candida
 
 test("formatHumanReadable includes runtime signal sections when provided", () => {
   const cli = loadCliModuleFresh();
+  const policyGates = cli.buildPolicyGateStatus(
+    {
+      actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
+    },
+    {
+      stages: [
+        {
+          id: "stage-1-advisory",
+          label: "Advisory only",
+          blocking: false,
+          status: "active",
+          summary: "Changed-file matching and workflow hints stay advisory and do not reroute canonical workflows.",
+        },
+        {
+          id: "stage-2-warning",
+          label: "Warning mode",
+          blocking: false,
+          status: "runtime-evaluated",
+          summary: "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals.",
+        },
+        {
+          id: "stage-3-hard-fail",
+          label: "Selective hard fail",
+          blocking: true,
+          status: "selective-enforcement",
+          summary: "Only narrow, high-confidence policy gates should block.",
+          candidateGates: [{ id: "protected-branch-violations", status: "candidate-only", confidence: "high", blocking: false }],
+        },
+      ],
+    }
+  );
   const output = cli.formatHumanReadable({
     changedFiles: ["service-worker.js"],
     merged: {
@@ -283,9 +342,7 @@ test("formatHumanReadable includes runtime signal sections when provided", () =>
       matchedSignals: [{ id: "service-worker-tests", label: "Service worker tests", status: "fail" }],
       actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
     },
-    policyGates: cli.buildPolicyGateStatus({
-      actionableHints: ["Service worker tests is currently failing (npm run test:service-worker)."],
-    }),
+    policyGates,
   });
 
   assert.match(output, /CI runtime signals/);

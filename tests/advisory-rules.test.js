@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   loadAdvisoryDocument,
@@ -103,6 +105,30 @@ test("multi-match strategy merges and de-duplicates arrays in stable order", () 
   const result = resolveAdvisoryForFiles(["systems/simulation-core.js"], customDocument);
   assert.deepEqual(result.merged.areas, ["systems", "simulation"]);
   assert.deepEqual(result.merged.recommendedChecks, ["npm run check", "npm run test:simulation"]);
+});
+
+test("policy gate document and advisory docs stay in sync for stage 3 gate entries", () => {
+  const { document } = loadAdvisoryDocument();
+  const docsPath = path.join(process.cwd(), "docs", "advisory-rules.md");
+  const docsText = fs.readFileSync(docsPath, "utf8");
+  const stageThree = document.policyGates.stages.find((stage) => stage.id === "stage-3-hard-fail");
+
+  assert.ok(stageThree, "expected stage-3-hard-fail policy gate stage");
+  assert.ok(Array.isArray(stageThree.candidateGates), "expected stage 3 candidate gates");
+
+  for (const gate of stageThree.candidateGates) {
+    assert.match(docsText, new RegExp(`\`{1}${gate.id}\`{1}`), `missing gate id in docs: ${gate.id}`);
+    assert.match(
+      docsText,
+      new RegExp(gate.documentationStatusLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `missing gate status line in docs: ${gate.id}`
+    );
+    assert.match(
+      docsText,
+      new RegExp(gate.documentationDetailLine.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `missing gate detail line in docs: ${gate.id}`
+    );
+  }
 });
 
 async function runTests() {

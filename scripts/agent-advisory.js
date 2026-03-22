@@ -75,45 +75,6 @@ const SIGNAL_METADATA = {
 };
 
 const VALID_RUNTIME_STATES = new Set(["pass", "fail", "cancelled", "skipped", "not-observed"]);
-const HARD_GATE_CANDIDATES = [
-  {
-    id: "broken-instruction-references",
-    status: "enforced",
-    confidence: "high",
-    blocking: true,
-    source: ["npm run instruction:lint", "CI verify-linux-signals"],
-    note:
-      "Broken internal instruction links, missing canonical references, and missing required workflow coverage already fail deterministic workflow validation.",
-  },
-  {
-    id: "missing-mandatory-canonical-artifacts",
-    status: "enforced",
-    confidence: "high",
-    blocking: true,
-    source: ["npm run instruction:lint", "npm run backlog:lint", "CI verify-linux-signals"],
-    note:
-      "Required canonical workflow files and required backlog/template artifacts are already protected by deterministic lint checks.",
-  },
-  {
-    id: "broken-mandatory-validation-jobs",
-    status: "enforced",
-    confidence: "high",
-    blocking: true,
-    source: ["CI verify-linux-signals", "CI test"],
-    note:
-      "Required verification jobs already hard-fail the compatibility gate when deterministic validation jobs are red.",
-  },
-  {
-    id: "protected-branch-violations",
-    status: "candidate-only",
-    confidence: "high",
-    blocking: false,
-    source: ["scripts/setup-hooks.js", "agent:preflight guardrail signal"],
-    note:
-      "Protected-branch behavior is currently guarded locally and surfaced as an observable preflight signal, but it is not promoted to a CI hard-fail gate yet.",
-  },
-];
-
 function stableUnique(values) {
   const seen = new Set();
   const result = [];
@@ -360,35 +321,19 @@ function evaluateRuntimeSignals(result, options) {
   };
 }
 
-function buildPolicyGateStatus(runtimeSignals) {
+function buildPolicyGateStatus(runtimeSignals, policyGatesDocument = {}) {
   const warnings = stableUnique(runtimeSignals.actionableHints || []);
+  const stages = Array.isArray(policyGatesDocument.stages) ? policyGatesDocument.stages : [];
 
   return {
-    stages: [
-      {
-        id: "stage-1-advisory",
-        label: "Advisory only",
-        blocking: false,
-        status: "active",
-        summary: "Changed-file matching and workflow hints stay advisory and do not reroute canonical workflows.",
-      },
-      {
-        id: "stage-2-warning",
-        label: "Warning mode",
-        blocking: false,
-        status: warnings.length > 0 ? "active-with-warnings" : "active-no-warnings",
-        summary: "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals.",
-        warnings,
-      },
-      {
-        id: "stage-3-hard-fail",
-        label: "Selective hard fail",
-        blocking: true,
-        status: "selective-enforcement",
-        summary: "Only narrow, high-confidence policy gates should block.",
-        candidateGates: HARD_GATE_CANDIDATES,
-      },
-    ],
+    stages: stages.map((stage) => {
+      const normalizedStage = { ...stage };
+      if (stage.id === "stage-2-warning") {
+        normalizedStage.status = warnings.length > 0 ? "active-with-warnings" : "active-no-warnings";
+        normalizedStage.warnings = warnings;
+      }
+      return normalizedStage;
+    }),
   };
 }
 
@@ -600,7 +545,7 @@ function main(argv = process.argv.slice(2)) {
   const result = resolveAdvisoryForFiles(changedFiles, document);
   result.rulesPath = absolutePath;
   result.runtimeSignals = evaluateRuntimeSignals(result, options);
-  result.policyGates = buildPolicyGateStatus(result.runtimeSignals);
+  result.policyGates = buildPolicyGateStatus(result.runtimeSignals, document.policyGates);
 
   if (options.unmatched) {
     const unmatchedFiles = result.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
