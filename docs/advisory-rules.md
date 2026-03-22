@@ -29,6 +29,43 @@ CI hinting follows an explicit phased rollout so low-noise machine signals land 
 
 Phase changes are qualitative maintainer decisions based on observed trustworthiness, usefulness, and noise. There is no required numeric gate in v1.
 
+## Progressive Policy Gates
+
+The phased rollout is now reflected in both documentation and `agent:advisory` output so contributors can see which signals are advisory, warning-only, or selective hard-fail candidates.
+
+The canonical machine-readable source for these policy-gate definitions is `workflow/advisory-rules.json`. This section mirrors that source for human-readable review and is covered by a consistency test.
+
+- Stage 1 advisory-only mode is active:
+  - changed-path classification, suggested reading, and recommended checks remain non-blocking
+  - canonical workflow routing still stays in `AGENTS.md` and `instructions/`
+- Stage 2 warning mode is active:
+  - `agent:advisory` surfaces non-blocking warnings when explicit CI runtime signals show risky states such as failed, cancelled, or skipped matched checks/jobs
+  - warning mode uses deterministic inputs only: matched rule signals, supplied job status, and supplied check outcomes
+- Stage 3 hard-fail mode is selective:
+  - only narrow, high-confidence policy gates should block
+  - candidate hard gates and current repo status are listed below
+
+### Stage 3 Candidate Hard Gates
+
+1. `broken-instruction-references`
+   - Current repo status: enforced
+   - Enforcement path: `npm run instruction:lint` in CI
+   - Scope: broken local instruction links/anchors, missing canonical references, missing required workflow coverage
+2. `missing-mandatory-canonical-artifacts`
+   - Current repo status: partial coverage only, not a single enforced hard-fail gate
+   - Current coverage: deterministic lint checks cover some canonical workflow files and backlog structure, but template-artifact existence is not enforced as one complete CI gate
+   - Scope: required canonical workflow files, prioritized backlog structure, and template/backlog artifacts
+3. `broken-mandatory-validation-jobs`
+   - Current repo status: enforced
+   - Enforcement path: `verify-linux-signals` and the compatibility `test` gate in CI
+   - Scope: required deterministic validation jobs going red
+4. `protected-branch-violations`
+   - Current repo status: candidate only, not a CI hard-fail gate
+   - Current coverage: local `.githooks/pre-push` protection plus `agent:preflight` guardrail visibility
+   - Promotion rule: keep local/preflight-only until maintainers explicitly decide the CI false-positive risk is acceptably low
+
+This means the repository already combines advisory and warning-only workflow hints with a narrow set of deterministic hard failures, but it does not yet promote protected-branch enforcement into CI policy blocking.
+
 ## File Locations
 
 - Rules: workflow/advisory-rules.json
@@ -36,6 +73,7 @@ Phase changes are qualitative maintainer decisions based on observed trustworthi
 - Schema ID strategy: `workflow/advisory-rules.schema.json` intentionally omits `$id` to avoid publishing a misleading local-only canonical URI.
 - Local matcher and validator: scripts/advisory-rules.js
 - Local CLI summary command: scripts/agent-advisory.js
+- Progressive policy gate metadata: `workflow/advisory-rules.json` (`policyGates`)
 
 ## Local Usage
 

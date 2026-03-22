@@ -3,11 +3,11 @@ workflow_type: backlog-item
 source: workflow-ideas.md
 idea_number: 14
 priority: 10
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-16
-last_updated: 2026-03-17
+last_updated: 2026-03-22
 ---
 
 # TODO: Progressive Policy Gates Instead Of Instant Hard Blocking
@@ -37,9 +37,14 @@ Define staged enforcement for workflow-aware CI to avoid premature contributor f
 ## Suggested Verification
 
 - `npm run check`
-- `npm run verify`
-- CI behavior review across staged scenarios.
+- `npm test`
+- `npm run instruction:lint`
+- CI/advisory output review across staged scenarios.
 
 ## Notes
 
 - Adoption should follow measured signal quality, not automation ambition.
+- Completed by:
+  - documenting the staged rollout and candidate hard gates in `docs/advisory-rules.md`
+  - exposing stage 2 warning mode and stage 3 candidate hard-gate status in `scripts/agent-advisory.js`
+  - covering the new policy output with `tests/agent-advisory.test.js`

@@ -75,7 +75,6 @@ const SIGNAL_METADATA = {
 };
 
 const VALID_RUNTIME_STATES = new Set(["pass", "fail", "cancelled", "skipped", "not-observed"]);
-
 function stableUnique(values) {
   const seen = new Set();
   const result = [];
@@ -284,6 +283,7 @@ function evaluateRuntimeSignals(result, options) {
   });
 
   const actionableHints = [];
+  const warningHints = [];
 
   matchedSignals
     .filter((entry) => isProblemRuntimeState(entry.status))
@@ -296,9 +296,9 @@ function evaluateRuntimeSignals(result, options) {
         .filter((job) => isProblemRuntimeState(job.status))
         .map((job) => job.jobName);
       const failingTargets = [...failingChecks, ...failingJobs];
-      actionableHints.push(
-        `${entry.label} ${describeProblemState(entry.status)}${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`
-      );
+      const hint = `${entry.label} ${describeProblemState(entry.status)}${failingTargets.length > 0 ? ` (${failingTargets.join(", ")})` : ""}.`;
+      actionableHints.push(hint);
+      warningHints.push(hint);
     });
 
   matchedSignals
@@ -318,7 +318,35 @@ function evaluateRuntimeSignals(result, options) {
     jobStatuses: runtime.jobStatuses,
     checkOutcomes: runtime.checkOutcomes,
     matchedSignals,
+    warningHints: stableUnique(warningHints),
     actionableHints: stableUnique(actionableHints),
+  };
+}
+
+function buildPolicyGateStatus(runtimeSignals, policyGatesDocument = {}) {
+  const warnings = stableUnique(runtimeSignals.warningHints || []);
+  const stages = Array.isArray(policyGatesDocument.stages) ? policyGatesDocument.stages : [];
+  const hasExplicitRuntimeSignals = runtimeSignals.hasExplicitRuntimeSignals === true;
+  const matchedSignals = Array.isArray(runtimeSignals.matchedSignals) ? runtimeSignals.matchedSignals : [];
+  const hasMatchedRuntimeSignals = matchedSignals.length > 0;
+  const allMatchedSignalsObserved =
+    hasMatchedRuntimeSignals && matchedSignals.every((entry) => entry.status && entry.status !== "not-observed");
+
+  return {
+    stages: stages.map((stage) => {
+      const normalizedStage = { ...stage };
+      if (stage.id === "stage-2-warning") {
+        if (!hasExplicitRuntimeSignals || !hasMatchedRuntimeSignals) {
+          normalizedStage.status = stage.status;
+        } else if (!allMatchedSignalsObserved) {
+          normalizedStage.status = warnings.length > 0 ? "active-with-warnings-partial" : stage.status;
+        } else {
+          normalizedStage.status = warnings.length > 0 ? "active-with-warnings" : "active-no-warnings";
+        }
+        normalizedStage.warnings = warnings;
+      }
+      return normalizedStage;
+    }),
   };
 }
 
@@ -412,39 +440,45 @@ function formatHumanReadable(result) {
 
   if (result.changedFiles.length === 0) {
     lines.push("No local file changes detected.");
-    return lines.join("\n");
-  }
-
-  lines.push("");
-  lines.push("Areas");
-  if (result.merged.areas.length === 0) {
-    lines.push("- none");
   } else {
-    result.merged.areas.forEach((entry) => lines.push(`- ${entry}`));
-  }
+    lines.push("");
+    lines.push("Areas");
+    if (result.merged.areas.length === 0) {
+      lines.push("- none");
+    } else {
+      result.merged.areas.forEach((entry) => lines.push(`- ${entry}`));
+    }
 
-  lines.push("");
-  lines.push("Recommended checks");
-  if (result.merged.recommendedChecks.length === 0) {
-    lines.push("- none");
-  } else {
-    result.merged.recommendedChecks.forEach((entry) => lines.push(`- ${entry}`));
-  }
+    lines.push("");
+    lines.push("Recommended checks");
+    if (result.merged.recommendedChecks.length === 0) {
+      lines.push("- none");
+    } else {
+      result.merged.recommendedChecks.forEach((entry) => lines.push(`- ${entry}`));
+    }
 
-  lines.push("");
-  lines.push("Manual checks");
-  if (result.merged.manualChecks.length === 0) {
-    lines.push("- none");
-  } else {
-    result.merged.manualChecks.forEach((entry) => lines.push(`- ${entry}`));
-  }
+    lines.push("");
+    lines.push("Manual checks");
+    if (result.merged.manualChecks.length === 0) {
+      lines.push("- none");
+    } else {
+      result.merged.manualChecks.forEach((entry) => lines.push(`- ${entry}`));
+    }
 
-  lines.push("");
-  lines.push("Matched rule ids");
-  if (result.matchedRules.length === 0) {
-    lines.push("- none");
-  } else {
-    result.matchedRules.forEach((rule) => lines.push(`- ${rule.id}`));
+    lines.push("");
+    lines.push("Matched rule ids");
+    if (result.matchedRules.length === 0) {
+      lines.push("- none");
+    } else {
+      result.matchedRules.forEach((rule) => lines.push(`- ${rule.id}`));
+    }
+
+    lines.push("");
+    lines.push("Per-file mapping");
+    result.perFile.forEach((entry) => {
+      const fallbackMark = entry.usedFallback ? " (fallback)" : "";
+      lines.push(`- ${entry.filePath}: ${entry.ruleIds.join(", ")}${fallbackMark}`);
+    });
   }
 
   lines.push("");
@@ -489,10 +523,20 @@ function formatHumanReadable(result) {
   }
 
   lines.push("");
-  lines.push("Per-file mapping");
-  result.perFile.forEach((entry) => {
-    const fallbackMark = entry.usedFallback ? " (fallback)" : "";
-    lines.push(`- ${entry.filePath}: ${entry.ruleIds.join(", ")}${fallbackMark}`);
+  lines.push("Progressive policy gates");
+  ((result.policyGates && result.policyGates.stages) || []).forEach((stage) => {
+    lines.push(`- ${stage.id} (${stage.label}): ${stage.status}${stage.blocking ? ", blocking" : ", non-blocking"}`);
+    lines.push(`  summary: ${stage.summary}`);
+    if (Array.isArray(stage.warnings) && stage.warnings.length > 0) {
+      stage.warnings.forEach((entry) => lines.push(`  warning: ${entry}`));
+    }
+    if (Array.isArray(stage.candidateGates) && stage.candidateGates.length > 0) {
+      stage.candidateGates.forEach((gate) => {
+        lines.push(
+          `  gate ${gate.id}: ${gate.status}, ${gate.blocking ? "blocking" : "non-blocking"}, confidence=${gate.confidence}`
+        );
+      });
+    }
   });
 
   return lines.join("\n");
@@ -513,6 +557,7 @@ function main(argv = process.argv.slice(2)) {
   const result = resolveAdvisoryForFiles(changedFiles, document);
   result.rulesPath = absolutePath;
   result.runtimeSignals = evaluateRuntimeSignals(result, options);
+  result.policyGates = buildPolicyGateStatus(result.runtimeSignals, document.policyGates);
 
   if (options.unmatched) {
     const unmatchedFiles = result.perFile.filter((entry) => entry.usedFallback).map((entry) => entry.filePath);
@@ -557,6 +602,7 @@ module.exports = {
   parseRuntimeStateMap,
   parseNameValuePairs,
   evaluateRuntimeSignals,
+  buildPolicyGateStatus,
   runGit,
   getChangedFiles,
   formatHumanReadable,

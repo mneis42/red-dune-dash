@@ -5,6 +5,69 @@
     "routingAuthority": "AGENTS.md",
     "note": "This file is advisory only. Canonical workflow routing stays in AGENTS.md and instruction files."
   },
+  "policyGates": {
+    "stages": [
+      {
+        "id": "stage-1-advisory",
+        "label": "Advisory only",
+        "blocking": false,
+        "status": "active",
+        "summary": "Changed-file matching and workflow hints stay advisory and do not reroute canonical workflows."
+      },
+      {
+        "id": "stage-2-warning",
+        "label": "Warning mode",
+        "blocking": false,
+        "status": "runtime-evaluated",
+        "summary": "Explicit risky runtime states surface as non-blocking warnings based on deterministic CI signals."
+      },
+      {
+        "id": "stage-3-hard-fail",
+        "label": "Selective hard fail",
+        "blocking": true,
+        "status": "selective-enforcement",
+        "summary": "Only narrow, high-confidence policy gates should block.",
+        "candidateGates": [
+          {
+            "id": "broken-instruction-references",
+            "status": "enforced",
+            "confidence": "high",
+            "blocking": true,
+            "source": ["npm run instruction:lint", "CI verify-linux-signals"],
+            "documentationStatusLine": "Current repo status: enforced",
+            "documentationDetailLine": "Enforcement path: `npm run instruction:lint` in CI"
+          },
+          {
+            "id": "missing-mandatory-canonical-artifacts",
+            "status": "partial-coverage",
+            "confidence": "high",
+            "blocking": false,
+            "source": ["npm run instruction:lint", "npm run backlog:lint", "CI verify-linux-signals"],
+            "documentationStatusLine": "Current repo status: partial coverage only, not a single enforced hard-fail gate",
+            "documentationDetailLine": "Current coverage: deterministic lint checks cover some canonical workflow files and backlog structure, but template-artifact existence is not enforced as one complete CI gate"
+          },
+          {
+            "id": "broken-mandatory-validation-jobs",
+            "status": "enforced",
+            "confidence": "high",
+            "blocking": true,
+            "source": ["CI verify-linux-signals", "CI test"],
+            "documentationStatusLine": "Current repo status: enforced",
+            "documentationDetailLine": "Enforcement path: `verify-linux-signals` and the compatibility `test` gate in CI"
+          },
+          {
+            "id": "protected-branch-violations",
+            "status": "candidate-only",
+            "confidence": "high",
+            "blocking": false,
+            "source": ["scripts/setup-hooks.js", "agent:preflight guardrail signal"],
+            "documentationStatusLine": "Current repo status: candidate only, not a CI hard-fail gate",
+            "documentationDetailLine": "Current coverage: local `.githooks/pre-push` protection plus `agent:preflight` guardrail visibility"
+          }
+        ]
+      }
+    ]
+  },
   "unknownFileFallback": {
     "id": "fallback-unclassified",
     "area": "unclassified",

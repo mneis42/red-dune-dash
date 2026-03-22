@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const DEFAULT_RULES_PATH = path.join(process.cwd(), "workflow", "advisory-rules.json");
+const REQUIRED_POLICY_STAGE_IDS = ["stage-1-advisory", "stage-2-warning", "stage-3-hard-fail"];
 
 function normalizeRepoPath(inputPath) {
   return String(inputPath || "")
@@ -46,6 +47,18 @@ function globToRegExp(globPattern) {
 
 function isStringArray(value) {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.length > 0);
+}
+
+function validateAllowedKeys(target, allowedKeys, fieldPath) {
+  const errors = [];
+
+  Object.keys(target).forEach((key) => {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${fieldPath}.${key} is not allowed`);
+    }
+  });
+
+  return errors;
 }
 
 function validateRuleLike(rule, fieldPath, { requireMatch }) {
@@ -128,6 +141,10 @@ function validateAdvisoryDocument(document) {
     }
   }
 
+  if (!("policyGates" in document)) {
+    errors.push("policyGates is required");
+  }
+
   if (!Array.isArray(document.rules) || document.rules.length === 0) {
     errors.push("rules must be a non-empty array");
   } else {
@@ -149,6 +166,111 @@ function validateAdvisoryDocument(document) {
     validateRuleLike(document.unknownFileFallback, "unknownFileFallback", { requireMatch: false }).forEach((entry) =>
       errors.push(entry)
     );
+  }
+
+  if ("policyGates" in document) {
+    if (!document.policyGates || typeof document.policyGates !== "object" || Array.isArray(document.policyGates)) {
+      errors.push("policyGates must be an object");
+    } else {
+      validateAllowedKeys(document.policyGates, new Set(["stages"]), "policyGates").forEach((entry) => errors.push(entry));
+
+      if (!Array.isArray(document.policyGates.stages) || document.policyGates.stages.length === 0) {
+        errors.push("policyGates.stages must be a non-empty array");
+      } else {
+        const stageIdCounts = new Map();
+        document.policyGates.stages.forEach((stage, stageIndex) => {
+          const fieldPath = `policyGates.stages[${stageIndex}]`;
+          if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
+            errors.push(`${fieldPath} must be an object`);
+            return;
+          }
+
+          validateAllowedKeys(stage, new Set(["id", "label", "blocking", "status", "summary", "candidateGates"]), fieldPath).forEach(
+            (entry) => errors.push(entry)
+          );
+
+          ["id", "label", "status", "summary"].forEach((key) => {
+            if (typeof stage[key] !== "string" || stage[key].trim().length === 0) {
+              errors.push(`${fieldPath}.${key} must be a non-empty string`);
+            }
+          });
+          if (typeof stage.id === "string" && stage.id.trim().length > 0) {
+            stageIdCounts.set(stage.id, (stageIdCounts.get(stage.id) || 0) + 1);
+          }
+          if (typeof stage.blocking !== "boolean") {
+            errors.push(`${fieldPath}.blocking must be a boolean`);
+          }
+
+          if (!("candidateGates" in stage)) {
+            if (stage.id === "stage-3-hard-fail") {
+              errors.push(`${fieldPath}.candidateGates is required for stage-3-hard-fail`);
+            }
+            return;
+          }
+          if (!Array.isArray(stage.candidateGates)) {
+            errors.push(`${fieldPath}.candidateGates must be an array`);
+            return;
+          }
+          if (stage.id === "stage-3-hard-fail" && stage.candidateGates.length === 0) {
+            errors.push(`${fieldPath}.candidateGates must be a non-empty array for stage-3-hard-fail`);
+            return;
+          }
+
+          const gateIdCounts = new Map();
+          stage.candidateGates.forEach((gate, gateIndex) => {
+            const gateFieldPath = `${fieldPath}.candidateGates[${gateIndex}]`;
+            if (!gate || typeof gate !== "object" || Array.isArray(gate)) {
+              errors.push(`${gateFieldPath} must be an object`);
+              return;
+            }
+
+            validateAllowedKeys(
+              gate,
+              new Set([
+                "id",
+                "status",
+                "confidence",
+                "blocking",
+                "source",
+                "documentationStatusLine",
+                "documentationDetailLine",
+              ]),
+              gateFieldPath
+            ).forEach((entry) => errors.push(entry));
+
+            ["id", "status", "confidence", "documentationStatusLine", "documentationDetailLine"].forEach((key) => {
+              if (typeof gate[key] !== "string" || gate[key].trim().length === 0) {
+                errors.push(`${gateFieldPath}.${key} must be a non-empty string`);
+              }
+            });
+            if (typeof gate.id === "string" && gate.id.trim().length > 0) {
+              gateIdCounts.set(gate.id, (gateIdCounts.get(gate.id) || 0) + 1);
+            }
+            if (typeof gate.blocking !== "boolean") {
+              errors.push(`${gateFieldPath}.blocking must be a boolean`);
+            }
+            if (!isStringArray(gate.source) && !(Array.isArray(gate.source) && gate.source.length === 0)) {
+              errors.push(`${gateFieldPath}.source must be a string array`);
+            }
+          });
+
+          gateIdCounts.forEach((count, gateId) => {
+            if (count > 1) {
+              errors.push(`${fieldPath}.candidateGates must include unique gate ids; duplicate id ${gateId}`);
+            }
+          });
+        });
+
+        REQUIRED_POLICY_STAGE_IDS.forEach((stageId) => {
+          const count = stageIdCounts.get(stageId) || 0;
+          if (count === 0) {
+            errors.push(`policyGates.stages must include canonical stage id ${stageId}`);
+          } else if (count > 1) {
+            errors.push(`policyGates.stages must include canonical stage id ${stageId} exactly once`);
+          }
+        });
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };
