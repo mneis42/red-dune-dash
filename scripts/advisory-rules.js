@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const DEFAULT_RULES_PATH = path.join(process.cwd(), "workflow", "advisory-rules.json");
+const REQUIRED_POLICY_STAGE_IDS = ["stage-1-advisory", "stage-2-warning", "stage-3-hard-fail"];
 
 function normalizeRepoPath(inputPath) {
   return String(inputPath || "")
@@ -176,6 +177,7 @@ function validateAdvisoryDocument(document) {
       if (!Array.isArray(document.policyGates.stages) || document.policyGates.stages.length === 0) {
         errors.push("policyGates.stages must be a non-empty array");
       } else {
+        const stageIdCounts = new Map();
         document.policyGates.stages.forEach((stage, stageIndex) => {
           const fieldPath = `policyGates.stages[${stageIndex}]`;
           if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
@@ -192,6 +194,9 @@ function validateAdvisoryDocument(document) {
               errors.push(`${fieldPath}.${key} must be a non-empty string`);
             }
           });
+          if (typeof stage.id === "string" && stage.id.trim().length > 0) {
+            stageIdCounts.set(stage.id, (stageIdCounts.get(stage.id) || 0) + 1);
+          }
           if (typeof stage.blocking !== "boolean") {
             errors.push(`${fieldPath}.blocking must be a boolean`);
           }
@@ -244,6 +249,15 @@ function validateAdvisoryDocument(document) {
               errors.push(`${gateFieldPath}.source must be a string array`);
             }
           });
+        });
+
+        REQUIRED_POLICY_STAGE_IDS.forEach((stageId) => {
+          const count = stageIdCounts.get(stageId) || 0;
+          if (count === 0) {
+            errors.push(`policyGates.stages must include canonical stage id ${stageId}`);
+          } else if (count > 1) {
+            errors.push(`policyGates.stages must include canonical stage id ${stageId} exactly once`);
+          }
         });
       }
     }

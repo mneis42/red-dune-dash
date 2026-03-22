@@ -200,6 +200,38 @@ test("validateAdvisoryDocument rejects empty stage 3 candidate gate list", () =>
   );
 });
 
+test("validateAdvisoryDocument requires canonical progressive stage ids", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  invalidDocument.policyGates.stages[1].id = "stage-2-warn";
+
+  const result = validateAdvisoryDocument(invalidDocument);
+
+  assert.equal(result.valid, false);
+  assert.equal(
+    result.errors.includes("policyGates.stages must include canonical stage id stage-2-warning"),
+    true
+  );
+});
+
+test("validateAdvisoryDocument rejects duplicate canonical progressive stage ids", () => {
+  const { document } = loadAdvisoryDocument();
+  const invalidDocument = JSON.parse(JSON.stringify(document));
+  invalidDocument.policyGates.stages[1].id = "stage-1-advisory";
+
+  const result = validateAdvisoryDocument(invalidDocument);
+
+  assert.equal(result.valid, false);
+  assert.equal(
+    result.errors.includes("policyGates.stages must include canonical stage id stage-1-advisory exactly once"),
+    true
+  );
+  assert.equal(
+    result.errors.includes("policyGates.stages must include canonical stage id stage-2-warning"),
+    true
+  );
+});
+
 async function runTests() {
   for (const { name, fn } of tests) {
     try {
