@@ -141,6 +141,23 @@ test("evaluateRuntimeSignals keeps unmatched failing job status visible without 
   assert.deepEqual(runtime.actionableHints, []);
 });
 
+test("evaluateRuntimeSignals suppresses not-observed hints when no runtime signals were provided", () => {
+  const cli = loadCliModuleFresh();
+  const advisory = {
+    merged: {
+      ciSignals: ["verify-linux-signals", "cross-platform-verify", "required-check"],
+    },
+  };
+  const runtime = cli.evaluateRuntimeSignals(advisory, {
+    ciJobStatuses: [],
+    ciCheckOutcomes: [],
+  });
+
+  assert.equal(runtime.hasExplicitRuntimeSignals, false);
+  assert.equal(runtime.matchedSignals.every((entry) => entry.status === "not-observed"), true);
+  assert.deepEqual(runtime.actionableHints, []);
+});
+
 test("formatHumanReadable includes runtime signal sections when provided", () => {
   const cli = loadCliModuleFresh();
   const output = cli.formatHumanReadable({

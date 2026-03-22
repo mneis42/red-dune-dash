@@ -163,6 +163,8 @@ function evaluateRuntimeSignals(result, options) {
       parseNameValuePairs(options.ciCheckOutcomes)
     ),
   };
+  const hasExplicitRuntimeSignals =
+    Object.keys(runtime.jobStatuses).length > 0 || Object.keys(runtime.checkOutcomes).length > 0;
 
   const matchedSignals = stableUnique(result.merged.ciSignals || []).map((signalId) => {
     const metadata = SIGNAL_METADATA[signalId] || {
@@ -218,12 +220,18 @@ function evaluateRuntimeSignals(result, options) {
     });
 
   matchedSignals
-    .filter((entry) => entry.status === "not-observed" && (entry.observedChecks.length > 0 || entry.observedJobs.length > 0))
+    .filter(
+      (entry) =>
+        hasExplicitRuntimeSignals &&
+        entry.status === "not-observed" &&
+        (entry.observedChecks.length > 0 || entry.observedJobs.length > 0)
+    )
     .forEach((entry) => {
       actionableHints.push(`${entry.label} has no observed runtime outcome in this advisory run yet.`);
     });
 
   return {
+    hasExplicitRuntimeSignals,
     jobStatuses: runtime.jobStatuses,
     checkOutcomes: runtime.checkOutcomes,
     matchedSignals,
