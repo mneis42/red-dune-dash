@@ -1,0 +1,20 @@
+date: 2026-03-22
+task_type: backlog-item-implementation
+short_goal: Expand PWA validation coverage with targeted smoke and manifest checks
+changed_files:
+  - app-assets.js
+  - scripts/pwa-local-smoke.js
+  - tests/pwa-asset-manifest.test.js
+  - tests/pwa-local-smoke.test.js
+  - tests/service-worker.test.js
+  - package.json
+  - README.md
+checks:
+  - name: npm run verify
+    outcome: fail
+  - name: npm run verify
+    outcome: pass
+friction_category: unexpected-verify-failure
+human_correction_needed: false
+missing_or_misleading_guardrail: The new PWA smoke test initially required opening a localhost port, which made standard verify runs fail in the sandbox even though the helper itself only needed unit-level fetch validation.
+improvement_proposal: Keep automated validation for local HTTP helpers sandbox-safe by mocking fetch and reserve real localhost serving for manual smoke instructions only.
