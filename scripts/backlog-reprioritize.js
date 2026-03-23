@@ -45,7 +45,19 @@ function normalizeRepoRelative(candidatePath) {
 }
 
 function isPathInside(parentPath, childPath) {
-  const relativePath = normalizeRepoRelative(path.relative(parentPath, childPath));
+  const pathModule =
+    typeof parentPath === "string" &&
+    typeof childPath === "string" &&
+    /^[a-zA-Z]:[\\/]/.test(parentPath) &&
+    /^[a-zA-Z]:[\\/]/.test(childPath)
+      ? path.win32
+      : path;
+  const parentRoot = normalizeRepoRelative(pathModule.parse(parentPath).root).toLowerCase();
+  const childRoot = normalizeRepoRelative(pathModule.parse(childPath).root).toLowerCase();
+  if (parentRoot && childRoot && parentRoot !== childRoot) {
+    return false;
+  }
+  const relativePath = normalizeRepoRelative(pathModule.relative(parentPath, childPath));
   return relativePath === "" || (!relativePath.startsWith("../") && relativePath !== ".." && !relativePath.includes("/../"));
 }
 
@@ -556,8 +568,8 @@ function executeRenamePlan(operations, fileSystem = fs) {
 
     for (const operation of operations) {
       if (operation.updatedContent !== operation.originalContent) {
-        fileSystem.writeFileSync(operation.finalAbsolutePath, operation.updatedContent);
         rewrittenFiles.push(operation);
+        fileSystem.writeFileSync(operation.finalAbsolutePath, operation.updatedContent);
       }
     }
   } catch (error) {

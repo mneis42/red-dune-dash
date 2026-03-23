@@ -5,6 +5,7 @@ const path = require("node:path");
 const { createTestHarness } = require("../scripts/test-harness.js");
 
 const {
+  isPathInside,
   parseArgs,
   parseRawMappingEntries,
   parseMappingFile,
@@ -93,6 +94,10 @@ test("parseArgs reads mapping file, backlog dir, apply, and json options", () =>
     json: true,
     errors: [],
   });
+});
+
+test("isPathInside rejects Windows cross-drive paths", () => {
+  assert.equal(isPathInside("C:\\repo", "D:\\escape\\file"), false);
 });
 
 test("parseMappingFile rejects duplicate targets", () => {
@@ -582,6 +587,46 @@ test("executeRenamePlan rolls back temp and final renames when second phase fail
     assert.deepEqual(list("backlog"), ["1-todo-alpha.md", "2-todo-beta.md"]);
     assert.equal(exists("backlog/1-todo-alpha.md"), true);
     assert.equal(exists("backlog/2-todo-beta.md"), true);
+  });
+});
+
+test("executeRenamePlan restores original content when writeFileSync fails after corruption", () => {
+  withTempRepo(({ root, write, read, exists }) => {
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-todo-beta.md", createBacklogItemContent({ priority: 2, title: "Beta" }));
+    write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
+
+    const plan = planReprioritization(root, {
+      backlogDir: "backlog",
+      mappingFile: "mapping.json",
+      apply: true,
+    });
+
+    let writeCount = 0;
+    const flakyFs = {
+      renameSync(sourcePath, targetPath) {
+        fs.renameSync(sourcePath, targetPath);
+      },
+      writeFileSync(filePath, content) {
+        writeCount += 1;
+        if (writeCount === 1) {
+          fs.writeFileSync(filePath, "CORRUPTED");
+          throw new Error("Injected write failure after partial overwrite.");
+        }
+        fs.writeFileSync(filePath, content);
+      },
+    };
+
+    assert.throws(
+      () => executeRenamePlan(plan.operations, flakyFs),
+      /Injected write failure after partial overwrite/
+    );
+    assert.equal(exists("backlog/1-todo-alpha.md"), true);
+    assert.equal(exists("backlog/2-todo-beta.md"), true);
+    assert.match(read("backlog/1-todo-alpha.md"), /^priority: 1$/m);
+    assert.match(read("backlog/2-todo-beta.md"), /^priority: 2$/m);
+    assert.equal(read("backlog/1-todo-alpha.md").includes("CORRUPTED"), false);
+    assert.equal(read("backlog/2-todo-beta.md").includes("CORRUPTED"), false);
   });
 });
 
