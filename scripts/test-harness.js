@@ -31,11 +31,15 @@ function formatOutcomeSummary(label, counts) {
 }
 
 function emitMachineSummary(summary) {
-  if (!process.env.RED_DUNE_TEST_PARENT_RUN) {
+  if (!isParentRunEnabled(process.env.RED_DUNE_TEST_PARENT_RUN)) {
     return;
   }
 
   console.log(`${MACHINE_SUMMARY_PREFIX}${JSON.stringify(summary)}`);
+}
+
+function isParentRunEnabled(rawValue) {
+  return rawValue === "1";
 }
 
 function createTestHarness(suiteName) {
@@ -48,7 +52,7 @@ function createTestHarness(suiteName) {
   async function run() {
     const mode = process.env.RED_DUNE_TEST_OUTPUT === "verbose" ? "verbose" : "compact";
     const maxFailures = parseMaxFailures(process.env.RED_DUNE_TEST_MAX_FAILURES);
-    const isParentRun = process.env.RED_DUNE_TEST_PARENT_RUN === "1";
+    const isParentRun = isParentRunEnabled(process.env.RED_DUNE_TEST_PARENT_RUN);
     const summary = createSummary(suiteName, tests.length);
 
     try {
@@ -109,5 +113,6 @@ module.exports = {
   MACHINE_SUMMARY_PREFIX,
   createTestHarness,
   formatOutcomeSummary,
+  isParentRunEnabled,
   parseMaxFailures,
 };

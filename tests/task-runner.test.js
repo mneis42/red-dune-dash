@@ -5,6 +5,7 @@ const {
   parseArgs,
   runTestWorkflow,
   runVerifyWorkflow,
+  TEST_SUITES,
 } = require("../scripts/task-runner.js");
 
 const { test, run } = createTestHarness("test:task-runner");
@@ -126,6 +127,80 @@ test("runTestWorkflow does not claim truncation when the last suite reaches the 
   assert.deepEqual(stderr, []);
 });
 
+test("runTestWorkflow fails when a suite exits non-zero without failed counts", async () => {
+  const stdout = [];
+  const stderr = [];
+
+  const exitCode = await runTestWorkflow(
+    { mode: "compact", maxFailures: 5 },
+    {
+      writeStdout(line) {
+        stdout.push(line);
+      },
+      writeStderr(line) {
+        stderr.push(line);
+      },
+      async runTestSuite() {
+        return {
+          exitCode: 1,
+          summary: {
+            suiteName: "test:simulation",
+            total: 1,
+            counts: { ok: 1, failed: 0 },
+            truncated: false,
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(stdout, [`tests: ${TEST_SUITES.length} ok`]);
+  assert.deepEqual(stderr, []);
+});
+
+test("runTestWorkflow keeps going after a rejected suite and reports the failure", async () => {
+  const stdout = [];
+  const stderr = [];
+  const seen = [];
+
+  const exitCode = await runTestWorkflow(
+    { mode: "compact", maxFailures: 5 },
+    {
+      writeStdout(line) {
+        stdout.push(line);
+      },
+      writeStderr(line) {
+        stderr.push(line);
+      },
+      async runTestSuite(suite) {
+        seen.push(suite.id);
+        if (suite.id === "test:simulation") {
+          throw new Error("suite exploded");
+        }
+        return {
+          exitCode: 0,
+          summary: {
+            suiteName: suite.id,
+            total: 1,
+            counts: { ok: 1, failed: 0 },
+            truncated: false,
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(exitCode, 1);
+  assert.equal(seen.includes("test:service-worker"), true);
+  assert.equal(stderr[0], "test:simulation: runner failure: failed");
+  assert.match(stderr[1], /suite exploded/);
+  assert.deepEqual(stdout, [
+    `tests: ${TEST_SUITES.length - 1} ok, 1 failed`,
+    "Hint: rerun npm run verify:verbose for debugging detail.",
+  ]);
+});
+
 test("runVerifyWorkflow continues through later stages after failures", async () => {
   const executed = [];
 
@@ -154,6 +229,44 @@ test("runVerifyWorkflow continues through later stages after failures", async ()
     "scripts/docs-language-lint.js",
     "scripts/backlog-template-lint.js",
   ]);
+});
+
+test("runVerifyWorkflow continues after rejected steps and reports runner failures", async () => {
+  const executed = [];
+  const stderr = [];
+
+  const exitCode = await runVerifyWorkflow(
+    { mode: "compact", maxFailures: 5 },
+    {
+      writeStderr(line) {
+        stderr.push(line);
+      },
+      async runNodeFile(file) {
+        executed.push(file);
+        if (file === "scripts/check-syntax.js") {
+          throw new Error("check crashed");
+        }
+        return { exitCode: 0 };
+      },
+      async runTestWorkflow() {
+        executed.push("workflow:test");
+        throw new Error("tests crashed");
+      },
+    }
+  );
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(executed, [
+    "scripts/check-syntax.js",
+    "workflow:test",
+    "scripts/instruction-lint.js",
+    "scripts/docs-language-lint.js",
+    "scripts/backlog-template-lint.js",
+  ]);
+  assert.equal(stderr[0], "check: runner failure: failed");
+  assert.match(stderr[1], /check crashed/);
+  assert.equal(stderr[2], "test: runner failure: failed");
+  assert.match(stderr[3], /tests crashed/);
 });
 
 run();

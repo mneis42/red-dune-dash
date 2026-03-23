@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { createTestHarness } = require("../scripts/test-harness.js");
+const { createTestHarness, isParentRunEnabled } = require("../scripts/test-harness.js");
 
 const { test, run } = createTestHarness("test:test-helpers");
 
@@ -67,6 +67,13 @@ test("standalone compact runs keep error details for single-suite debugging", as
   assert.equal(captured.errors[0][0], "debug-suite: shows stack source: failed");
   assert.equal(captured.errors[1][0], failure);
   assert.equal(captured.logs[0][0], "debug-suite: 0 ok, 1 failed");
+});
+
+test("parent-run detection only enables machine mode for value 1", () => {
+  assert.equal(isParentRunEnabled(undefined), false);
+  assert.equal(isParentRunEnabled(""), false);
+  assert.equal(isParentRunEnabled("true"), false);
+  assert.equal(isParentRunEnabled("1"), true);
 });
 
 run();

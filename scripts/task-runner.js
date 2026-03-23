@@ -93,6 +93,23 @@ function runNodeFile(file, { env = {}, onStdoutLine, onStderrLine } = {}) {
   });
 }
 
+function createRejectedResult(error, fallback = {}) {
+  return {
+    exitCode: 1,
+    rejected: true,
+    error,
+    ...fallback,
+  };
+}
+
+async function invokeWithRejectionCapture(callback, fallback = {}) {
+  try {
+    return await callback();
+  } catch (error) {
+    return createRejectedResult(error, fallback);
+  }
+}
+
 async function runTestSuite(suite, options) {
   let summary = null;
   const { mode, remainingFailures } = options;
@@ -133,14 +150,35 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
 
   const totalCounts = { ok: 0, failed: 0 };
   let truncated = false;
+  let exitCode = 0;
 
   for (const [index, suite] of TEST_SUITES.entries()) {
     const remainingFailures = Math.max(1, maxFailures - totalCounts.failed);
-    const result = await executeSuite(suite, { mode, remainingFailures });
+    const result = await invokeWithRejectionCapture(
+      () => executeSuite(suite, { mode, remainingFailures }),
+      {
+        summary: {
+          suiteName: suite.id,
+          total: 0,
+          counts: { ok: 0, failed: 1 },
+          truncated: false,
+        },
+      }
+    );
     const counts = result.summary?.counts || { ok: 0, failed: result.exitCode === 0 ? 0 : 1 };
 
     totalCounts.ok += counts.ok || 0;
     totalCounts.failed += counts.failed || 0;
+    if (result.exitCode !== 0) {
+      exitCode = 1;
+    }
+
+    if (result.rejected) {
+      writeStderr(`${suite.id}: runner failure: failed`);
+      if (result.error) {
+        writeStderr(result.error.stack || String(result.error));
+      }
+    }
 
     if (result.summary?.truncated) {
       truncated = true;
@@ -161,26 +199,43 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
     writeStdout("Hint: rerun npm run verify:verbose for debugging detail.");
   }
 
-  return totalCounts.failed > 0 ? 1 : 0;
+  return exitCode !== 0 || totalCounts.failed > 0 ? 1 : 0;
 }
 
 async function runVerifyWorkflow({ mode, maxFailures }, dependencies = {}) {
   const executeNodeFile = dependencies.runNodeFile || runNodeFile;
   const executeTestWorkflow = dependencies.runTestWorkflow || runTestWorkflow;
+  const writeStderr = dependencies.writeStderr || ((line) => process.stderr.write(`${line}\n`));
   let exitCode = 0;
 
   for (const step of VERIFY_STEPS) {
     if (step.type === "workflow") {
-      const stepExitCode = await executeTestWorkflow({ mode, maxFailures }, dependencies);
+      const result = await invokeWithRejectionCapture(
+        () => executeTestWorkflow({ mode, maxFailures }, dependencies),
+        {}
+      );
+      const stepExitCode = result.exitCode ?? result;
       if (stepExitCode !== 0) {
         exitCode = 1;
+      }
+      if (result.rejected) {
+        writeStderr(`${step.id}: runner failure: failed`);
+        if (result.error) {
+          writeStderr(result.error.stack || String(result.error));
+        }
       }
       continue;
     }
 
-    const result = await executeNodeFile(step.file);
+    const result = await invokeWithRejectionCapture(() => executeNodeFile(step.file), {});
     if (result.exitCode !== 0) {
       exitCode = 1;
+    }
+    if (result.rejected) {
+      writeStderr(`${step.id}: runner failure: failed`);
+      if (result.error) {
+        writeStderr(result.error.stack || String(result.error));
+      }
     }
   }
 
