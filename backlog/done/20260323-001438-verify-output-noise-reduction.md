@@ -216,7 +216,7 @@ Done criteria
 
 Verification performed
 
-- `npm test` passed on 2026-03-23 with one aggregate summary line: `tests: 209 ok`.
+- `npm test` passed on 2026-03-23 with one aggregate summary line; the exact passing-test count increased as follow-up runner regression coverage was added in the same branch and is currently `tests: 214 ok`.
 - Verbose suite output was inspected on 2026-03-23 via `RED_DUNE_TEST_OUTPUT=verbose node tests/simulation-core.test.js`.
 
 Remaining risk / follow-up
