@@ -428,6 +428,7 @@ function buildUpdatedContent(file, nextPriority) {
 function buildRenamePlan(entries, files, backlogDirRelative) {
   const fileByPriority = new Map(files.map((file) => [file.priority, file]));
   const destinationPaths = [];
+  const tempPaths = [];
   const operations = [];
 
   if (hasWindowsReservedPathSegment(backlogDirRelative)) {
@@ -447,6 +448,7 @@ function buildRenamePlan(entries, files, backlogDirRelative) {
     }
 
     destinationPaths.push(finalRelativePath.toLowerCase());
+    tempPaths.push(tempRelativePath.toLowerCase());
     const updatedContent = buildUpdatedContent(currentFile, entry.to);
     operations.push({
       from: entry.from,
@@ -465,6 +467,28 @@ function buildRenamePlan(entries, files, backlogDirRelative) {
   const duplicateDestinations = destinationPaths.filter((value, index) => destinationPaths.indexOf(value) !== index);
   if (duplicateDestinations.length > 0) {
     throw new Error(`Multiple renames would collide on the same target path: ${stableUnique(duplicateDestinations).join(", ")}.`);
+  }
+
+  const duplicateTempPaths = tempPaths.filter((value, index) => tempPaths.indexOf(value) !== index);
+  if (duplicateTempPaths.length > 0) {
+    throw new Error(`Multiple renames would collide on the same temporary path: ${stableUnique(duplicateTempPaths).join(", ")}.`);
+  }
+
+  const sourcePathSet = new Set(files.map((file) => file.relativePath.toLowerCase()));
+  for (const operation of operations) {
+    if (
+      fs.existsSync(operation.tempAbsolutePath) &&
+      !sourcePathSet.has(operation.tempPath.toLowerCase())
+    ) {
+      throw new Error(`Temporary path already exists and would be overwritten: ${operation.tempPath}`);
+    }
+
+    if (
+      fs.existsSync(operation.finalAbsolutePath) &&
+      !sourcePathSet.has(operation.finalPath.toLowerCase())
+    ) {
+      throw new Error(`Target path already exists outside the provided mapping: ${operation.finalPath}`);
+    }
   }
 
   return operations;

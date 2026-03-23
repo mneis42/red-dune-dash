@@ -295,6 +295,27 @@ test("runCli rejects duplicate prioritized numbers instead of silently picking o
   });
 });
 
+test("runCli rejects apply when an internal temporary path already exists", () => {
+  withTempRepo(({ root, write, list, read }) => {
+    write("backlog/1-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-beta.md", createBacklogItemContent({ priority: 2, title: "Beta" }));
+    write("backlog/__tmp-reprioritize__-1-2-alpha.md", "preexisting-temp\n");
+    write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
+
+    const stderr = [];
+    const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "backlog", "--apply"], {
+      repoRoot: root,
+      writeStdout: () => {},
+      writeStderr: (line) => stderr.push(line),
+    });
+
+    assert.equal(exitCode, 1);
+    assert.match(stderr.join("\n"), /Temporary path already exists and would be overwritten/);
+    assert.deepEqual(list("backlog"), ["1-alpha.md", "2-beta.md", "__tmp-reprioritize__-1-2-alpha.md"]);
+    assert.equal(read("backlog/__tmp-reprioritize__-1-2-alpha.md"), "preexisting-temp\n");
+  });
+});
+
 test("planReprioritization allows chained renames that rely on the temporary phase", () => {
   withTempRepo(({ root, write }) => {
     write("backlog/1-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
