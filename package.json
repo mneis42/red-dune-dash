@@ -33,6 +33,7 @@
     "test:preflight": "node tests/agent-preflight.test.js",
     "test:summary": "node tests/agent-summary.test.js",
     "test:task-runner": "node tests/task-runner.test.js",
+    "test:test-helpers": "node tests/test-helpers-harness.test.js",
     "test:simulation": "node tests/simulation-core.test.js",
     "test:service-worker": "node tests/service-worker.test.js",
     "verify": "node scripts/task-runner.js verify",

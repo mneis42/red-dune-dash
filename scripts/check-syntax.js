@@ -17,7 +17,9 @@ const filesToCheck = [
   "scripts/agent-advisory.js",
   "scripts/agent-preflight.js",
   "scripts/instruction-lint.js",
-  "scripts/pwa-local-smoke.js"
+  "scripts/pwa-local-smoke.js",
+  "scripts/task-runner.js",
+  "tests/test-helpers.js"
 ];
 
 for (const file of filesToCheck) {

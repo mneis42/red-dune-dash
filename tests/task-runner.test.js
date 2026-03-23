@@ -78,6 +78,54 @@ test("runTestWorkflow aggregates counts and stops when max failures is reached",
   assert.deepEqual(stderr, ["tests: stopped after 3 failures; not all tests ran."]);
 });
 
+test("runTestWorkflow does not claim truncation when the last suite reaches the failure cap", async () => {
+  const stdout = [];
+  const stderr = [];
+  const originalSuites = require("../scripts/task-runner.js").TEST_SUITES.slice();
+
+  const exitCode = await runTestWorkflow(
+    { mode: "compact", maxFailures: 3 },
+    {
+      writeStdout(line) {
+        stdout.push(line);
+      },
+      writeStderr(line) {
+        stderr.push(line);
+      },
+      async runTestSuite(suite) {
+        if (suite.id === originalSuites[0].id) {
+          return {
+            exitCode: 1,
+            summary: {
+              suiteName: suite.id,
+              total: 2,
+              counts: { ok: 0, failed: 2 },
+              truncated: false,
+            },
+          };
+        }
+
+        return {
+          exitCode: suite.id === originalSuites[originalSuites.length - 1].id ? 1 : 0,
+          summary: {
+            suiteName: suite.id,
+            total: 1,
+            counts: {
+              ok: suite.id === originalSuites[originalSuites.length - 1].id ? 0 : 1,
+              failed: suite.id === originalSuites[originalSuites.length - 1].id ? 1 : 0,
+            },
+            truncated: false,
+          },
+        };
+      },
+    }
+  );
+
+  assert.equal(exitCode, 1);
+  assert.equal(stdout[0].includes("3 failed"), true);
+  assert.deepEqual(stderr, []);
+});
+
 test("runVerifyWorkflow continues through later stages after failures", async () => {
   const executed = [];
 

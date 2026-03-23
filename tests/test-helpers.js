@@ -48,6 +48,7 @@ function createTestHarness(suiteName) {
   async function run() {
     const mode = process.env.RED_DUNE_TEST_OUTPUT === "verbose" ? "verbose" : "compact";
     const maxFailures = parseMaxFailures(process.env.RED_DUNE_TEST_MAX_FAILURES);
+    const isParentRun = process.env.RED_DUNE_TEST_PARENT_RUN === "1";
     const summary = createSummary(suiteName, tests.length);
 
     try {
@@ -66,7 +67,7 @@ function createTestHarness(suiteName) {
         } catch (error) {
           summary.counts.failed += 1;
           console.error(`${suiteName}: ${name}: failed`);
-          if (mode === "verbose") {
+          if (mode === "verbose" || !isParentRun) {
             console.error(error);
           }
         }
@@ -74,7 +75,7 @@ function createTestHarness(suiteName) {
     } catch (error) {
       summary.counts.failed += 1;
       console.error(`${suiteName}: unhandled test runner failure: failed`);
-      if (mode === "verbose") {
+      if (mode === "verbose" || !isParentRun) {
         console.error(error);
       }
     }
@@ -83,7 +84,7 @@ function createTestHarness(suiteName) {
       console.error(`${suiteName}: stopped after ${maxFailures} failures; not all tests ran.`);
     }
 
-    if (!process.env.RED_DUNE_TEST_PARENT_RUN) {
+    if (!isParentRun) {
       console.log(formatOutcomeSummary(suiteName, summary.counts));
       if (mode === "compact" && summary.counts.failed > 0) {
         console.log("Hint: rerun npm run verify:verbose for debugging detail.");

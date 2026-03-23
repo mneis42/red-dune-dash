@@ -13,6 +13,7 @@ const TEST_SUITES = [
   { id: "test:preflight", file: "tests/agent-preflight.test.js" },
   { id: "test:summary", file: "tests/agent-summary.test.js" },
   { id: "test:task-runner", file: "tests/task-runner.test.js" },
+  { id: "test:test-helpers", file: "tests/test-helpers-harness.test.js" },
   { id: "test:git-guard", file: "tests/agent-git-guard.test.js" },
   { id: "test:gh-safe", file: "tests/gh-safe.test.js" },
   { id: "test:instruction-lint", file: "tests/instruction-lint.test.js" },
@@ -133,7 +134,7 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
   const totalCounts = { ok: 0, failed: 0 };
   let truncated = false;
 
-  for (const suite of TEST_SUITES) {
+  for (const [index, suite] of TEST_SUITES.entries()) {
     const remainingFailures = Math.max(1, maxFailures - totalCounts.failed);
     const result = await executeSuite(suite, { mode, remainingFailures });
     const counts = result.summary?.counts || { ok: 0, failed: result.exitCode === 0 ? 0 : 1 };
@@ -141,8 +142,13 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
     totalCounts.ok += counts.ok || 0;
     totalCounts.failed += counts.failed || 0;
 
-    if (result.summary?.truncated || totalCounts.failed >= maxFailures) {
+    if (result.summary?.truncated) {
       truncated = true;
+      break;
+    }
+
+    if (totalCounts.failed >= maxFailures) {
+      truncated = index < TEST_SUITES.length - 1;
       break;
     }
   }
