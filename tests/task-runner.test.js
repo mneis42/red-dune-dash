@@ -26,6 +26,14 @@ test("parseArgs accepts verbose mode and max-failures override", () => {
   });
 });
 
+test("parseArgs accepts split max-failures syntax", () => {
+  assert.deepEqual(parseArgs(["test", "--max-failures", "3"]), {
+    command: "test",
+    mode: "compact",
+    maxFailures: 3,
+  });
+});
+
 test("runTestWorkflow aggregates counts and stops when max failures is reached", async () => {
   const stdout = [];
   const stderr = [];
@@ -74,7 +82,7 @@ test("runTestWorkflow aggregates counts and stops when max failures is reached",
   ]);
   assert.deepEqual(stdout, [
     "tests: 1 ok, 3 failed",
-    "Hint: rerun npm run verify:verbose for debugging detail.",
+    "Hint: rerun npm run test:verbose for detailed per-test output.",
   ]);
   assert.deepEqual(stderr, ["tests: stopped after 3 failures; not all tests ran."]);
 });
@@ -197,7 +205,7 @@ test("runTestWorkflow keeps going after a rejected suite and reports the failure
   assert.match(stderr[1], /suite exploded/);
   assert.deepEqual(stdout, [
     `tests: ${TEST_SUITES.length - 1} ok, 1 failed`,
-    "Hint: rerun npm run verify:verbose for debugging detail.",
+    "Hint: rerun npm run test:verbose for detailed per-test output.",
   ]);
 });
 

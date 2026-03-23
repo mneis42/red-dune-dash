@@ -333,3 +333,10 @@ File references
 - [x] README updated
 - [x] Relevant docs in `docs/` reviewed; no changes required
 - [x] Relevant instruction or workflow files reviewed; no changes required
+
+## Pre-PR Exception Note
+
+- Exception type: documented no-split exception for a mixed `workflow-docs` + `tooling` branch.
+- Rationale: the README and archived workflow record changed only because this branch introduced new public verification entry points and updated the verification evidence for the same runner work; splitting the doc updates from the implementation would leave either stale commands or stale branch-local verification history in one side of the split.
+- Reviewer concern: broader review surface than a tooling-only branch.
+- Mitigation: verification for the combined branch was rerun after the follow-up fixes (`npm run check`, `npm test`, `npm run verify`), and the workflow-doc changes remain limited to command guidance and branch-local archived evidence for the same feature.

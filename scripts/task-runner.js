@@ -36,7 +36,8 @@ function parseArgs(argv) {
   let mode = "compact";
   let maxFailures = DEFAULT_MAX_FAILURES;
 
-  for (const arg of args.slice(1)) {
+  for (let index = 1; index < args.length; index += 1) {
+    const arg = args[index];
     if (arg === "--verbose") {
       mode = "verbose";
       continue;
@@ -44,6 +45,12 @@ function parseArgs(argv) {
 
     if (arg.startsWith("--max-failures=")) {
       maxFailures = parseMaxFailures(arg.slice("--max-failures=".length));
+      continue;
+    }
+
+    if (arg === "--max-failures" && index + 1 < args.length) {
+      maxFailures = parseMaxFailures(args[index + 1]);
+      index += 1;
     }
   }
 
@@ -196,7 +203,7 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
     writeStderr(`tests: stopped after ${maxFailures} failures; not all tests ran.`);
   }
   if (mode === "compact" && totalCounts.failed > 0) {
-    writeStdout("Hint: rerun npm run verify:verbose for debugging detail.");
+    writeStdout("Hint: rerun npm run test:verbose for detailed per-test output.");
   }
 
   return exitCode !== 0 || totalCounts.failed > 0 ? 1 : 0;

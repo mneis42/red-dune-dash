@@ -67,6 +67,7 @@ test("standalone compact runs keep error details for single-suite debugging", as
   assert.equal(captured.errors[0][0], "debug-suite: shows stack source: failed");
   assert.equal(captured.errors[1][0], failure);
   assert.equal(captured.logs[0][0], "debug-suite: 0 ok, 1 failed");
+  assert.equal(captured.logs[1][0], "Hint: rerun npm run test:verbose for detailed per-test output.");
 });
 
 test("parent-run detection only enables machine mode for value 1", () => {

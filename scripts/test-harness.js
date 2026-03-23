@@ -91,7 +91,7 @@ function createTestHarness(suiteName) {
     if (!isParentRun) {
       console.log(formatOutcomeSummary(suiteName, summary.counts));
       if (mode === "compact" && summary.counts.failed > 0) {
-        console.log("Hint: rerun npm run verify:verbose for debugging detail.");
+        console.log("Hint: rerun npm run test:verbose for detailed per-test output.");
       }
     }
 
