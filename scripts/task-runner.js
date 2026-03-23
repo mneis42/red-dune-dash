@@ -20,6 +20,7 @@ const TEST_SUITES = [
   { id: "test:docs-language-lint", file: "tests/docs-language-lint.test.js" },
   { id: "test:backlog-lint", file: "tests/backlog-template-lint.test.js" },
   { id: "test:backlog-branch", file: "tests/backlog-to-branch.test.js" },
+  { id: "test:backlog-reprioritize", file: "tests/backlog-reprioritize.test.js" },
 ];
 
 const VERIFY_STEPS = [

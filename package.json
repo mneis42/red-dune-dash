@@ -5,6 +5,7 @@
   "description": "Browser-first endless runner and AI-agent workflow experiment.",
   "scripts": {
     "backlog:lint": "node scripts/backlog-template-lint.js",
+    "backlog:reprioritize": "node scripts/backlog-reprioritize.js",
     "backlog:branch": "node scripts/backlog-to-branch.js",
     "check": "node scripts/check-syntax.js",
     "docs:language:lint": "node scripts/docs-language-lint.js",
@@ -23,6 +24,7 @@
     "test:verbose": "node scripts/task-runner.js test --verbose",
     "test:advisory": "node tests/advisory-rules.test.js && node tests/agent-advisory.test.js",
     "test:backlog-branch": "node tests/backlog-to-branch.test.js",
+    "test:backlog-reprioritize": "node tests/backlog-reprioritize.test.js",
     "test:backlog-lint": "node tests/backlog-template-lint.test.js",
     "test:docs-language-lint": "node tests/docs-language-lint.test.js",
     "test:gh-safe": "node tests/gh-safe.test.js",

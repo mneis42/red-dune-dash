@@ -2,11 +2,11 @@
 workflow_type: backlog-item
 source: process-hardening-2026-03-17
 priority: 21
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-17
-last_updated: 2026-03-17
+last_updated: 2026-03-23
 ---
 
 # TODO: Add Deterministic Backlog Reprioritize Script
@@ -50,3 +50,4 @@ Provide one canonical script to reprioritize numbered backlog items without shel
 - This hardens workflow execution against multiline shell and REPL state issues.
 - Align with repository goal of high signal-to-noise workflows by replacing fragile manual command chains.
 - Reprioritization can move legacy items across numeric policy cutoffs; implementation must define how metadata/lint expectations are handled after renumbering.
+- Completed on 2026-03-23 with `scripts/backlog-reprioritize.js`, the `backlog:reprioritize` npm entrypoint, README usage guidance, and cross-platform/path-safety guardrails.

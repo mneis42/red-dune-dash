@@ -2,11 +2,11 @@
 workflow_type: backlog-item
 source: process-hardening-2026-03-17
 priority: 23
-status: open
+status: done
 planning_model: GPT-5.3-Codex
 execution_model: GPT-5.3-Codex
 created_at: 2026-03-17
-last_updated: 2026-03-17
+last_updated: 2026-03-23
 ---
 
 # TODO: Add Backlog Reprioritize Fixture Tests
@@ -47,3 +47,4 @@ Add automated fixture tests that verify safe reprioritization behavior and prote
 
 - Fixture-based tests are the main defense against model-specific command variance.
 - Depends on item 21 and should be completed before enforcing CI gates in item 25.
+- Completed on 2026-03-23 with focused fixture coverage for dry-run/apply behavior, rollback safety, temp-path protection, case-insensitive collisions, symlink escapes, and Windows cross-drive path handling.
