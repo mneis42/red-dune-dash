@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 // Make self an alias for globalThis for manifest propagation correctness
 const listeners = {};
@@ -70,11 +71,7 @@ const assetManifest = globalThis.RED_DUNE_ASSET_MANIFEST ?? {
   appShellAssets: [],
 };
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:service-worker");
 
 function createEvent(url, options = {}) {
   const { method = "GET", mode = "same-origin" } = options;
@@ -247,21 +244,4 @@ test("service worker falls back to the cached core response when network-first f
   fetchImplementation = async (request) => createResponse(typeof request === "string" ? request : request.url);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

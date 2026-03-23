@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 const {
   readOptionValue,
@@ -13,11 +14,7 @@ const {
   main,
 } = require("../scripts/gh-safe.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:gh-safe");
 
 test("parseArgs preserves gh args and body-stdin selection", () => {
   const result = parseArgs(["pr", "create", "--title", "Demo", "--body-stdin"]);
@@ -160,8 +157,10 @@ test("main routes stdin markdown through body-file and cleans temporary director
   const createdFiles = [];
   const removedPaths = [];
   const runnerCalls = [];
+  const logs = [];
 
   const exitCode = main(["pr", "comment", "42", "--body-stdin"], {
+    logError: (line) => logs.push(line),
     readStdin: () => body,
     tmpRoot: "/tmp",
     mkdtempSync: (prefix) => `${prefix}run`,
@@ -181,12 +180,15 @@ test("main routes stdin markdown through body-file and cleans temporary director
   assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body-file", path.join("/tmp", "gh-body-run", "body.md")]]);
   assert.equal(createdFiles[0].contents, body);
   assert.deepEqual(removedPaths, [path.join("/tmp", "gh-body-run")]);
+  assert.equal(logs.length, 1);
 });
 
 test("main keeps short inline bodies on native --body", () => {
   const runnerCalls = [];
+  const logs = [];
 
   const exitCode = main(["pr", "comment", "42", "--body", "Short plain note."], {
+    logError: (line) => logs.push(line),
     runner: (_command, args) => {
       runnerCalls.push(args);
       return { status: 0 };
@@ -195,6 +197,7 @@ test("main keeps short inline bodies on native --body", () => {
 
   assert.equal(exitCode, 0);
   assert.deepEqual(runnerCalls, [["pr", "comment", "42", "--body", "Short plain note."]]);
+  assert.equal(logs.length, 1);
 });
 
 test("main emits escalation note before running network-required gh commands", () => {
@@ -210,21 +213,4 @@ test("main emits escalation note before running network-required gh commands", (
   assert.match(logs[0], /request escalated execution up front/);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

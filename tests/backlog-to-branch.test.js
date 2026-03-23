@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 const {
   parseArgs,
@@ -12,11 +13,7 @@ const {
   normalizeChecks,
 } = require("../scripts/backlog-to-branch.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:backlog-branch");
 
 test("parseArgs reads file, json, and max-files", () => {
   const options = parseArgs(["--file", "backlog/5-todo-backlog-to-branch-helper.md", "--json", "--max-files", "4"]);
@@ -89,21 +86,4 @@ test("normalizeChecks strips markdown code wrapping and deduplicates", () => {
   assert.deepEqual(checks, ["npm run check", "npm test"]);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

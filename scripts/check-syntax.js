@@ -17,11 +17,13 @@ const filesToCheck = [
   "scripts/agent-advisory.js",
   "scripts/agent-preflight.js",
   "scripts/instruction-lint.js",
-  "scripts/pwa-local-smoke.js"
+  "scripts/pwa-local-smoke.js",
+  "scripts/task-runner.js",
+  "scripts/test-harness.js"
 ];
 
 for (const file of filesToCheck) {
   execFileSync(process.execPath, ["--check", file], { stdio: "inherit" });
 }
 
-console.log(`Checked ${filesToCheck.length} JavaScript files.`);
+console.log(`check: ok (${filesToCheck.length} JavaScript files checked)`);

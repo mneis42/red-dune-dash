@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 const {
   parseArgs,
@@ -16,11 +17,7 @@ const {
   normalizeRunLogDecision,
 } = require("../scripts/agent-summary.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:summary");
 
 function createAdvisoryResult(overrides = {}) {
   return {
@@ -434,21 +431,4 @@ test("isFailingCheckStatus is true for fail, error, failed-signal", () => {
   assert.equal(isFailingCheckStatus("skipped-unsafe"), false);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

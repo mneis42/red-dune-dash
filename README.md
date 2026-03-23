@@ -82,6 +82,16 @@ Run the existing checks locally with npm:
 npm test
 ```
 
+For the detailed per-test debugging view, use:
+
+```powershell
+npm run test:verbose
+```
+
+Use that path when `npm test` or an individual suite fails and you want fuller per-test detail without rerunning the whole verification flow.
+
+For a single suite such as `npm run test:simulation`, rerun the same underlying file with PowerShell syntax like `$env:RED_DUNE_TEST_OUTPUT="verbose"; node tests/<suite-file>.test.js` if you want suite-local verbose detail without running the full aggregate test command. In POSIX shells, the equivalent form is `RED_DUNE_TEST_OUTPUT=verbose node tests/<suite-file>.test.js`.
+
 For syntax validation, use:
 
 ```powershell
@@ -93,6 +103,14 @@ To run the full local verification flow:
 ```powershell
 npm run verify
 ```
+
+For the verbose verification path with per-test outcomes and richer debugging detail:
+
+```powershell
+npm run verify:verbose
+```
+
+Use that path when `npm run verify` fails and you want the full verification flow rerun with detailed output.
 
 To enforce the technical documentation language policy directly:
 

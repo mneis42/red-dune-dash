@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 const {
   DEFAULT_BASE_URL,
@@ -7,11 +8,7 @@ const {
   runSmokeCheck,
 } = require("../scripts/pwa-local-smoke.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:pwa-smoke");
 
 function createResponse({ status = 200, contentType = "text/plain", body = "" }) {
   return {
@@ -137,21 +134,4 @@ test("runSmokeCheck reports invalid JSON payloads as endpoint failures", async (
   assert.equal(result.failures.some((entry) => entry.includes("manifest: validation failed")), true);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

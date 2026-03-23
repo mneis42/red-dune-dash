@@ -652,23 +652,19 @@ function runInstructionLint({ repoRoot = process.cwd(), files } = {}) {
 }
 
 function formatInstructionLintResult(result) {
-  const lines = [];
-  lines.push("Instruction lint");
-  lines.push("================");
-  lines.push(`Checked files: ${result.checkedFiles.length}`);
-  lines.push(`Issues: ${result.issues.length}`);
-  if (result.issues.length > 0) {
-    const counts = result.severityCounts || { high: 0, medium: 0, low: 0 };
-    lines.push(`Severity: high ${counts.high}, medium ${counts.medium}, low ${counts.low}`);
+  if (result.issues.length === 0) {
+    return `instruction:lint: ok (${result.checkedFiles.length} files checked)`;
   }
 
-  if (result.issues.length > 0) {
-    lines.push("");
-    lines.push("Findings");
-    result.issues.forEach((issue) => {
-      lines.push(`- [${issue.severity}] [${issue.code}] ${issue.filePath}:${issue.line} ${issue.message}`);
-    });
-  }
+  const lines = [];
+  const counts = result.severityCounts || { high: 0, medium: 0, low: 0 };
+  lines.push(`instruction:lint: FAILED (${result.issues.length} issues across ${result.checkedFiles.length} files)`);
+  lines.push(`severity: high ${counts.high}, medium ${counts.medium}, low ${counts.low}`);
+  lines.push("");
+  lines.push("Findings");
+  result.issues.forEach((issue) => {
+    lines.push(`- [${issue.severity}] [${issue.code}] ${issue.filePath}:${issue.line} ${issue.message}`);
+  });
 
   return lines.join("\n");
 }

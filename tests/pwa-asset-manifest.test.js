@@ -1,16 +1,13 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 require("../app-assets.js");
 
 const assetManifest = globalThis.RED_DUNE_ASSET_MANIFEST;
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:pwa-assets");
 
 function normalizeAssetPath(assetPath) {
   if (assetPath.startsWith("./")) {
@@ -57,21 +54,4 @@ test("core HTML bootstrap assets stay on network-first routing", () => {
   assert.deepEqual(missingPaths, []);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

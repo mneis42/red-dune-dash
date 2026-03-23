@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 require("../systems/bug-lifecycle-system.js");
 require("../systems/debug-tools.js");
@@ -20,11 +21,7 @@ const generatorHelpers = globalThis.RedDuneGeneratorHelpers;
 const respawnHelpers = globalThis.RedDuneRespawnHelpers;
 const hudRuntimeSystem = globalThis.RedDuneHudRuntime;
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:simulation");
 
 test("simulation core calculates euro rate, balance, and monotonic progress", () => {
   assert.equal(simulationCore.calculateEuroRatePerHour(450, 900_000), 18);
@@ -991,21 +988,4 @@ test("hud runtime manages touch controls, tooltip state, and fly-to-HUD effects"
   assert.deepEqual(drawOps, []);
 });
 
-let failed = 0;
-
-tests.forEach(({ name, fn }) => {
-  try {
-    fn();
-    console.log(`ok - ${name}`);
-  } catch (error) {
-    failed += 1;
-    console.error(`not ok - ${name}`);
-    console.error(error);
-  }
-});
-
-if (failed > 0) {
-  process.exitCode = 1;
-} else {
-  console.log(`All ${tests.length} gameplay system tests passed.`);
-}
+run();

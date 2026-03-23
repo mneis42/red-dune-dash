@@ -19,7 +19,8 @@
     "agent:preflight:json": "node scripts/agent-preflight.js --json",
     "gh:safe": "node scripts/gh-safe.js",
     "agent:summary": "node scripts/agent-summary.js",
-    "test": "npm run test:simulation && npm run test:service-worker && npm run test:pwa-assets && npm run test:pwa-smoke && npm run test:advisory && npm run test:preflight && npm run test:summary && npm run test:git-guard && npm run test:gh-safe && npm run test:instruction-lint && npm run test:docs-language-lint && npm run test:backlog-lint && npm run test:backlog-branch",
+    "test": "node scripts/task-runner.js test",
+    "test:verbose": "node scripts/task-runner.js test --verbose",
     "test:advisory": "node tests/advisory-rules.test.js && node tests/agent-advisory.test.js",
     "test:backlog-branch": "node tests/backlog-to-branch.test.js",
     "test:backlog-lint": "node tests/backlog-template-lint.test.js",
@@ -31,8 +32,11 @@
     "test:pwa-smoke": "node tests/pwa-local-smoke.test.js",
     "test:preflight": "node tests/agent-preflight.test.js",
     "test:summary": "node tests/agent-summary.test.js",
+    "test:task-runner": "node tests/task-runner.test.js",
+    "test:test-helpers": "node tests/test-helpers-harness.test.js",
     "test:simulation": "node tests/simulation-core.test.js",
     "test:service-worker": "node tests/service-worker.test.js",
-    "verify": "npm run check && npm test && npm run instruction:lint && npm run docs:language:lint && npm run backlog:lint"
+    "verify": "node scripts/task-runner.js verify",
+    "verify:verbose": "node scripts/task-runner.js verify --verbose"
   }
 }
