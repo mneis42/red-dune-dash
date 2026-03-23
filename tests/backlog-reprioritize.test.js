@@ -11,6 +11,7 @@ const {
   executeRenamePlan,
   runCli,
 } = require("../scripts/backlog-reprioritize.js");
+const { validateBacklogFile } = require("../scripts/backlog-template-lint.js");
 
 const { test, run } = createTestHarness("test:backlog-reprioritize");
 
@@ -42,6 +43,40 @@ function withTempRepo(callback) {
   }
 }
 
+function createBacklogItemContent({ priority, title, extraFrontmatter = [] }) {
+  return [
+    "---",
+    "workflow_type: backlog-item",
+    "source: test",
+    `priority: ${priority}`,
+    "status: open",
+    "created_at: 2026-03-23",
+    ...extraFrontmatter,
+    "---",
+    "",
+    `# TODO: ${title}`,
+    "",
+    "## Goal",
+    "x",
+    "",
+    "## Scope",
+    "- x",
+    "",
+    "## Out Of Scope",
+    "- x",
+    "",
+    "## Acceptance Criteria",
+    "- x",
+    "",
+    "## Suggested Verification",
+    "- x",
+    "",
+    "## Notes",
+    "- x",
+    "",
+  ].join("\n");
+}
+
 test("parseArgs reads mapping file, backlog dir, apply, and json options", () => {
   const options = parseArgs(["--mapping-file", "tmp/map.json", "--backlog-dir", "fixtures/backlog", "--apply", "--json"]);
 
@@ -60,8 +95,8 @@ test("parseMappingFile rejects duplicate targets", () => {
 
 test("planReprioritization builds deterministic dry-run summary", () => {
   withTempRepo(({ root, write }) => {
-    write("backlog/1-todo-alpha.md", "# alpha\n");
-    write("backlog/2-todo-beta.md", "# beta\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-todo-beta.md", createBacklogItemContent({ priority: 2, title: "Beta" }));
     write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
 
     const result = planReprioritization(root, {
@@ -84,8 +119,8 @@ test("planReprioritization builds deterministic dry-run summary", () => {
 
 test("runCli apply performs two-phase rename without partial writes", () => {
   withTempRepo(({ root, write, exists, list }) => {
-    write("backlog/1-todo-alpha.md", "alpha\n");
-    write("backlog/2-todo-beta.md", "beta\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-todo-beta.md", createBacklogItemContent({ priority: 2, title: "Beta" }));
     write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
 
     const stdout = [];
@@ -104,13 +139,51 @@ test("runCli apply performs two-phase rename without partial writes", () => {
     assert.equal(exists("backlog/1-todo-alpha.md"), false);
     assert.equal(exists("backlog/2-todo-beta.md"), false);
     assert.deepEqual(list("backlog"), ["1-todo-beta.md", "2-todo-alpha.md"]);
+    assert.deepEqual(validateBacklogFile(root, "backlog/1-todo-beta.md"), []);
+    assert.deepEqual(validateBacklogFile(root, "backlog/2-todo-alpha.md"), []);
+  });
+});
+
+test("runCli apply rewrites backlog-item priority and preserves 12+ lint validity", () => {
+  withTempRepo(({ root, write, read, exists }) => {
+    write(
+      "backlog/11-todo-alpha.md",
+      createBacklogItemContent({
+        priority: 11,
+        title: "Alpha",
+        extraFrontmatter: ["planning_model: GPT-5.4", "execution_model: GPT-5.4", "last_updated: 2026-03-23"],
+      })
+    );
+    write(
+      "backlog/13-todo-beta.md",
+      createBacklogItemContent({
+        priority: 13,
+        title: "Beta",
+        extraFrontmatter: ["planning_model: GPT-5.4", "execution_model: GPT-5.4", "last_updated: 2026-03-23"],
+      })
+    );
+    write("mapping.json", JSON.stringify({ 11: 13, 13: 11 }, null, 2));
+
+    const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "backlog", "--apply"], {
+      repoRoot: root,
+      writeStdout: () => {},
+      writeStderr: () => {},
+    });
+
+    assert.equal(exitCode, 0);
+    assert.equal(exists("backlog/13-todo-alpha.md"), true);
+    assert.equal(exists("backlog/11-todo-beta.md"), true);
+    assert.match(read("backlog/13-todo-alpha.md"), /^priority: 13$/m);
+    assert.match(read("backlog/11-todo-beta.md"), /^priority: 11$/m);
+    assert.deepEqual(validateBacklogFile(root, "backlog/13-todo-alpha.md"), []);
+    assert.deepEqual(validateBacklogFile(root, "backlog/11-todo-beta.md"), []);
   });
 });
 
 test("runCli dry-run does not mutate fixture files", () => {
   withTempRepo(({ root, write, read, list }) => {
-    write("backlog/1-todo-alpha.md", "alpha\n");
-    write("backlog/2-todo-beta.md", "beta\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-todo-beta.md", createBacklogItemContent({ priority: 2, title: "Beta" }));
     write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
 
     const beforeAlpha = read("backlog/1-todo-alpha.md");
@@ -130,8 +203,8 @@ test("runCli dry-run does not mutate fixture files", () => {
 
 test("runCli rejects incomplete mappings before mutation", () => {
   withTempRepo(({ root, write, list }) => {
-    write("backlog/1-todo-alpha.md", "alpha\n");
-    write("backlog/2-todo-beta.md", "beta\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-todo-beta.md", createBacklogItemContent({ priority: 2, title: "Beta" }));
     write("mapping.json", JSON.stringify({ 1: 2 }, null, 2));
 
     const stderr = [];
@@ -149,7 +222,7 @@ test("runCli rejects incomplete mappings before mutation", () => {
 
 test("runCli rejects missing source priorities before mutation", () => {
   withTempRepo(({ root, write, list }) => {
-    write("backlog/1-todo-alpha.md", "alpha\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
     write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
 
     const stderr = [];
@@ -167,7 +240,7 @@ test("runCli rejects missing source priorities before mutation", () => {
 
 test("runCli rejects files with invalid numbered backlog coverage before mutation", () => {
   withTempRepo(({ root, write, list }) => {
-    write("backlog/1-todo-alpha.md", "alpha\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
     write("backlog/notes.md", "freeform\n");
     write("mapping.json", JSON.stringify({ 1: 2 }, null, 2));
 
@@ -182,10 +255,29 @@ test("runCli rejects files with invalid numbered backlog coverage before mutatio
   });
 });
 
+test("runCli rejects duplicate prioritized numbers instead of silently picking one file", () => {
+  withTempRepo(({ root, write, list }) => {
+    write("backlog/1-alpha.md", "alpha\n");
+    write("backlog/1-beta.md", "beta\n");
+    write("mapping.json", JSON.stringify({ 1: 2 }, null, 2));
+
+    const stderr = [];
+    const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "backlog"], {
+      repoRoot: root,
+      writeStdout: () => {},
+      writeStderr: (line) => stderr.push(line),
+    });
+
+    assert.equal(exitCode, 1);
+    assert.match(stderr.join("\n"), /Duplicate prioritized backlog number 1/);
+    assert.deepEqual(list("backlog"), ["1-alpha.md", "1-beta.md"]);
+  });
+});
+
 test("runCli rejects case-collision targets explicitly", () => {
   withTempRepo(({ root, write, list }) => {
-    write("backlog/1-todo-Alpha.md", "alpha\n");
-    write("backlog/2-todo-alpha.md", "beta\n");
+    write("backlog/1-todo-Alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-todo-alpha.md", createBacklogItemContent({ priority: 2, title: "alpha" }));
     write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
 
     const stderr = [];
@@ -221,7 +313,7 @@ test("runCli rejects Windows-reserved backlog directory path segments", () => {
 
 test("runCli emits machine-readable json output", () => {
   withTempRepo(({ root, write }) => {
-    write("backlog/1-todo-alpha.md", "alpha\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
     write("mapping.json", JSON.stringify({ 1: 3 }, null, 2));
 
     const stdout = [];
@@ -246,8 +338,8 @@ test("runCli emits machine-readable json output", () => {
 
 test("executeRenamePlan rolls back temp and final renames when second phase fails", () => {
   withTempRepo(({ root, write, list, exists }) => {
-    write("backlog/1-todo-alpha.md", "alpha\n");
-    write("backlog/2-todo-beta.md", "beta\n");
+    write("backlog/1-todo-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-todo-beta.md", createBacklogItemContent({ priority: 2, title: "Beta" }));
     write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
 
     const plan = planReprioritization(root, {
@@ -264,6 +356,9 @@ test("executeRenamePlan rolls back temp and final renames when second phase fail
           throw new Error("Injected rename failure during finalization.");
         }
         fs.renameSync(sourcePath, targetPath);
+      },
+      writeFileSync(filePath, content) {
+        fs.writeFileSync(filePath, content);
       },
     };
 

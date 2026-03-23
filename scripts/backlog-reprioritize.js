@@ -1,8 +1,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { parseFrontmatter } = require("./backlog-template-lint.js");
 
 const PRIORITIZED_BACKLOG_PATTERN = /^(\d+)-(.+)\.md$/;
 const TEMP_SEGMENT = "__tmp-reprioritize__";
+const ENHANCED_METADATA_MIN_ITEM_NUMBER = 12;
+const BACKLOG_ITEM_NEW_REQUIRED_FIELDS = ["planning_model", "execution_model", "last_updated"];
 const WINDOWS_RESERVED_SEGMENTS = new Set([
   "con",
   "prn",
@@ -216,10 +219,37 @@ function listPrioritizedBacklogFiles(backlogDirAbsolute, backlogDirRelative) {
         suffix: match[2],
         absolutePath: path.join(backlogDirAbsolute, entry.name),
         relativePath: normalizeRepoRelative(path.join(backlogDirRelative, entry.name)),
+        content: fs.readFileSync(path.join(backlogDirAbsolute, entry.name), "utf8"),
       };
     })
     .filter(Boolean)
+    .map((file) => ({
+      ...file,
+      parsedFrontmatter: parseFrontmatter(file.content),
+    }))
     .sort((left, right) => left.priority - right.priority || left.fileName.localeCompare(right.fileName));
+}
+
+function validatePrioritizedFileSet(files) {
+  const issues = [];
+  const filesByPriority = new Map();
+
+  for (const file of files) {
+    if (!filesByPriority.has(file.priority)) {
+      filesByPriority.set(file.priority, []);
+    }
+    filesByPriority.get(file.priority).push(file.relativePath);
+  }
+
+  for (const [priority, filePaths] of filesByPriority.entries()) {
+    if (filePaths.length > 1) {
+      issues.push(
+        `Duplicate prioritized backlog number ${priority}: ${filePaths.sort().join(", ")}.`
+      );
+    }
+  }
+
+  return issues;
 }
 
 function validateMappingCoverage(entries, files) {
@@ -257,6 +287,48 @@ function hasWindowsReservedPathSegment(relativePath) {
     .some((segment) => WINDOWS_RESERVED_SEGMENTS.has(segment.toLowerCase()));
 }
 
+function hasPlaceholderValue(value) {
+  return /^<.+>$/.test(String(value || "").trim());
+}
+
+function updateFrontmatterField(content, fieldName, nextValue) {
+  const fieldPattern = new RegExp(`^(\\s*${fieldName}:\\s*).*$`, "m");
+  if (!fieldPattern.test(content)) {
+    throw new Error(`Cannot update missing frontmatter field ${fieldName}.`);
+  }
+
+  return content.replace(fieldPattern, `$1${nextValue}`);
+}
+
+function buildUpdatedContent(file, nextPriority) {
+  const parsedFrontmatter = file.parsedFrontmatter || parseFrontmatter(file.content);
+  if (!parsedFrontmatter.hasFrontmatter) {
+    throw new Error(`${file.relativePath}: missing YAML frontmatter; reprioritize cannot update priority safely.`);
+  }
+
+  const workflowType = parsedFrontmatter.map.workflow_type;
+  if (workflowType !== "backlog-item") {
+    return file.content;
+  }
+
+  if (!parsedFrontmatter.map.priority) {
+    throw new Error(`${file.relativePath}: missing frontmatter field priority; reprioritize cannot keep file lint-valid.`);
+  }
+
+  if (nextPriority >= ENHANCED_METADATA_MIN_ITEM_NUMBER) {
+    for (const field of BACKLOG_ITEM_NEW_REQUIRED_FIELDS) {
+      const value = parsedFrontmatter.map[field];
+      if (!value || hasPlaceholderValue(value)) {
+        throw new Error(
+          `${file.relativePath}: reprioritize to ${nextPriority} requires frontmatter field ${field} for prioritized backlog items ${ENHANCED_METADATA_MIN_ITEM_NUMBER}+.`
+        );
+      }
+    }
+  }
+
+  return updateFrontmatterField(file.content, "priority", String(nextPriority));
+}
+
 function buildRenamePlan(entries, files, backlogDirRelative) {
   const fileByPriority = new Map(files.map((file) => [file.priority, file]));
   const destinationPaths = [];
@@ -279,11 +351,14 @@ function buildRenamePlan(entries, files, backlogDirRelative) {
     }
 
     destinationPaths.push(finalRelativePath.toLowerCase());
+    const updatedContent = buildUpdatedContent(currentFile, entry.to);
     operations.push({
       from: entry.from,
       to: entry.to,
       sourcePath: currentFile.relativePath,
       sourceAbsolutePath: currentFile.absolutePath,
+      originalContent: currentFile.content,
+      updatedContent,
       tempPath: tempRelativePath,
       tempAbsolutePath: path.resolve(path.dirname(currentFile.absolutePath), path.basename(tempRelativePath)),
       finalPath: finalRelativePath,
@@ -309,6 +384,7 @@ function buildRenamePlan(entries, files, backlogDirRelative) {
 function executeRenamePlan(operations, fileSystem = fs) {
   const movedToTemp = [];
   const movedToFinal = [];
+  const rewrittenFiles = [];
 
   try {
     for (const operation of operations) {
@@ -320,7 +396,23 @@ function executeRenamePlan(operations, fileSystem = fs) {
       fileSystem.renameSync(operation.tempAbsolutePath, operation.finalAbsolutePath);
       movedToFinal.push(operation);
     }
+
+    for (const operation of operations) {
+      if (operation.updatedContent !== operation.originalContent) {
+        fileSystem.writeFileSync(operation.finalAbsolutePath, operation.updatedContent);
+        rewrittenFiles.push(operation);
+      }
+    }
   } catch (error) {
+    for (let index = rewrittenFiles.length - 1; index >= 0; index -= 1) {
+      const operation = rewrittenFiles[index];
+      try {
+        fileSystem.writeFileSync(operation.finalAbsolutePath, operation.originalContent);
+      } catch {
+        // Best-effort rollback; preserve the original failure as the surfaced error.
+      }
+    }
+
     for (let index = movedToFinal.length - 1; index >= 0; index -= 1) {
       const operation = movedToFinal[index];
       try {
@@ -360,7 +452,10 @@ function planReprioritization(repoRoot, options) {
   const { absolutePath: backlogDirAbsolute, relativePath: backlogDirRelative } = resolveSubdirectory(repoRoot, options.backlogDir);
   const mapping = readMappingFile(repoRoot, options.mappingFile);
   const files = listPrioritizedBacklogFiles(backlogDirAbsolute, backlogDirRelative);
-  const issues = validateMappingCoverage(mapping.entries, files);
+  const issues = [
+    ...validatePrioritizedFileSet(files),
+    ...validateMappingCoverage(mapping.entries, files),
+  ];
 
   if (issues.length > 0) {
     throw new Error(issues.join(" "));
@@ -439,7 +534,9 @@ module.exports = {
   parseMappingFile,
   readMappingFile,
   listPrioritizedBacklogFiles,
+  validatePrioritizedFileSet,
   validateMappingCoverage,
+  buildUpdatedContent,
   buildRenamePlan,
   executeRenamePlan,
   formatPlanSummary,
