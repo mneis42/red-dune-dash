@@ -6,6 +6,7 @@ const { createTestHarness } = require("../scripts/test-harness.js");
 
 const {
   parseArgs,
+  parseRawMappingEntries,
   parseMappingFile,
   planReprioritization,
   executeRenamePlan,
@@ -91,6 +92,26 @@ test("parseArgs reads mapping file, backlog dir, apply, and json options", () =>
 
 test("parseMappingFile rejects duplicate targets", () => {
   assert.throws(() => parseMappingFile('{"1":2,"2":2}'), /Duplicate target priorities/);
+});
+
+test("parseRawMappingEntries preserves duplicate source keys before JSON object collapse", () => {
+  const entries = parseRawMappingEntries('{"1":2,"1":3,"2":1}');
+
+  assert.deepEqual(
+    entries.map((entry) => [entry.rawFrom, entry.to]),
+    [
+      ["1", 2],
+      ["1", 3],
+      ["2", 1],
+    ]
+  );
+});
+
+test("parseMappingFile rejects duplicate source priorities from raw json content", () => {
+  assert.throws(
+    () => parseMappingFile('{"1":2,"1":3,"2":1}'),
+    /Duplicate source priorities are not allowed: 1/
+  );
 });
 
 test("planReprioritization builds deterministic dry-run summary", () => {

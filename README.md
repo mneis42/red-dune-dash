@@ -179,6 +179,30 @@ For machine-readable output, add `--json`:
 npm run backlog:branch -- --file backlog/<path-to-backlog-item>.md --json
 ```
 
+To reprioritize numbered backlog items with one deterministic mapping file instead of ad hoc shell renames, create a small JSON object with explicit old-to-new priority pairs and run a dry-run first:
+
+```json
+{
+  "21": 24,
+  "22": 21,
+  "23": 22,
+  "24": 23
+}
+```
+
+```powershell
+npm run backlog:reprioritize -- --mapping-file tmp/backlog-map.json
+```
+
+If the planned rename summary looks correct, apply the same mapping and then validate the repository backlog state:
+
+```powershell
+npm run backlog:reprioritize -- --mapping-file tmp/backlog-map.json --apply
+npm run backlog:lint
+```
+
+For script chaining or machine-readable inspection, add `--json` to the dry-run command. The reprioritize helper fails fast on incomplete mappings, duplicate source or target priorities, duplicate numbered backlog files, case-insensitive rename collisions, and renames that would leave backlog frontmatter lint-invalid after the move.
+
 The GitHub Actions workflows also run the same syntax and test steps before deployment.
 
 Core workflow verification in CI now runs as:

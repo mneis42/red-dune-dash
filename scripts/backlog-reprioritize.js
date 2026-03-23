@@ -43,6 +43,102 @@ function normalizeRepoRelative(candidatePath) {
   return String(candidatePath || "").replaceAll("\\", "/");
 }
 
+function splitTopLevelJsonMembers(rawText) {
+  const text = String(rawText || "").trim();
+  if (!text.startsWith("{") || !text.endsWith("}")) {
+    throw new Error("Mapping file must contain a JSON object with old priority numbers as keys.");
+  }
+
+  const body = text.slice(1, -1);
+  const members = [];
+  let current = "";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const character of body) {
+    if (escaped) {
+      current += character;
+      escaped = false;
+      continue;
+    }
+
+    if (character === "\\") {
+      current += character;
+      if (inString) {
+        escaped = true;
+      }
+      continue;
+    }
+
+    if (character === "\"") {
+      current += character;
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (character === "{" || character === "[") {
+        depth += 1;
+      } else if (character === "}" || character === "]") {
+        depth -= 1;
+      } else if (character === "," && depth === 0) {
+        if (current.trim()) {
+          members.push(current.trim());
+        }
+        current = "";
+        continue;
+      }
+    }
+
+    current += character;
+  }
+
+  if (current.trim()) {
+    members.push(current.trim());
+  }
+
+  return members.filter(Boolean);
+}
+
+function parseRawMappingEntries(content) {
+  const members = splitTopLevelJsonMembers(content);
+  const entries = [];
+
+  for (const member of members) {
+    const separatorIndex = member.indexOf(":");
+    if (separatorIndex === -1) {
+      throw new Error(`Invalid mapping entry: ${member}`);
+    }
+
+    const rawKey = member.slice(0, separatorIndex).trim();
+    const rawValue = member.slice(separatorIndex + 1).trim();
+
+    let parsedKey;
+    let parsedValue;
+    try {
+      parsedKey = JSON.parse(rawKey);
+    } catch (error) {
+      throw new Error(`Invalid mapping key ${rawKey}: ${error.message}`);
+    }
+
+    try {
+      parsedValue = JSON.parse(rawValue);
+    } catch (error) {
+      throw new Error(`Invalid mapping value for ${rawKey}: ${error.message}`);
+    }
+
+    entries.push({
+      from: Number.parseInt(parsedKey, 10),
+      to: Number.parseInt(parsedValue, 10),
+      rawFrom: String(parsedKey),
+      rawTo: parsedValue,
+    });
+  }
+
+  return entries;
+}
+
 function parseArgs(argv) {
   const options = {
     backlogDir: "backlog",
@@ -138,12 +234,7 @@ function parseMappingFile(content) {
     throw new Error("Mapping file must contain a JSON object with old priority numbers as keys.");
   }
 
-  const entries = Object.entries(parsed).map(([source, target]) => ({
-    from: Number.parseInt(source, 10),
-    to: Number.parseInt(target, 10),
-    rawFrom: source,
-    rawTo: target,
-  }));
+  const entries = parseRawMappingEntries(content);
 
   if (entries.length === 0) {
     throw new Error("Mapping file must define at least one old->new priority mapping.");
@@ -531,6 +622,8 @@ module.exports = {
   WINDOWS_RESERVED_SEGMENTS,
   hasWindowsReservedPathSegment,
   parseArgs,
+  splitTopLevelJsonMembers,
+  parseRawMappingEntries,
   parseMappingFile,
   readMappingFile,
   listPrioritizedBacklogFiles,
