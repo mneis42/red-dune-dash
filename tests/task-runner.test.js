@@ -82,7 +82,7 @@ test("runTestWorkflow aggregates counts and stops when max failures is reached",
   ]);
   assert.deepEqual(stdout, [
     "tests: 1 ok, 3 failed",
-    "Hint: rerun npm run test:verbose for detailed per-test output.",
+    "Hint: rerun npm run test:verbose for detailed output.",
   ]);
   assert.deepEqual(stderr, ["tests: stopped after 3 failures; not all tests ran."]);
 });
@@ -138,6 +138,7 @@ test("runTestWorkflow does not claim truncation when the last suite reaches the 
 test("runTestWorkflow fails when a suite exits non-zero without failed counts", async () => {
   const stdout = [];
   const stderr = [];
+  let callCount = 0;
 
   const exitCode = await runTestWorkflow(
     { mode: "compact", maxFailures: 5 },
@@ -149,6 +150,19 @@ test("runTestWorkflow fails when a suite exits non-zero without failed counts", 
         stderr.push(line);
       },
       async runTestSuite() {
+        callCount += 1;
+        if (callCount > 1) {
+          return {
+            exitCode: 0,
+            summary: {
+              suiteName: "test:service-worker",
+              total: 1,
+              counts: { ok: 1, failed: 0 },
+              truncated: false,
+            },
+          };
+        }
+
         return {
           exitCode: 1,
           summary: {
@@ -163,7 +177,10 @@ test("runTestWorkflow fails when a suite exits non-zero without failed counts", 
   );
 
   assert.equal(exitCode, 1);
-  assert.deepEqual(stdout, [`tests: ${TEST_SUITES.length} ok`]);
+  assert.deepEqual(stdout, [
+    `tests: ${TEST_SUITES.length} ok, 1 failed`,
+    "Hint: rerun npm run test:verbose for detailed output.",
+  ]);
   assert.deepEqual(stderr, []);
 });
 
@@ -205,12 +222,13 @@ test("runTestWorkflow keeps going after a rejected suite and reports the failure
   assert.match(stderr[1], /suite exploded/);
   assert.deepEqual(stdout, [
     `tests: ${TEST_SUITES.length - 1} ok, 1 failed`,
-    "Hint: rerun npm run test:verbose for detailed per-test output.",
+    "Hint: rerun npm run test:verbose for detailed output.",
   ]);
 });
 
 test("runVerifyWorkflow continues through later stages after failures", async () => {
   const executed = [];
+  let receivedRerunHint = null;
 
   const exitCode = await runVerifyWorkflow(
     { mode: "compact", maxFailures: 5 },
@@ -222,8 +240,9 @@ test("runVerifyWorkflow continues through later stages after failures", async ()
         }
         return { exitCode: 0 };
       },
-      async runTestWorkflow() {
+      async runTestWorkflow(_options, deps) {
         executed.push("workflow:test");
+        receivedRerunHint = deps.rerunHint;
         return 1;
       },
     }
@@ -237,6 +256,7 @@ test("runVerifyWorkflow continues through later stages after failures", async ()
     "scripts/docs-language-lint.js",
     "scripts/backlog-template-lint.js",
   ]);
+  assert.equal(receivedRerunHint, "npm run verify:verbose");
 });
 
 test("runVerifyWorkflow continues after rejected steps and reports runner failures", async () => {

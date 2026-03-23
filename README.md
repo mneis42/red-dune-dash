@@ -88,6 +88,8 @@ For the detailed per-test debugging view, use:
 npm run test:verbose
 ```
 
+Use that path when `npm test` or an individual suite fails and you want fuller per-test detail without rerunning the whole verification flow.
+
 For syntax validation, use:
 
 ```powershell
@@ -105,6 +107,8 @@ For the verbose verification path with per-test outcomes and richer debugging de
 ```powershell
 npm run verify:verbose
 ```
+
+Use that path when `npm run verify` fails and you want the full verification flow rerun with detailed output.
 
 To enforce the technical documentation language policy directly:
 

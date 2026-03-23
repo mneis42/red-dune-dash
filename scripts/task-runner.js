@@ -154,6 +154,7 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
   const executeSuite = dependencies.runTestSuite || runTestSuite;
   const writeStdout = dependencies.writeStdout || ((line) => process.stdout.write(`${line}\n`));
   const writeStderr = dependencies.writeStderr || ((line) => process.stderr.write(`${line}\n`));
+  const rerunHint = dependencies.rerunHint || "npm run test:verbose";
 
   const totalCounts = { ok: 0, failed: 0 };
   let truncated = false;
@@ -172,7 +173,10 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
         },
       }
     );
-    const counts = result.summary?.counts || { ok: 0, failed: result.exitCode === 0 ? 0 : 1 };
+    const counts = { ...(result.summary?.counts || { ok: 0, failed: 0 }) };
+    if (result.exitCode !== 0 && (counts.failed || 0) === 0) {
+      counts.failed = 1;
+    }
 
     totalCounts.ok += counts.ok || 0;
     totalCounts.failed += counts.failed || 0;
@@ -203,7 +207,7 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
     writeStderr(`tests: stopped after ${maxFailures} failures; not all tests ran.`);
   }
   if (mode === "compact" && totalCounts.failed > 0) {
-    writeStdout("Hint: rerun npm run test:verbose for detailed per-test output.");
+    writeStdout(`Hint: rerun ${rerunHint} for detailed output.`);
   }
 
   return exitCode !== 0 || totalCounts.failed > 0 ? 1 : 0;
@@ -218,7 +222,7 @@ async function runVerifyWorkflow({ mode, maxFailures }, dependencies = {}) {
   for (const step of VERIFY_STEPS) {
     if (step.type === "workflow") {
       const result = await invokeWithRejectionCapture(
-        () => executeTestWorkflow({ mode, maxFailures }, dependencies),
+        () => executeTestWorkflow({ mode, maxFailures }, { ...dependencies, rerunHint: "npm run verify:verbose" }),
         {}
       );
       const stepExitCode = result.exitCode ?? result;
