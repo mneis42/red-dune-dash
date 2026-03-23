@@ -44,6 +44,11 @@ function withTempRepo(callback) {
   }
 }
 
+function createSymlink(targetPath, linkPath, type) {
+  const linkType = type || (process.platform === "win32" ? "junction" : "dir");
+  fs.symlinkSync(targetPath, linkPath, linkType);
+}
+
 function createBacklogItemContent({ priority, title, extraFrontmatter = [] }) {
   return [
     "---",
@@ -314,6 +319,63 @@ test("runCli rejects apply when an internal temporary path already exists", () =
     assert.deepEqual(list("backlog"), ["1-alpha.md", "2-beta.md", "__tmp-reprioritize__-1-2-alpha.md"]);
     assert.equal(read("backlog/__tmp-reprioritize__-1-2-alpha.md"), "preexisting-temp\n");
   });
+});
+
+test("runCli rejects backlog directories that resolve outside the repository via symlink", () => {
+  const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rdd-backlog-reprioritize-external-"));
+
+  try {
+    withTempRepo(({ root, write, exists }) => {
+      fs.mkdirSync(path.join(externalRoot, "backlog"), { recursive: true });
+      fs.writeFileSync(
+        path.join(externalRoot, "backlog", "1-item.md"),
+        createBacklogItemContent({ priority: 1, title: "External item" })
+      );
+      write("mapping.json", JSON.stringify({ 1: 1 }, null, 2));
+      fs.mkdirSync(path.join(root, "links"), { recursive: true });
+      createSymlink(path.join(externalRoot, "backlog"), path.join(root, "links", "backlog-link"));
+
+      const stderr = [];
+      const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "links/backlog-link"], {
+        repoRoot: root,
+        writeStdout: () => {},
+        writeStderr: (line) => stderr.push(line),
+      });
+
+      assert.equal(exitCode, 1);
+      assert.match(stderr.join("\n"), /Backlog directory must resolve inside the repository root/);
+      assert.equal(exists("links/backlog-link"), true);
+      assert.equal(fs.existsSync(path.join(externalRoot, "backlog", "1-item.md")), true);
+    });
+  } finally {
+    fs.rmSync(externalRoot, { recursive: true, force: true });
+  }
+});
+
+test("runCli rejects mapping files that resolve outside the repository via symlink", () => {
+  const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rdd-backlog-reprioritize-external-"));
+
+  try {
+    withTempRepo(({ root, write }) => {
+      fs.writeFileSync(path.join(externalRoot, "mapping.json"), JSON.stringify({ 1: 1 }, null, 2));
+      write("backlog/1-item.md", createBacklogItemContent({ priority: 1, title: "Internal item" }));
+      fs.mkdirSync(path.join(root, "links"), { recursive: true });
+      createSymlink(path.join(externalRoot, "mapping.json"), path.join(root, "links", "mapping-link.json"), "file");
+
+      const stderr = [];
+      const exitCode = runCli(["--mapping-file", "links/mapping-link.json", "--backlog-dir", "backlog"], {
+        repoRoot: root,
+        writeStdout: () => {},
+        writeStderr: (line) => stderr.push(line),
+      });
+
+      assert.equal(exitCode, 1);
+      assert.match(stderr.join("\n"), /Mapping file must resolve inside the repository root/);
+      assert.equal(fs.existsSync(path.join(externalRoot, "mapping.json")), true);
+    });
+  } finally {
+    fs.rmSync(externalRoot, { recursive: true, force: true });
+  }
 });
 
 test("planReprioritization allows chained renames that rely on the temporary phase", () => {

@@ -44,6 +44,36 @@ function normalizeRepoRelative(candidatePath) {
   return String(candidatePath || "").replaceAll("\\", "/");
 }
 
+function isPathInside(parentPath, childPath) {
+  const relativePath = normalizeRepoRelative(path.relative(parentPath, childPath));
+  return relativePath === "" || (!relativePath.startsWith("../") && relativePath !== ".." && !relativePath.includes("/../"));
+}
+
+function resolveRealPathInsideRepo(repoRoot, candidatePath, label) {
+  let realRepoRoot;
+  try {
+    realRepoRoot = fs.realpathSync(repoRoot);
+  } catch (error) {
+    throw new Error(`Unable to resolve repository root for ${label}: ${error.message}`);
+  }
+
+  let realCandidatePath;
+  try {
+    realCandidatePath = fs.realpathSync(candidatePath);
+  } catch (error) {
+    throw new Error(`Unable to resolve ${label}: ${error.message}`);
+  }
+
+  if (!isPathInside(realRepoRoot, realCandidatePath)) {
+    throw new Error(`${label} must resolve inside the repository root.`);
+  }
+
+  return {
+    realRepoRoot,
+    realCandidatePath,
+  };
+}
+
 function splitTopLevelJsonMembers(rawText) {
   const text = String(rawText || "").trim();
   if (!text.startsWith("{") || !text.endsWith("}")) {
@@ -216,8 +246,10 @@ function resolveSubdirectory(repoRoot, dirPath) {
     throw new Error("Backlog directory must stay inside the repository.");
   }
 
+  const { realCandidatePath } = resolveRealPathInsideRepo(repoRoot, absolutePath, "Backlog directory");
+
   return {
-    absolutePath,
+    absolutePath: realCandidatePath,
     relativePath,
   };
 }
@@ -285,9 +317,11 @@ function readMappingFile(repoRoot, mappingFile) {
     throw new Error(`Mapping file not found: ${relativePath}`);
   }
 
+  const { realCandidatePath } = resolveRealPathInsideRepo(repoRoot, absolutePath, "Mapping file");
+
   return {
     path: relativePath,
-    entries: parseMappingFile(fs.readFileSync(absolutePath, "utf8")),
+    entries: parseMappingFile(fs.readFileSync(realCandidatePath, "utf8")),
   };
 }
 
@@ -642,6 +676,8 @@ module.exports = {
   PRIORITIZED_BACKLOG_PATTERN,
   TEMP_SEGMENT,
   WINDOWS_RESERVED_SEGMENTS,
+  isPathInside,
+  resolveRealPathInsideRepo,
   hasWindowsReservedPathSegment,
   parseArgs,
   splitTopLevelJsonMembers,
