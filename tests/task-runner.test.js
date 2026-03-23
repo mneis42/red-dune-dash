@@ -184,6 +184,52 @@ test("runTestWorkflow fails when a suite exits non-zero without failed counts", 
   assert.deepEqual(stderr, []);
 });
 
+test("runTestWorkflow treats a missing machine summary as a runner failure", async () => {
+  const stdout = [];
+  const stderr = [];
+  let callCount = 0;
+
+  const exitCode = await runTestWorkflow(
+    { mode: "compact", maxFailures: 5 },
+    {
+      writeStdout(line) {
+        stdout.push(line);
+      },
+      writeStderr(line) {
+        stderr.push(line);
+      },
+      async runTestSuite() {
+        callCount += 1;
+        if (callCount > 1) {
+          return {
+            exitCode: 0,
+            missingSummary: false,
+            summary: {
+              suiteName: "test:service-worker",
+              total: 1,
+              counts: { ok: 1, failed: 0 },
+              truncated: false,
+            },
+          };
+        }
+
+        return {
+          exitCode: 0,
+          missingSummary: true,
+          summary: null,
+        };
+      },
+    }
+  );
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(stdout, [
+    `tests: ${TEST_SUITES.length - 1} ok, 1 failed`,
+    "Hint: rerun npm run test:verbose for detailed output.",
+  ]);
+  assert.deepEqual(stderr, ["test:simulation: runner failure: missing machine summary"]);
+});
+
 test("runTestWorkflow keeps going after a rejected suite and reports the failure", async () => {
   const stdout = [];
   const stderr = [];

@@ -90,6 +90,8 @@ npm run test:verbose
 
 Use that path when `npm test` or an individual suite fails and you want fuller per-test detail without rerunning the whole verification flow.
 
+For a single suite such as `npm run test:simulation`, rerun the same underlying file with `RED_DUNE_TEST_OUTPUT=verbose node tests/<suite-file>.test.js` if you want suite-local verbose detail without running the full aggregate test command.
+
 For syntax validation, use:
 
 ```powershell

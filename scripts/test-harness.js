@@ -42,6 +42,15 @@ function isParentRunEnabled(rawValue) {
   return rawValue === "1";
 }
 
+function formatStandaloneVerboseHint() {
+  const scriptPath = process.argv[1];
+  if (scriptPath) {
+    return `Hint: rerun RED_DUNE_TEST_OUTPUT=verbose node ${scriptPath} for suite-local detail.`;
+  }
+
+  return "Hint: rerun the same suite with RED_DUNE_TEST_OUTPUT=verbose for suite-local detail.";
+}
+
 function createTestHarness(suiteName) {
   const tests = [];
 
@@ -91,7 +100,7 @@ function createTestHarness(suiteName) {
     if (!isParentRun) {
       console.log(formatOutcomeSummary(suiteName, summary.counts));
       if (mode === "compact" && summary.counts.failed > 0) {
-        console.log("Hint: rerun npm run test:verbose for detailed per-test output.");
+        console.log(formatStandaloneVerboseHint());
       }
     }
 
@@ -113,6 +122,7 @@ module.exports = {
   MACHINE_SUMMARY_PREFIX,
   createTestHarness,
   formatOutcomeSummary,
+  formatStandaloneVerboseHint,
   isParentRunEnabled,
   parseMaxFailures,
 };

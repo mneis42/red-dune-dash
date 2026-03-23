@@ -141,12 +141,8 @@ async function runTestSuite(suite, options) {
 
   return {
     exitCode: result.exitCode,
-    summary: summary || {
-      suiteName: suite.id,
-      total: 0,
-      counts: { ok: 0, failed: result.exitCode === 0 ? 0 : 1 },
-      truncated: false,
-    },
+    missingSummary: summary === null,
+    summary: summary || null,
   };
 }
 
@@ -165,6 +161,7 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
     const result = await invokeWithRejectionCapture(
       () => executeSuite(suite, { mode, remainingFailures }),
       {
+        missingSummary: false,
         summary: {
           suiteName: suite.id,
           total: 0,
@@ -174,6 +171,11 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
       }
     );
     const counts = { ...(result.summary?.counts || { ok: 0, failed: 0 }) };
+    if (result.missingSummary) {
+      counts.failed = Math.max(1, counts.failed || 0);
+      exitCode = 1;
+      writeStderr(`${suite.id}: runner failure: missing machine summary`);
+    }
     if (result.exitCode !== 0 && (counts.failed || 0) === 0) {
       counts.failed = 1;
     }
