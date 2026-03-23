@@ -108,7 +108,7 @@ Done criteria
 Verification performed
 
 - Decision updated on 2026-03-23 to immediate implementation.
-- Implemented compact-vs-verbose command contract in `package.json`, `scripts/task-runner.js`, and `tests/test-helpers.js`.
+- Implemented compact-vs-verbose command contract in `package.json`, `scripts/task-runner.js`, and `scripts/test-harness.js`.
 - Verified compact default with `npm test` and `npm run verify` on 2026-03-23.
 - Verified verbose per-test output with `RED_DUNE_TEST_OUTPUT=verbose node tests/simulation-core.test.js` on 2026-03-23.
 
@@ -216,7 +216,7 @@ Done criteria
 
 Verification performed
 
-- `npm test` passed on 2026-03-23 with one aggregate summary line: `tests: 207 ok`.
+- `npm test` passed on 2026-03-23 with one aggregate summary line: `tests: 209 ok`.
 - Verbose suite output was inspected on 2026-03-23 via `RED_DUNE_TEST_OUTPUT=verbose node tests/simulation-core.test.js`.
 
 Remaining risk / follow-up

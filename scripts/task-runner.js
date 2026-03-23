@@ -1,7 +1,7 @@
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 
-const { DEFAULT_MAX_FAILURES, MACHINE_SUMMARY_PREFIX, formatOutcomeSummary, parseMaxFailures } = require("../tests/test-helpers.js");
+const { DEFAULT_MAX_FAILURES, MACHINE_SUMMARY_PREFIX, formatOutcomeSummary, parseMaxFailures } = require("./test-harness.js");
 
 const TEST_SUITES = [
   { id: "test:simulation", file: "tests/simulation-core.test.js" },

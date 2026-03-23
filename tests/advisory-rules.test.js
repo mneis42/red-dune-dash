@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { createTestHarness } = require("./test-helpers.js");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 const {
   loadAdvisoryDocument,

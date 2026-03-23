@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { createTestHarness } = require("./test-helpers.js");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 // Make self an alias for globalThis for manifest propagation correctness
 const listeners = {};

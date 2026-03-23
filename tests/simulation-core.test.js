@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { createTestHarness } = require("./test-helpers.js");
+const { createTestHarness } = require("../scripts/test-harness.js");
 
 require("../systems/bug-lifecycle-system.js");
 require("../systems/debug-tools.js");

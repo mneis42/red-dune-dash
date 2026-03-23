@@ -19,7 +19,7 @@ const filesToCheck = [
   "scripts/instruction-lint.js",
   "scripts/pwa-local-smoke.js",
   "scripts/task-runner.js",
-  "tests/test-helpers.js"
+  "scripts/test-harness.js"
 ];
 
 for (const file of filesToCheck) {
