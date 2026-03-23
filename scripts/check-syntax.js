@@ -24,4 +24,4 @@ for (const file of filesToCheck) {
   execFileSync(process.execPath, ["--check", file], { stdio: "inherit" });
 }
 
-console.log(`Checked ${filesToCheck.length} JavaScript files.`);
+console.log(`check: ok (${filesToCheck.length} JavaScript files checked)`);

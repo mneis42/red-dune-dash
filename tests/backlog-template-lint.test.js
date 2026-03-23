@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { createTestHarness } = require("./test-helpers.js");
 
 const {
   parseFrontmatter,
@@ -10,11 +11,7 @@ const {
   runBacklogTemplateLint,
 } = require("../scripts/backlog-template-lint.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:backlog-lint");
 
 function withTempRepo(callback) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdd-backlog-lint-"));
@@ -664,21 +661,4 @@ test("runBacklogTemplateLint rejects open-vs-done collisions for feature-request
   });
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

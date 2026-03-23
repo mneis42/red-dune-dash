@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createTestHarness } = require("./test-helpers.js");
 
 const {
   parseArgs,
@@ -10,11 +11,7 @@ const {
   runPushWithVerification,
 } = require("../scripts/agent-git-guard.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:git-guard");
 
 test("parseArgs reads command and git args after separator", () => {
   const result = parseArgs(["commit", "--", "-m", "test"]);
@@ -345,21 +342,4 @@ test("runPushWithVerification fails when the remote ref still lags after retry",
   assert.match(result.message, /verification still failed/);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

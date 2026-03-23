@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const { createTestHarness } = require("./test-helpers.js");
 
 const {
   parseScope,
@@ -12,14 +13,10 @@ const {
   formatHumanReadable,
 } = require("../scripts/agent-preflight.js");
 
-const tests = [];
+const { test, run } = createTestHarness("test:preflight");
 
 function normalizePath(candidatePath) {
   return String(candidatePath || "").replace(/\\/g, "/");
-}
-
-function test(name, fn) {
-  tests.push({ name, fn });
 }
 
 function createAdvisoryResult(perFile, matchedRules, mergedAreas, mergedRiskTags = []) {
@@ -541,21 +538,4 @@ test("human output keeps section order deterministic", () => {
   }
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

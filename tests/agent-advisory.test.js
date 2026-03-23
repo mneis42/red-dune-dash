@@ -2,12 +2,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { createTestHarness } = require("./test-helpers.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:agent-advisory");
 
 function loadCliModuleFresh() {
   const modulePath = require.resolve("../scripts/agent-advisory.js");
@@ -616,21 +613,4 @@ test("main returns non-zero for invalid advisory rules without exiting host proc
   assert.equal(errors.some((line) => line.includes("Invalid advisory rules in")), true);
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createTestHarness } = require("./test-helpers.js");
 
 const {
   loadAdvisoryDocument,
@@ -8,11 +9,7 @@ const {
   resolveAdvisoryForFiles,
 } = require("../scripts/advisory-rules.js");
 
-const tests = [];
-
-function test(name, fn) {
-  tests.push({ name, fn });
-}
+const { test, run } = createTestHarness("test:advisory-rules");
 
 test("advisory rules file validates successfully", () => {
   const { document } = loadAdvisoryDocument();
@@ -248,21 +245,4 @@ test("validateAdvisoryDocument rejects duplicate stage 3 candidate gate ids", ()
   );
 });
 
-async function runTests() {
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      console.error(`not ok - ${name}`);
-      console.error(error);
-      process.exitCode = 1;
-    }
-  }
-}
-
-runTests().catch((error) => {
-  console.error("not ok - unhandled test runner failure");
-  console.error(error);
-  process.exitCode = 1;
-});
+run();

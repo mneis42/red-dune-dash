@@ -82,6 +82,12 @@ Run the existing checks locally with npm:
 npm test
 ```
 
+For the detailed per-test debugging view, use:
+
+```powershell
+npm run test:verbose
+```
+
 For syntax validation, use:
 
 ```powershell
@@ -92,6 +98,12 @@ To run the full local verification flow:
 
 ```powershell
 npm run verify
+```
+
+For the verbose verification path with per-test outcomes and richer debugging detail:
+
+```powershell
+npm run verify:verbose
 ```
 
 To enforce the technical documentation language policy directly:

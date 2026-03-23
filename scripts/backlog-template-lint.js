@@ -358,22 +358,15 @@ function runBacklogTemplateLint(options = {}) {
 }
 
 function formatResult(result) {
-  const lines = [];
-
-  if (result.files.length === 0) {
-    lines.push("backlog-template-lint: no in-scope backlog files found.");
-  } else {
-    lines.push(`backlog-template-lint: checked ${result.files.length} in-scope backlog files.`);
-  }
-  lines.push(`backlog-template-lint: checked ${result.doneFiles.length} done backlog files.`);
-
   if (result.issues.length === 0) {
-    lines.push("backlog-template-lint: OK");
-  } else {
-    lines.push(`backlog-template-lint: FAILED (${result.issues.length} issues)`);
-    for (const issue of result.issues) {
-      lines.push(`- ${issue}`);
-    }
+    return `backlog:lint: ok (${result.files.length} open files, ${result.doneFiles.length} done files checked)`;
+  }
+
+  const lines = [];
+  lines.push(`backlog:lint: FAILED (${result.issues.length} issues)`);
+  lines.push(`backlog:lint: checked ${result.files.length} open files and ${result.doneFiles.length} done files.`);
+  for (const issue of result.issues) {
+    lines.push(`- ${issue}`);
   }
 
   return lines.join("\n");
