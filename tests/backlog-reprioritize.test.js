@@ -300,6 +300,25 @@ test("runCli rejects duplicate prioritized numbers instead of silently picking o
   });
 });
 
+test("runCli treats uppercase .MD backlog files as existing numbered files for collision coverage", () => {
+  withTempRepo(({ root, write, list }) => {
+    write("backlog/1-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-ALPHA.MD", createBacklogItemContent({ priority: 2, title: "ALPHA" }));
+    write("mapping.json", JSON.stringify({ 1: 2 }, null, 2));
+
+    const stderr = [];
+    const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "backlog"], {
+      repoRoot: root,
+      writeStdout: () => {},
+      writeStderr: (line) => stderr.push(line),
+    });
+
+    assert.equal(exitCode, 1);
+    assert.match(stderr.join("\n"), /Missing mapping for prioritized backlog file backlog\/2-ALPHA\.MD/);
+    assert.deepEqual(list("backlog"), ["1-alpha.md", "2-ALPHA.MD"]);
+  });
+});
+
 test("runCli rejects apply when an internal temporary path already exists", () => {
   withTempRepo(({ root, write, list, read }) => {
     write("backlog/1-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));

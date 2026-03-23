@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { parseFrontmatter } = require("./backlog-template-lint.js");
 
-const PRIORITIZED_BACKLOG_PATTERN = /^(\d+)-(.+)\.md$/;
+const PRIORITIZED_BACKLOG_PATTERN = /^(\d+)-(.+)\.md$/i;
 const TEMP_SEGMENT = "__tmp-reprioritize__";
 const ENHANCED_METADATA_MIN_ITEM_NUMBER = 12;
 const BACKLOG_ITEM_REQUIRED_FIELDS = ["workflow_type", "source", "priority", "status", "created_at"];
@@ -332,7 +332,7 @@ function listPrioritizedBacklogFiles(backlogDirAbsolute, backlogDirRelative) {
 
   return fs
     .readdirSync(backlogDirAbsolute, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md"))
     .map((entry) => {
       const match = entry.name.match(PRIORITIZED_BACKLOG_PATTERN);
       if (!match) {
@@ -464,6 +464,7 @@ function buildRenamePlan(entries, files, backlogDirRelative) {
   const destinationPaths = [];
   const tempPaths = [];
   const operations = [];
+  const backlogDirAbsolute = files[0] ? path.dirname(files[0].absolutePath) : null;
 
   if (hasWindowsReservedPathSegment(backlogDirRelative)) {
     throw new Error(`Backlog directory uses a Windows-reserved path segment: ${backlogDirRelative}`);
@@ -509,16 +510,25 @@ function buildRenamePlan(entries, files, backlogDirRelative) {
   }
 
   const sourcePathSet = new Set(files.map((file) => file.relativePath.toLowerCase()));
+  const existingPathSet = new Set(
+    (backlogDirAbsolute
+      ? fs
+          .readdirSync(backlogDirAbsolute, { withFileTypes: true })
+          .filter((entry) => entry.isFile())
+          .map((entry) => normalizeRepoRelative(path.join(backlogDirRelative, entry.name)).toLowerCase())
+      : [])
+  );
+
   for (const operation of operations) {
     if (
-      fs.existsSync(operation.tempAbsolutePath) &&
+      existingPathSet.has(operation.tempPath.toLowerCase()) &&
       !sourcePathSet.has(operation.tempPath.toLowerCase())
     ) {
       throw new Error(`Temporary path already exists and would be overwritten: ${operation.tempPath}`);
     }
 
     if (
-      fs.existsSync(operation.finalAbsolutePath) &&
+      existingPathSet.has(operation.finalPath.toLowerCase()) &&
       !sourcePathSet.has(operation.finalPath.toLowerCase())
     ) {
       throw new Error(`Target path already exists outside the provided mapping: ${operation.finalPath}`);
