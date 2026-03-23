@@ -5,6 +5,7 @@ const { parseFrontmatter } = require("./backlog-template-lint.js");
 const PRIORITIZED_BACKLOG_PATTERN = /^(\d+)-(.+)\.md$/;
 const TEMP_SEGMENT = "__tmp-reprioritize__";
 const ENHANCED_METADATA_MIN_ITEM_NUMBER = 12;
+const BACKLOG_ITEM_REQUIRED_FIELDS = ["workflow_type", "source", "priority", "status", "created_at"];
 const BACKLOG_ITEM_NEW_REQUIRED_FIELDS = ["planning_model", "execution_model", "last_updated"];
 const WINDOWS_RESERVED_SEGMENTS = new Set([
   "con",
@@ -402,8 +403,12 @@ function buildUpdatedContent(file, nextPriority) {
     return file.content;
   }
 
-  if (!parsedFrontmatter.map.priority) {
-    throw new Error(`${file.relativePath}: missing frontmatter field priority; reprioritize cannot keep file lint-valid.`);
+  for (const field of BACKLOG_ITEM_REQUIRED_FIELDS) {
+    if (!parsedFrontmatter.map[field]) {
+      throw new Error(
+        `${file.relativePath}: missing frontmatter field ${field}; reprioritize cannot keep file lint-valid.`
+      );
+    }
   }
 
   if (nextPriority >= ENHANCED_METADATA_MIN_ITEM_NUMBER) {
@@ -460,13 +465,6 @@ function buildRenamePlan(entries, files, backlogDirRelative) {
   const duplicateDestinations = destinationPaths.filter((value, index) => destinationPaths.indexOf(value) !== index);
   if (duplicateDestinations.length > 0) {
     throw new Error(`Multiple renames would collide on the same target path: ${stableUnique(duplicateDestinations).join(", ")}.`);
-  }
-
-  const sourceLowercase = new Set(files.map((file) => file.relativePath.toLowerCase()));
-  for (const operation of operations) {
-    if (sourceLowercase.has(operation.finalPath.toLowerCase()) && operation.sourcePath.toLowerCase() !== operation.finalPath.toLowerCase()) {
-      throw new Error(`Case-insensitive target collision detected for ${operation.finalPath}.`);
-    }
   }
 
   return operations;

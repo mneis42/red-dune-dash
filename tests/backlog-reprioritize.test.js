@@ -295,22 +295,112 @@ test("runCli rejects duplicate prioritized numbers instead of silently picking o
   });
 });
 
-test("runCli rejects case-collision targets explicitly", () => {
-  withTempRepo(({ root, write, list }) => {
-    write("backlog/1-todo-Alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
-    write("backlog/2-todo-alpha.md", createBacklogItemContent({ priority: 2, title: "alpha" }));
-    write("mapping.json", JSON.stringify({ 1: 2, 2: 1 }, null, 2));
+test("planReprioritization allows chained renames that rely on the temporary phase", () => {
+  withTempRepo(({ root, write }) => {
+    write("backlog/1-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-alpha.md", createBacklogItemContent({ priority: 2, title: "Alpha follow-up" }));
+    write("backlog/3-beta.md", createBacklogItemContent({ priority: 3, title: "Beta" }));
+    write("mapping.json", JSON.stringify({ 1: 2, 2: 3, 3: 1 }, null, 2));
+
+    const result = planReprioritization(root, {
+      backlogDir: "backlog",
+      mappingFile: "mapping.json",
+      apply: false,
+    });
+
+    assert.equal(result.operations.length, 3);
+    assert.deepEqual(
+      result.operations.map((entry) => [entry.sourcePath, entry.finalPath]),
+      [
+        ["backlog/1-alpha.md", "backlog/2-alpha.md"],
+        ["backlog/2-alpha.md", "backlog/3-alpha.md"],
+        ["backlog/3-beta.md", "backlog/1-beta.md"],
+      ]
+    );
+  });
+});
+
+test("runCli apply supports chained renames that temporarily target another source path", () => {
+  withTempRepo(({ root, write, list, exists }) => {
+    write("backlog/1-alpha.md", createBacklogItemContent({ priority: 1, title: "Alpha" }));
+    write("backlog/2-alpha.md", createBacklogItemContent({ priority: 2, title: "Alpha follow-up" }));
+    write("backlog/3-beta.md", createBacklogItemContent({ priority: 3, title: "Beta" }));
+    write("mapping.json", JSON.stringify({ 1: 2, 2: 3, 3: 1 }, null, 2));
+
+    const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "backlog", "--apply"], {
+      repoRoot: root,
+      writeStdout: () => {},
+      writeStderr: () => {},
+    });
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(list("backlog"), ["1-beta.md", "2-alpha.md", "3-alpha.md"]);
+    assert.equal(exists("backlog/2-alpha.md"), true);
+    assert.equal(exists("backlog/3-alpha.md"), true);
+    assert.equal(exists("backlog/1-beta.md"), true);
+    assert.deepEqual(validateBacklogFile(root, "backlog/1-beta.md"), []);
+    assert.deepEqual(validateBacklogFile(root, "backlog/2-alpha.md"), []);
+    assert.deepEqual(validateBacklogFile(root, "backlog/3-alpha.md"), []);
+  });
+});
+
+test("runCli rejects apply when a backlog-item is already missing created_at", () => {
+  withTempRepo(({ root, write, exists, read }) => {
+    write(
+      "backlog/11-todo-alpha.md",
+      [
+        "---",
+        "workflow_type: backlog-item",
+        "source: test",
+        "priority: 11",
+        "status: open",
+        "---",
+        "",
+        "# TODO: Alpha",
+        "",
+        "## Goal",
+        "x",
+        "",
+        "## Scope",
+        "- x",
+        "",
+        "## Out Of Scope",
+        "- x",
+        "",
+        "## Acceptance Criteria",
+        "- x",
+        "",
+        "## Suggested Verification",
+        "- x",
+        "",
+        "## Notes",
+        "- x",
+        "",
+      ].join("\n")
+    );
+    write(
+      "backlog/12-todo-beta.md",
+      createBacklogItemContent({
+        priority: 12,
+        title: "Beta",
+        extraFrontmatter: ["planning_model: GPT-5.4", "execution_model: GPT-5.4", "last_updated: 2026-03-23"],
+      })
+    );
+    write("mapping.json", JSON.stringify({ 11: 12, 12: 11 }, null, 2));
 
     const stderr = [];
-    const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "backlog"], {
+    const exitCode = runCli(["--mapping-file", "mapping.json", "--backlog-dir", "backlog", "--apply"], {
       repoRoot: root,
       writeStdout: () => {},
       writeStderr: (line) => stderr.push(line),
     });
 
     assert.equal(exitCode, 1);
-    assert.match(stderr.join("\n"), /Case-insensitive target collision detected/);
-    assert.deepEqual(list("backlog"), ["1-todo-Alpha.md", "2-todo-alpha.md"]);
+    assert.match(stderr.join("\n"), /missing frontmatter field created_at/);
+    assert.equal(exists("backlog/11-todo-alpha.md"), true);
+    assert.equal(exists("backlog/12-todo-beta.md"), true);
+    assert.match(read("backlog/11-todo-alpha.md"), /^priority: 11$/m);
+    assert.match(read("backlog/12-todo-beta.md"), /^priority: 12$/m);
   });
 });
 
