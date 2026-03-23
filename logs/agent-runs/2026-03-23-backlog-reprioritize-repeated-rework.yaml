@@ -1,0 +1,24 @@
+date: 2026-03-23
+task_type: backlog-item-implementation
+short_goal: Implement deterministic backlog reprioritize tooling and fixture tests
+changed_files:
+  - README.md
+  - package.json
+  - scripts/backlog-reprioritize.js
+  - scripts/task-runner.js
+  - tests/backlog-reprioritize.test.js
+  - backlog/done/20260323-185247-add-deterministic-backlog-reprioritize-script.md
+  - backlog/done/20260323-185248-add-backlog-reprioritize-fixture-tests.md
+checks:
+  - name: npm run check
+    outcome: pass
+  - name: npm test
+    outcome: pass
+  - name: npm run backlog:lint
+    outcome: pass
+  - name: npm run verify
+    outcome: pass
+friction_category: repeated-rework
+human_correction_needed: false
+missing_or_misleading_guardrail: Initial reprioritize guardrails and tests missed several filesystem, rollback, collision, and path-boundary edge cases that only surfaced after multiple review rounds.
+improvement_proposal: Add adversarial failure-path and cross-platform path-safety fixtures before marking new workflow tooling as PR-ready.
