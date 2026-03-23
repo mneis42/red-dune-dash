@@ -230,6 +230,55 @@ test("runTestWorkflow treats a missing machine summary as a runner failure", asy
   assert.deepEqual(stderr, ["test:simulation: runner failure: missing machine summary"]);
 });
 
+test("runTestWorkflow treats an invalid machine summary as a runner failure", async () => {
+  const stdout = [];
+  const stderr = [];
+  let callCount = 0;
+
+  const exitCode = await runTestWorkflow(
+    { mode: "compact", maxFailures: 5 },
+    {
+      writeStdout(line) {
+        stdout.push(line);
+      },
+      writeStderr(line) {
+        stderr.push(line);
+      },
+      async runTestSuite() {
+        callCount += 1;
+        if (callCount > 1) {
+          return {
+            exitCode: 0,
+            invalidSummaryError: null,
+            missingSummary: false,
+            summary: {
+              suiteName: "test:service-worker",
+              total: 1,
+              counts: { ok: 1, failed: 0 },
+              truncated: false,
+            },
+          };
+        }
+
+        return {
+          exitCode: 0,
+          invalidSummaryError: new SyntaxError("Unexpected token } in JSON at position 1"),
+          missingSummary: false,
+          summary: null,
+        };
+      },
+    }
+  );
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(stdout, [
+    `tests: ${TEST_SUITES.length - 1} ok, 1 failed`,
+    "Hint: rerun npm run test:verbose for detailed output.",
+  ]);
+  assert.equal(stderr[0], "test:simulation: runner failure: invalid machine summary");
+  assert.match(stderr[1], /Unexpected token/);
+});
+
 test("runTestWorkflow keeps going after a rejected suite and reports the failure", async () => {
   const stdout = [];
   const stderr = [];

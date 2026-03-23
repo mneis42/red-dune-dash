@@ -119,6 +119,7 @@ async function invokeWithRejectionCapture(callback, fallback = {}) {
 
 async function runTestSuite(suite, options) {
   let summary = null;
+  let invalidSummaryError = null;
   const { mode, remainingFailures } = options;
 
   const result = await runNodeFile(suite.file, {
@@ -129,7 +130,11 @@ async function runTestSuite(suite, options) {
     },
     onStdoutLine(line) {
       if (line.startsWith(MACHINE_SUMMARY_PREFIX)) {
-        summary = JSON.parse(line.slice(MACHINE_SUMMARY_PREFIX.length));
+        try {
+          summary = JSON.parse(line.slice(MACHINE_SUMMARY_PREFIX.length));
+        } catch (error) {
+          invalidSummaryError = error;
+        }
         return;
       }
       process.stdout.write(`${line}\n`);
@@ -141,7 +146,8 @@ async function runTestSuite(suite, options) {
 
   return {
     exitCode: result.exitCode,
-    missingSummary: summary === null,
+    invalidSummaryError,
+    missingSummary: summary === null && invalidSummaryError === null,
     summary: summary || null,
   };
 }
@@ -171,6 +177,12 @@ async function runTestWorkflow({ mode, maxFailures }, dependencies = {}) {
       }
     );
     const counts = { ...(result.summary?.counts || { ok: 0, failed: 0 }) };
+    if (result.invalidSummaryError) {
+      counts.failed = Math.max(1, counts.failed || 0);
+      exitCode = 1;
+      writeStderr(`${suite.id}: runner failure: invalid machine summary`);
+      writeStderr(result.invalidSummaryError.stack || String(result.invalidSummaryError));
+    }
     if (result.missingSummary) {
       counts.failed = Math.max(1, counts.failed || 0);
       exitCode = 1;
