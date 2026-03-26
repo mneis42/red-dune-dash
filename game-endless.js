@@ -24,6 +24,9 @@ const CLOUD_RESPAWN_MAX_GAP = 260;
 const GEM_VALUE_CENTS = 10;
 const FRAME_DURATION_MS = 1000 / 60;
 const JUMP_BUTTON_GLOW_DURATION_MS = Math.round(8 * FRAME_DURATION_MS);
+// Maximum number of consecutive jumps the tiger can perform before landing.
+// Set to 2 to allow exactly one double-jump per airborne sequence.
+const MAX_JUMPS = 2;
 const INVINCIBILITY_BLINK_INTERVAL_MS = Math.round(5 * FRAME_DURATION_MS);
 const scoreConfig = {
   gemPickup: 30,
@@ -2615,6 +2618,9 @@ function handleMovement(delta) {
       player.y = platform.y - player.h;
       player.vy = 0;
       player.grounded = true;
+      // Reset the jump counter when the tiger lands so the next airborne
+      // sequence starts fresh and double-jump is available again.
+      player.jumpsUsed = 0;
       updateCheckpoint(platform);
       return;
     }
@@ -3563,7 +3569,9 @@ function gameLoop(time) {
 }
 
 /**
- * Starts the run from the ready state or makes the tiger jump when grounded.
+ * Starts the run from the ready state or makes the tiger jump.
+ * The tiger can jump once from the ground and once more while airborne
+ * (double jump), but no more than MAX_JUMPS times per airborne sequence.
  */
 function tryJump() {
   if (isPortraitMobileView()) {
@@ -3585,9 +3593,11 @@ function tryJump() {
   if (gameState !== "playing") {
     return;
   }
-  if (player.grounded) {
+  // Allow a jump if the tiger is grounded OR has jumps remaining for a double-jump.
+  if (player.grounded || player.jumpsUsed < MAX_JUMPS) {
     player.vy = player.jumpPower;
     player.grounded = false;
+    player.jumpsUsed += 1;
   }
 }
 
